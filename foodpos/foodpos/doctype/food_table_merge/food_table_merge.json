@@ -1,0 +1,113 @@
+{
+ "actions": [],
+ "autoname": "FTMRG-.YYYY.-.#####",
+ "creation": "2026-10-13 10:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "branch",
+  "primary_table",
+  "merged_at",
+  "column_break_1",
+  "status",
+  "unmerged_at",
+  "section_secondary",
+  "secondary_tables"
+ ],
+ "fields": [
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Branch",
+   "options": "Branch",
+   "reqd": 1
+  },
+  {
+   "fieldname": "primary_table",
+   "fieldtype": "Link",
+   "label": "Primary Table",
+   "options": "Restaurant Table",
+   "reqd": 1,
+   "in_list_view": 1,
+   "description": "The billing table — all charges will appear under this table."
+  },
+  {
+   "fieldname": "merged_at",
+   "fieldtype": "Datetime",
+   "label": "Merged At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Active\nUnmerged",
+   "default": "Active",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "unmerged_at",
+   "fieldtype": "Datetime",
+   "label": "Unmerged At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_secondary",
+   "fieldtype": "Section Break",
+   "label": "Secondary Tables"
+  },
+  {
+   "fieldname": "secondary_tables",
+   "fieldtype": "Table",
+   "label": "Secondary Tables",
+   "options": "Food Table Merge Secondary",
+   "reqd": 1,
+   "description": "Tables physically joined to the primary table."
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "is_submittable": 0,
+ "links": [],
+ "modified": "2026-10-13 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Foodpos",
+ "name": "Food Table Merge",
+ "naming_rule": "Expression (old style)",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "read": 1,
+   "role": "System Manager",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 0,
+   "read": 1,
+   "role": "Sales Manager",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 0,
+   "read": 1,
+   "role": "Sales User",
+   "write": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "primary_table",
+ "track_changes": 1
+}

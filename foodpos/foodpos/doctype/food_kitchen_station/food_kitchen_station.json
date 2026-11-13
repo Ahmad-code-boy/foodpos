@@ -1,0 +1,113 @@
+{
+ "actions": [],
+ "autoname": "format:{branch}-{station_name}",
+ "creation": "2026-11-03 10:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "station_name",
+  "branch",
+  "column_break_1",
+  "is_active",
+  "printer_name"
+ ],
+ "fields": [
+  {
+   "fieldname": "station_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Station Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Branch",
+   "options": "Branch",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Is Active"
+  },
+  {
+   "fieldname": "printer_name",
+   "fieldtype": "Data",
+   "label": "Kitchen Printer Name / IP"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "is_submittable": 0,
+ "links": [],
+ "modified": "2026-11-03 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Foodpos",
+ "name": "Food Kitchen Station",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Branch Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 0,
+   "delete": 0,
+   "email": 1,
+   "export": 0,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Kitchen User",
+   "share": 0,
+   "write": 0
+  },
+  {
+   "create": 0,
+   "delete": 0,
+   "email": 1,
+   "export": 0,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "POS Cashier",
+   "share": 0,
+   "write": 0
+  }
+ ],
+ "sort_field": "station_name",
+ "sort_order": "ASC",
+ "states": [],
+ "title_field": "station_name",
+ "track_changes": 1
+}
+

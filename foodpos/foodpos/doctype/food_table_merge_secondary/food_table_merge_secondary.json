@@ -1,0 +1,51 @@
+{
+ "actions": [],
+ "creation": "2026-10-13 10:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "table",
+  "table_no",
+  "section"
+ ],
+ "fields": [
+  {
+   "fieldname": "table",
+   "fieldtype": "Link",
+   "label": "Table",
+   "options": "Restaurant Table",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "table_no",
+   "fieldtype": "Data",
+   "label": "Table No",
+   "fetch_from": "table.table_no",
+   "fetch_if_empty": 1,
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "section",
+   "fieldtype": "Data",
+   "label": "Section",
+   "fetch_from": "table.section",
+   "fetch_if_empty": 1,
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-10-13 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Foodpos",
+ "name": "Food Table Merge Secondary",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

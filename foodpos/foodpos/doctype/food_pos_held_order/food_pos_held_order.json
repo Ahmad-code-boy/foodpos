@@ -1,0 +1,212 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "creation": "2026-11-03 16:09:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "status",
+  "branch",
+  "pos_profile",
+  "pos_opening_entry",
+  "cashier",
+  "column_break_1",
+  "order_type",
+  "table",
+  "customer",
+  "customer_name",
+  "phone",
+  "delivery_address",
+  "delivery_charges",
+  "section_break_totals",
+  "grand_total",
+  "hold_reason",
+  "section_break_data",
+  "order_data"
+ ],
+ "fields": [
+  {
+   "default": "Held",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Held\nResumed\nDiscarded",
+   "reqd": 1
+  },
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Branch",
+   "options": "Branch"
+  },
+  {
+   "fieldname": "pos_profile",
+   "fieldtype": "Link",
+   "label": "POS Profile",
+   "options": "POS Profile"
+  },
+  {
+   "fieldname": "pos_opening_entry",
+   "fieldtype": "Link",
+   "label": "POS Opening Entry",
+   "options": "POS Opening Entry"
+  },
+  {
+   "fieldname": "cashier",
+   "fieldtype": "Link",
+   "label": "Cashier",
+   "options": "User"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Dine In",
+   "fieldname": "order_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Order Type",
+   "options": "Dine In\nTakeaway\nDelivery"
+  },
+  {
+   "fieldname": "table",
+   "fieldtype": "Link",
+   "label": "Table",
+   "options": "Restaurant Table"
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "label": "Customer",
+   "options": "Customer"
+  },
+  {
+   "fieldname": "customer_name",
+   "fieldtype": "Data",
+   "label": "Customer Name"
+  },
+  {
+   "fieldname": "phone",
+   "fieldtype": "Data",
+   "label": "Phone"
+  },
+  {
+   "fieldname": "delivery_address",
+   "fieldtype": "Small Text",
+   "label": "Delivery Address"
+  },
+  {
+   "default": "0",
+   "fieldname": "delivery_charges",
+   "fieldtype": "Currency",
+   "label": "Delivery Charges"
+  },
+  {
+   "fieldname": "section_break_totals",
+   "fieldtype": "Section Break",
+   "label": "Totals"
+  },
+  {
+   "default": "0",
+   "fieldname": "grand_total",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Grand Total"
+  },
+  {
+   "fieldname": "hold_reason",
+   "fieldtype": "Data",
+   "label": "Hold Reason"
+  },
+  {
+   "fieldname": "section_break_data",
+   "fieldtype": "Section Break",
+   "label": "Order Payload"
+  },
+  {
+   "fieldname": "order_data",
+   "fieldtype": "Long Text",
+   "label": "Order Data (JSON)"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-11-03 16:09:00.000000",
+ "modified_by": "Administrator",
+ "module": "foodpos",
+ "name": "Food POS Held Order",
+ "naming_rule": "By script",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Food POS Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "POS Cashier",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "POS User",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Food POS User",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
+

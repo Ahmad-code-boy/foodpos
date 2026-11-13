@@ -1,0 +1,233 @@
+{
+ "actions": [],
+ "autoname": "format:{branch}-{table_no}",
+ "creation": "2026-10-09 10:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "branch",
+  "table_no",
+  "section",
+  "capacity",
+  "column_break_1",
+  "status",
+  "disabled",
+  "section_occupancy",
+  "occupied_since",
+  "order_id",
+  "guests",
+  "waiter",
+  "section_reservation",
+  "reservation_name",
+  "reservation_time",
+  "mobile",
+  "notes",
+  "section_charges",
+  "cover_charge",
+  "service_charge_percent"
+ ],
+ "fields": [
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Branch",
+   "options": "Branch",
+   "reqd": 1
+  },
+  {
+   "fieldname": "table_no",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Table No",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Section",
+   "default": "Main Floor"
+  },
+  {
+   "fieldname": "capacity",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Seating Capacity",
+   "default": "4",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Available",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Available\nOccupied\nReserved\nCleaning",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "disabled",
+   "fieldtype": "Check",
+   "label": "Disabled"
+  },
+  {
+   "fieldname": "section_occupancy",
+   "fieldtype": "Section Break",
+   "label": "Occupancy Info"
+  },
+  {
+   "fieldname": "occupied_since",
+   "fieldtype": "Datetime",
+   "label": "Occupied Since",
+   "read_only": 0
+  },
+  {
+   "fieldname": "order_id",
+   "fieldtype": "Data",
+   "label": "Current Order ID"
+  },
+  {
+   "fieldname": "guests",
+   "fieldtype": "Int",
+   "label": "Number of Guests",
+   "default": "0"
+  },
+  {
+   "fieldname": "waiter",
+   "fieldtype": "Data",
+   "label": "Assigned Waiter"
+  },
+  {
+   "fieldname": "section_reservation",
+   "fieldtype": "Section Break",
+   "label": "Reservation / Notes"
+  },
+  {
+   "fieldname": "reservation_name",
+   "fieldtype": "Data",
+   "label": "Reservation Name",
+   "description": "Name of the customer who made the reservation"
+  },
+  {
+   "fieldname": "reservation_time",
+   "fieldtype": "Datetime",
+   "label": "Reservation Time",
+   "description": "Scheduled arrival time for the reservation"
+  },
+  {
+   "fieldname": "mobile",
+   "fieldtype": "Data",
+   "label": "Mobile Number",
+   "description": "Contact mobile number for the reservation"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  },
+  {
+   "fieldname": "section_charges",
+   "fieldtype": "Section Break",
+   "label": "Table Charges",
+   "collapsible": 1,
+   "description": "Optional per-table surcharges applied automatically to orders at this table"
+  },
+  {
+   "fieldname": "cover_charge",
+   "fieldtype": "Currency",
+   "label": "Cover Charge (per guest)",
+   "default": "0",
+   "description": "Fixed charge per seated guest (e.g. bread/butter cover). Set 0 to disable."
+  },
+  {
+   "fieldname": "service_charge_percent",
+   "fieldtype": "Percent",
+   "label": "Service Charge %",
+   "default": "0",
+   "description": "Percentage service charge applied to the order total at checkout. Set 0 to disable."
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-10-23 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Foodpos",
+ "name": "Restaurant Table",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Food POS Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "POS Cashier",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Food POS User",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "POS User",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "section",
+ "sort_order": "ASC",
+ "states": [],
+ "title_field": "table_no",
+ "track_changes": 1
+}

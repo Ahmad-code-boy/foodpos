@@ -1,0 +1,111 @@
+{
+ "actions": [],
+ "autoname": "field:group_name",
+ "creation": "2026-10-13 10:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "group_name",
+  "selection_type",
+  "min_selections",
+  "max_selections",
+  "column_break_1",
+  "is_required",
+  "disabled",
+  "section_modifiers",
+  "modifiers"
+ ],
+ "fields": [
+  {
+   "fieldname": "group_name",
+   "fieldtype": "Data",
+   "label": "Group Name",
+   "reqd": 1,
+   "unique": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "selection_type",
+   "fieldtype": "Select",
+   "label": "Selection Type",
+   "options": "Single\nMultiple",
+   "default": "Single",
+   "reqd": 1,
+   "in_list_view": 1,
+   "description": "Single = radio buttons (pick one). Multiple = checkboxes (pick many)."
+  },
+  {
+   "fieldname": "min_selections",
+   "fieldtype": "Int",
+   "label": "Min Selections",
+   "default": "0",
+   "description": "Minimum number of modifiers customer must select (0 = optional)."
+  },
+  {
+   "fieldname": "max_selections",
+   "fieldtype": "Int",
+   "label": "Max Selections",
+   "default": "1",
+   "description": "Maximum allowed selections (ignored for Single type)."
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "is_required",
+   "fieldtype": "Check",
+   "label": "Required",
+   "default": "0",
+   "description": "If checked, cashier must pick at least one option before adding item."
+  },
+  {
+   "fieldname": "disabled",
+   "fieldtype": "Check",
+   "label": "Disabled",
+   "default": "0"
+  },
+  {
+   "fieldname": "section_modifiers",
+   "fieldtype": "Section Break",
+   "label": "Modifier Options"
+  },
+  {
+   "fieldname": "modifiers",
+   "fieldtype": "Table",
+   "label": "Modifiers",
+   "options": "Food Item Modifier",
+   "reqd": 1
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "is_submittable": 0,
+ "links": [],
+ "modified": "2026-10-13 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Foodpos",
+ "name": "Food Item Modifier Group",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "read": 1,
+   "role": "System Manager",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 0,
+   "read": 1,
+   "role": "Sales Manager",
+   "write": 1
+  }
+ ],
+ "sort_field": "group_name",
+ "sort_order": "ASC",
+ "states": [],
+ "title_field": "group_name",
+ "track_changes": 0
+}

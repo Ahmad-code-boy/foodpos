@@ -1,0 +1,137 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-11-03 10:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "timestamp",
+  "action_type",
+  "branch",
+  "column_break_1",
+  "cashier",
+  "approved_by",
+  "order_id",
+  "table",
+  "section_details",
+  "details"
+ ],
+ "fields": [
+  {
+   "fieldname": "timestamp",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Timestamp",
+   "reqd": 1
+  },
+  {
+   "fieldname": "action_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Action Type",
+   "options": "Discount Override\nEmergency Table Free\nTable Transfer\nPrice Override\nVoid Order\nZero Price Approval\nKOT Created\nKOT Status Change\nOrder Held\nOrder Resumed\nOrder Discarded\nOrder Settled\nClose Register",
+   "reqd": 1
+  },
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Branch",
+   "options": "Branch",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "cashier",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Cashier",
+   "options": "User"
+  },
+  {
+   "fieldname": "approved_by",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Approved By Manager",
+   "options": "User"
+  },
+  {
+   "fieldname": "order_id",
+   "fieldtype": "Data",
+   "label": "Order / Invoice ID"
+  },
+  {
+   "fieldname": "table",
+   "fieldtype": "Data",
+   "label": "Table"
+  },
+  {
+   "fieldname": "section_details",
+   "fieldtype": "Section Break",
+   "label": "Details"
+  },
+  {
+   "fieldname": "details",
+   "fieldtype": "Small Text",
+   "label": "Details / Reason"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "is_submittable": 0,
+ "links": [],
+ "modified": "2026-11-03 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Foodpos",
+ "name": "Food POS Audit Log",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 0
+  },
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Branch Manager",
+   "share": 0,
+   "write": 0
+  },
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 0,
+   "export": 0,
+   "print": 0,
+   "read": 0,
+   "report": 0,
+   "role": "POS Cashier",
+   "share": 0,
+   "write": 0
+  }
+ ],
+ "sort_field": "timestamp",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "action_type",
+ "track_changes": 0
+}
+
