@@ -2930,7 +2930,7 @@ def get_active_kitchen_kots(pos_profile=None, branch=None, station=None):
 	kots = frappe.get_all(
 		"Food KOT",
 		filters=filters,
-		fields=["name", "status", "order_type", "table", "customer", "order_note", "creation", "modified", "pos_profile", "branch", "kitchen_station"],
+		fields=["name", "status", "order_type", "table", "customer", "order_note", "creation", "modified", "pos_profile", "branch", "kitchen_station", "order_id"],
 		order_by="creation asc"
 	)
 

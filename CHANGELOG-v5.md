@@ -1,5 +1,21 @@
 # CHANGELOG — Food POS v5 (premium vibe)
 
+## v5.10 — Fix: no auto KOT slip/print on Confirm (2026-11-15, live bench re-test by agent)
+
+- **Root cause (corrected):** v5.9 moved `print()` into the new tab, but the
+  print DIALOG still opens on Confirm — and that dialog is what blocks the
+  whole POS tab (Pay, Filters, sidebar dead until it is dismissed). Proof:
+  every run where Confirm opened a slip tab froze the page; the run where
+  Confirm failed (no tab) paid fine, and the KDS Settle path (no slip)
+  paid fine. **Fix:** Confirm opens NO tab and prints nothing — the live
+  KDS screen IS the kitchen ticket. Paper slip: a Print button on each KOT
+  card in the Live Kitchen Orders drawer opens the slip tab with a manual
+  Print button inside it (same pattern as the customer bill). `open_kot_slip`
+  replaces `print_kot_slip` (alias kept).
+- Background offline sync can no longer pop an "Internal Server Error"
+  dialog over the POS (it now fails silently to console, with a toast only
+  on a manual retry). Sanity **154/154 PASS**.
+
 ## v5.9 — Fix: page dead after Confirm (print-block), KDS Settle, tables on demand, sync pill (2026-11-15, live bench diagnostic by agent)
 
 - **Root cause of the dead page:** `print_kot_slip` called `win.print()`

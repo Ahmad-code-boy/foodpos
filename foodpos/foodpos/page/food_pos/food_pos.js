@@ -2407,9 +2407,12 @@ foodpos.FoodPOS.Controller = class {
 			this.render_table_chips(); // v3: chip flips to "Kitchen • Pending"
 			this.refresh_kitchen_badge();
 			this.render_tables_view();
-			// v2 thermal: the kitchen slip (parchi) prints automatically on
-			// confirm so the kitchen gets a paper ticket as well as the live KDS.
-			try { this.print_kot_slip(msg, order_payload); } catch (e) { console.warn("KOT slip print skipped:", e); }
+			// v5.10: NO auto slip/print on confirm. The live KDS screen IS
+			// the kitchen ticket. Opening a slip tab with a print dialog on
+			// confirm blocked the whole POS tab (no click worked until the
+			// dialog was dismissed) — that is what killed Pay in v5.9 even
+			// after the in-tab print fix. Paper slip: the Print button on the
+			// KOT card in the Live Kitchen Orders drawer (open_kot_slip).
 		} catch (e) {
 			frappe.dom.unfreeze();
 			frappe.show_alert({ message: __("Failed to confirm order: {0}", [e.message]), indicator: "red" });
@@ -3911,6 +3914,7 @@ foodpos.FoodPOS.Controller = class {
 						<span style="font-size:11px;color:#94a3b8;">${kot.customer || "Walk-in"}</span>
 						<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
 							${stage_btn}
+							<button class="btn btn-default btn-xs fpos-kot-print-btn" data-kot="${kot.name}" style="font-weight:700;background:#f8fafc;color:#334155;border-color:#cbd5e1;border-radius:6px;padding:5px 12px;">${fpos_icon("printer", "fpos-ic-sm")} ${__("Print")}</button>
 							<button class="btn btn-default btn-xs fpos-kot-settle-btn" data-kot="${kot.name}" style="font-weight:700;background:#15803d;color:#fff;border-color:#15803d;border-radius:6px;padding:5px 12px;">${__("Settle & Print Bill")}</button>
 						</div>
 					</div>
@@ -3963,6 +3967,26 @@ foodpos.FoodPOS.Controller = class {
 					frappe.dom.unfreeze();
 					frappe.msgprint(__("Could not update stage: {0}", [err.message]));
 				}
+			});
+
+			// v5.10: paper KOT slip on demand (manual Print button inside the
+			// slip tab) — never auto-printed, so the counter never blocks.
+			card.find(".fpos-kot-print-btn").on("click", (e) => {
+				const kot_id = $(e.currentTarget).data("kot");
+				this.open_kot_slip(
+					{ kot_name: kot_id, order_id: kot.order_id || "" },
+					{
+						order_type: kot.order_type,
+						table: kot.table || "",
+						order_note: kot.order_note || "",
+						items: (kot.items || []).map((it) => ({
+							item_code: it.item_code,
+							item_name: it.item_name,
+							qty: it.qty,
+							item_note: it.item_note || "",
+						})),
+					}
+				);
 			});
 
 			// v5.9: settle an open KOT — loads its items back into the cart
@@ -4653,6 +4677,10 @@ foodpos.FoodPOS.Controller = class {
 				method: "foodpos.foodpos.page.food_pos.food_pos.sync_offline_invoices",
 				args: { invoices: queue },
 				freeze: false,
+				// v5.10: a failing background sync must never pop an
+				// "Internal Server Error" dialog over the POS (the stale
+				// v5.8 tab showed it six times on load).
+				error: () => {},
 			});
 
 			const results = res.message || [];
@@ -6559,7 +6587,12 @@ foodpos.FoodPOS.Controller = class {
 	// v2 thermal: kitchen slip (KOT parchi) — 80mm/58mm monospace, printed
 	// automatically when an order is confirmed, so the kitchen gets paper
 	// as well as the live KDS ticket.
-	print_kot_slip(msg, order_payload) {
+	// v5.10: open the paper KOT slip in a new tab — NEVER auto-print.
+	// Any print dialog opened automatically on Confirm blocked the whole
+	// POS tab (v5.9 proved even in-tab print() does it), so the slip only
+	// opens from the drawer's Print button, with a manual Print button
+	// inside it. Same pattern as the customer bill (print_pos_slip).
+	open_kot_slip(msg, order_payload) {
 		const kot = (msg && (msg.kot_name || msg.kot)) || this.linked_kot_id || "";
 		const items = (order_payload && order_payload.items) || this.cart_items || [];
 		if (!items.length) return;
@@ -6577,6 +6610,8 @@ foodpos.FoodPOS.Controller = class {
 				.row { display:flex; justify-content:space-between; }
 				.divider { border-top:1px dashed #000; margin:6px 0; }
 				.big { font-size:16px; }
+				.kot-print-btn { display:block; margin:10px auto; padding:8px 22px; font-size:14px; font-weight:700; background:#15803d; color:#fff; border:0; border-radius:8px; cursor:pointer; }
+				@media print { .kot-print-btn { display:none; } }
 			</style></head><body>
 				<div class="center bold big">*** KITCHEN TICKET ***</div>
 				<div class="center bold">${kot || ""}</div>
@@ -6590,19 +6625,16 @@ foodpos.FoodPOS.Controller = class {
 				<div class="divider"></div>
 				${order_payload.order_note ? `<div>Note: ${order_payload.order_note}</div>` : ""}
 				<div class="center" style="margin-top:8px;">— ${__("Please prepare") } —</div>
+				<button class="kot-print-btn" onclick="window.print()">${__("Print")}</button>
 			</body></html>`;
 		const win = window.open("", "_blank");
 		if (!win) return;
-		// v5.9: window.print() MUST run inside the new tab's own script.
-		// Calling win.print() from this page blocks the POS tab's JS thread
-		// until the print dialog closes — after Confirm, NO click worked at
-		// all (Pay, Filters, sidebar, Home — everything dead until reload),
-		// even though the page looked normal and the button was enabled.
-		const html_with_print = html.replace("</body>",
-			`<script>window.addEventListener("load", function(){ setTimeout(function(){ window.print(); }, 300); });</script></body>`);
-		win.document.write(html_with_print);
+		win.document.write(html);
 		win.document.close();
 	}
+
+	// Backwards-compatible alias (old callers, if any, get the manual slip).
+	print_kot_slip(msg, order_payload) { return this.open_kot_slip(msg, order_payload); }
 
 	refresh() {
 		if (this.pos_profile) {

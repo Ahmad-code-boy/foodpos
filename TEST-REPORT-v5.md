@@ -1,5 +1,28 @@
 # TEST REPORT — Food POS v5 (premium vibe)
 
+## v5.10 — direct confirm→Pay freeze STILL present in v5.9 (2026-11-15)
+
+- Live bench re-test (agent, as Administrator) of v5.9 after pull + migrate
+  + Custom Field is_billing_contact + build + restart: tables T1–T6 FIXED
+  (floor shows 6, all Available); sync pill FIXED — manual retry synced both
+  queued invoices → BR1-2026-00001 + BR1-2026-00002 (Rs 120 each), Today's
+  Sales Rs 240; KDS drawer FIXED — cards render with Settle & Print Bill,
+  settling FKOT-2026-00001 produced Invoice BR1-2026-00003 (Rs 120, Cash),
+  Today's Sales Rs 360 / 3 orders; the is_billing_contact MySQL error is
+  GONE everywhere. Stale "− 1 +" stepper gone.
+- BUT direct Confirm → Pay & Print Bill STILL froze the page (KOT
+  FKOT-2026-00004 created, Pay never opened, Filters/Tables dead; freeze
+  text lingered in DOM). v5.9's in-tab print did NOT fix it — the print
+  dialog itself is the blocker. v5.10 removes auto slip/print from Confirm
+  entirely; paper slip is one tap away on the KOT card.
+- Still unbilled test KOTs: FKOT-2026-00002, FKOT-2026-00003, FKOT-2026-00004
+  (1× 7UP, Rs 120 each) — payable via drawer Settle. Minor known lags:
+  home KDS count reads "0 active" right after reload until the drawer is
+  opened; Today's Sales lags one reload behind a new payment.
+- Sanity **154/154 PASS**, seed stub **9/9 PASS**. NOT verified live: user
+  must pull v5.10 + build + clear-cache + restart, then re-test the direct
+  flow — Confirm → Pay opens immediately → Cash → invoice + receipt.
+
 ## v5.9 — post-confirm click death + KDS settle + tables/sync (2026-11-15)
 
 - Live bench diagnostic (agent, as Administrator): Confirm works (KOT
