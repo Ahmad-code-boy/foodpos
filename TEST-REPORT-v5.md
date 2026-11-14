@@ -1,5 +1,16 @@
 # TEST REPORT — Food POS v5 (premium vibe)
 
+## v5.12 — Pending Payments sidebar logic (2026-11-15)
+
+- User question: after the kitchen slip prints and the customer waits for
+  the food, where does the cashier print that pending-payment bill from?
+  Answer built: sidebar Pending item + badge + drawer (Settle & Print
+  Bill / Print Bill). Pricing comes from the server (KOT items + total).
+- Sanity **166/166 PASS**, seed stub **9/9 PASS**. NOT verified live: user
+  must pull v5.12 + build + clear-cache + restart, then check the sidebar
+  Pending badge count, open the drawer, and print + settle a pending bill
+  (the 3 test KOTs FKOT-2026-00002/00003/00004 are still unbilled).
+
 ## v5.11 — single-tab print preview + menu scroll (2026-11-15)
 
 - User feedback: too many separate tabs were opening; everything must stay

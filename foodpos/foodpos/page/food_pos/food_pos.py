@@ -2940,6 +2940,33 @@ def get_active_kitchen_kots(pos_profile=None, branch=None, station=None):
 			filters={"parent": kot.name},
 			fields=["name", "item_code", "item_name", "qty", "item_note", "is_done"]
 		)
+		# v5.12: price items from the profile's selling price list (same
+		# source as get_kot_for_payment) so the Pending Payments drawer can
+		# show each bill's amount and print the pending bill.
+		price_list = "Standard Selling"
+		try:
+			if kot.get("pos_profile"):
+				profile_data = get_pos_profile_data(kot.pos_profile)
+				price_list = profile_data.get("selling_price_list") or price_list
+		except Exception:
+			pass
+		kot_total = 0
+		for it in items:
+			rate = frappe.db.get_value(
+				"Item Price",
+				{"item_code": it.item_code, "price_list": price_list, "selling": 1},
+				"price_list_rate",
+			)
+			if rate is None:
+				rate = frappe.db.get_value(
+					"Item Price",
+					{"item_code": it.item_code, "price_list": "Standard Selling", "selling": 1},
+					"price_list_rate",
+				) or 0
+			it["rate"] = flt(rate)
+			it["amount"] = flt(it.qty) * flt(rate)
+			kot_total += it["amount"]
+		kot["total"] = kot_total
 		kot["items"] = items
 		kot["total_items"] = len(items)
 		if kot.status in ["Ready", "Served"]:

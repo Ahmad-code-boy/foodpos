@@ -2188,7 +2188,15 @@ button.fpos-home-sync:hover { filter: brightness(0.97); }
 /* ── v3: POS left icon sidebar (image 4 concept) ── */
 .fpos-body { display: flex; }
 .fpos-pos-sidebar { width: 84px; flex-shrink: 0; background: #fff; border-right: 1px solid #e2e8f0; display: flex; flex-direction: column; align-items: stretch; padding: 12px 8px; gap: 4px; }
-.fpos-pos-nav-item { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 11px 4px; border: none; background: none; border-radius: 12px; cursor: pointer; font-size: 11px; font-weight: 700; color: #475569; min-height: 56px; }
+.fpos-pos-nav-item { position: relative; display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 11px 4px; border: none; background: none; border-radius: 12px; cursor: pointer; font-size: 11px; font-weight: 700; color: #475569; min-height: 56px; }
+/* v5.12: live count of unpaid bills on the sidebar Pending item. */
+.fpos-pending-badge {
+	position: absolute; top: 4px; right: 6px;
+	background: #b45309; color: #fff; font-size: 10px; font-weight: 800;
+	min-width: 18px; height: 18px; padding: 0 5px; border-radius: 10px;
+	display: flex; align-items: center; justify-content: center;
+	box-shadow: 0 1px 4px rgba(0, 0, 0, .25);
+}
 .fpos-pos-nav-item .fpos-ic { width: 22px; height: 22px; }
 .fpos-pos-nav-item:hover { background: #f0fdf4; color: #15803d; }
 .fpos-pos-nav-item.active { background: #15803d; color: #fff; }

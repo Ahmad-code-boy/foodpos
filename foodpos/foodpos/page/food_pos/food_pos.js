@@ -910,6 +910,7 @@ foodpos.FoodPOS.Controller = class {
 					<nav class="fpos-pos-sidebar" aria-label="${__("POS sections")}">
 						<button class="fpos-pos-nav-item active" data-nav="menu" title="${__("Menu")}">${fpos_icon("grid")}<span class="fpos-pos-nav-label">${__("Menu")}</span></button>
 						<button class="fpos-pos-nav-item" data-nav="tables" title="${__("Table Services")}">${fpos_icon("table")}<span class="fpos-pos-nav-label">${__("Tables")}</span></button>
+						<button class="fpos-pos-nav-item" data-nav="pending" title="${__("Pending Payments")}">${fpos_icon("receipt")}<span class="fpos-pos-nav-label">${__("Pending")}</span><span class="fpos-pending-badge" style="display:none;">0</span></button>
 						<button class="fpos-pos-nav-item" data-nav="reservation" title="${__("Reservation")}">${fpos_icon("calendar")}<span class="fpos-pos-nav-label">${__("Reserve")}</span></button>
 						<button class="fpos-pos-nav-item" data-nav="delivery" title="${__("Delivery")}">${fpos_icon("truck")}<span class="fpos-pos-nav-label">${__("Delivery")}</span></button>
 						<button class="fpos-pos-nav-item" data-nav="accounting" title="${__("Accounting")}">${fpos_icon("chart")}<span class="fpos-pos-nav-label">${__("Accounts")}</span></button>
@@ -1069,6 +1070,19 @@ foodpos.FoodPOS.Controller = class {
 						<button type="button" class="btn btn-default btn-xs fpos-kds-station-btn" data-station="Beverages" style="font-weight:700;border-radius:6px;">${__("Beverages")}</button>
 					</div>
 					<div class="fpos-drawer-body fpos-kitchen-body"></div>
+				</div>
+
+				<!-- PENDING PAYMENTS DRAWER (v5.12: bills waiting to be paid) -->
+				<div class="fpos-drawer fpos-pending-drawer">
+					<div class="fpos-drawer-header">
+						<div class="fpos-drawer-title">
+							<span>${fpos_icon("receipt")}</span>
+							<span>${__("Pending Payments")}</span>
+							<span class="fpos-pending-count-pill" style="font-size:11px;background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:12px;font-weight:700;">0 pending</span>
+						</div>
+						<button class="fpos-drawer-close fpos-close-pending-drawer">&times;</button>
+					</div>
+					<div class="fpos-drawer-body fpos-pending-body"></div>
 				</div>
 
 				<!-- HELD ORDERS DRAWER -->
@@ -3836,6 +3850,188 @@ foodpos.FoodPOS.Controller = class {
 		$("body").removeClass("modal-open");
 	}
 
+	// ─── v5.12: Pending Payments drawer ───────────────────────────
+	// The answer to "the customer waited, the food is ready, now where
+	// does the cashier print the pending bill from?" — the sidebar
+	// Pending item (with a live count badge) opens this drawer: every
+	// confirmed-but-unpaid order with its amount, ready to settle or to
+	// print the bill. The bill itself is only final at payment; the
+	// Print Bill slip is the unpaid check (PENDING PAYMENT, no paid amount).
+	async show_pending_drawer() {
+		const $drawer = this.wrapper.find(".fpos-pending-drawer");
+		const $overlay = this.wrapper.find(".fpos-drawer-overlay");
+		const $body = $drawer.find(".fpos-pending-body");
+
+		this.wrapper.find(".fpos-kitchen-drawer, .fpos-held-drawer").removeClass("active");
+		$overlay.addClass("active");
+		$drawer.addClass("active");
+		$body.html(`
+			<div style="display:flex;justify-content:center;align-items:center;height:200px;flex-direction:column;gap:10px;">
+				<div class="fpos-spinner" style="width:32px;height:32px;border:3px solid #e2e8f0;border-top-color:#15803d;border-radius:50%;animation:fpos-spin .8s linear infinite;"></div>
+				<span style="color:#64748b;font-size:13px;">${__("Loading pending payments...")}</span>
+			</div>
+		`);
+
+		try {
+			const res = await frappe.call({
+				method: "foodpos.foodpos.page.food_pos.food_pos.get_active_kitchen_kots",
+				args: { pos_profile: this.pos_profile, branch: this.branch },
+				freeze: false,
+				quiet: true,
+				error: () => {},
+			});
+			const kots = res.message || [];
+			this.pending_kots = kots;
+			this.render_pending_kots(kots);
+			this.update_kitchen_badge(kots);
+		} catch (e) {
+			$body.html(`
+				<div style="text-align:center;padding:30px;color:#ef4444;">
+					<div style="margin-bottom:8px;color:#94a3b8;">${fpos_icon("receipt", "fpos-ic-lg")}</div>
+					<div style="font-weight:600;">${__("Failed to load pending payments")}</div>
+					<button class="btn btn-default btn-xs fpos-retry-pending-btn" style="margin-top:10px;font-weight:700;">${fpos_icon("refresh", "fpos-ic-sm")} ${__("Retry")}</button>
+				</div>
+			`);
+			$body.find(".fpos-retry-pending-btn").on("click", () => this.show_pending_drawer());
+		}
+	}
+
+	hide_pending_drawer() {
+		this.wrapper.find(".fpos-pending-drawer").removeClass("active");
+		this.wrapper.find(".fpos-drawer-overlay").removeClass("active");
+		$(".fpos-pending-drawer").removeClass("active");
+		$(".fpos-drawer-overlay").removeClass("active");
+		frappe.dom.unfreeze();
+		$(".modal-backdrop").remove();
+		$("body").removeClass("modal-open");
+	}
+
+	render_pending_kots(kots) {
+		const $body = this.wrapper.find(".fpos-pending-body");
+		$body.empty();
+
+		if (!kots || kots.length === 0) {
+			$body.html(`
+				<div style="text-align:center;padding:50px 20px;color:#94a3b8;">
+					<div style="margin-bottom:8px;color:#94a3b8;">${fpos_icon("receipt", "fpos-ic-lg")}</div>
+					<div style="font-weight:600;font-size:14px;color:#64748b;">${__("No pending payments")}</div>
+					<p style="font-size:12px;margin-top:4px;">${__("When a kitchen order is waiting for payment, it will appear here with its bill amount.")}</p>
+				</div>
+			`);
+			return;
+		}
+
+		const grand = kots.reduce((s, k) => s + flt(k.total || 0), 0);
+		$body.append(`
+			<div style="display:flex;justify-content:space-between;align-items:center;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:10px 14px;">
+				<span style="font-size:13px;font-weight:700;color:#92400e;">${__("{0} pending bill(s)", [kots.length])}</span>
+				<span style="font-size:14px;font-weight:800;color:#92400e;">${__("Total Due")} ${this.format_money(grand)}</span>
+			</div>
+		`);
+
+		kots.forEach((kot) => {
+			const status_colors = {
+				Pending: { bg: "#fef9c3", text: "#854d0e" },
+				"In Progress": { bg: "#dbeafe", text: "#1d4ed8" },
+				Ready: { bg: "#dcfce7", text: "#15803d" },
+			};
+			const sc = status_colors[kot.status] || { bg: "#f1f5f9", text: "#475569" };
+			const items = kot.items || [];
+			const shown = items.slice(0, 3).map((it) => `${it.qty}× ${it.item_name}`).join(", ");
+			const more = items.length > 3 ? ` +${items.length - 3} more` : "";
+
+			const card = $(`
+				<div class="fpos-recent-card" data-kot="${kot.name}" style="border-left: 4px solid #d97706;">
+					<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+						<div>
+							<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+								<span style="font-weight:800;font-size:14px;color:#0f172a;">${kot.name}</span>
+								<span style="background:${sc.bg};color:${sc.text};padding:2px 7px;border-radius:10px;font-size:10px;font-weight:800;text-transform:uppercase;">${kot.status}</span>
+							</div>
+							<div style="font-size:11px;color:#64748b;margin-top:3px;">
+								<span>${kot.order_type || "Dine In"}</span>
+								${kot.table_no ? `&bull; <b>Table ${kot.table_no}</b>` : ""}
+								${kot.customer ? `&bull; ${kot.customer}` : ""}
+								&bull; <span>${kot.time_ago || ""}</span>
+							</div>
+						</div>
+						<div style="text-align:right;flex-shrink:0;">
+							<div style="font-size:11px;color:#92400e;font-weight:700;">${__("TOTAL DUE")}</div>
+							<div style="font-size:18px;font-weight:800;color:#15803d;">${this.format_money(kot.total || 0)}</div>
+						</div>
+					</div>
+					<div style="font-size:12px;color:#475569;">${shown}${more}</div>
+					<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
+						<button class="btn btn-default btn-xs fpos-pending-print-btn" data-kot="${kot.name}" style="font-weight:700;background:#f8fafc;color:#334155;border-color:#cbd5e1;border-radius:6px;padding:5px 12px;">${fpos_icon("printer", "fpos-ic-sm")} ${__("Print Bill")}</button>
+						<button class="btn btn-default btn-xs fpos-pending-settle-btn" data-kot="${kot.name}" style="font-weight:700;background:#15803d;color:#fff;border-color:#15803d;border-radius:6px;padding:5px 12px;">${__("Settle & Print Bill")}</button>
+					</div>
+				</div>
+			`);
+			card.find(".fpos-pending-settle-btn").on("click", async (e) => {
+				const kot_id = $(e.currentTarget).data("kot");
+				this.hide_pending_drawer();
+				await this.resume_kot_for_payment(kot_id);
+			});
+			card.find(".fpos-pending-print-btn").on("click", (e) => {
+				const kot_id = $(e.currentTarget).data("kot");
+				const target = (this.pending_kots || []).find((k) => k.name === kot_id) || kot;
+				this.print_pending_bill(target);
+			});
+			$body.append(card);
+		});
+	}
+
+	// Print the bill of a confirmed-but-unpaid order (the "check"): the
+	// customer sees the amount before paying. No paid amount on it — the
+	// final receipt prints at settle (Settle & Print Bill).
+	print_pending_bill(kot) {
+		if (!kot) return;
+		const format_curr = (val) => this.format_money(val);
+		const items_html = (kot.items || []).map((i) => `
+			<tr>
+				<td style="padding: 2px 0; text-align: left;">${i.item_name}</td>
+				<td style="padding: 2px; text-align: center;">${i.qty}</td>
+				<td style="padding: 2px; text-align: right;">${format_curr(i.rate || 0)}</td>
+				<td style="padding: 2px 0; text-align: right;">${format_curr(i.amount || 0)}</td>
+			</tr>
+		`).join("");
+		const body_html = `
+				<div class="text-center bold" style="font-size:15px;">${(this.profile_data && this.profile_data.company) || kot.pos_profile || "FOOD POS RESTAURANT"}</div>
+				<div class="text-center" style="font-size:11px;">${kot.pos_profile || ""}</div>
+				<div class="text-center" style="font-size:10px;">${new Date().toLocaleString()}</div>
+				<div class="divider"></div>
+				<div class="row"><span>KOT #:</span><span class="bold">${kot.name}</span></div>
+				<div class="row"><span>Order:</span><span>${kot.order_type || "Dine In"}${kot.table_no ? ` (Table ${kot.table_no})` : ""}</span></div>
+				<div class="row"><span>Customer:</span><span>${kot.customer || "Walk-in"}</span></div>
+				<div class="divider"></div>
+				<table>
+					<thead>
+						<tr style="border-bottom: 1px solid #000;">
+							<th style="text-align: left;">Item</th>
+							<th style="text-align: center;">Qty</th>
+							<th style="text-align: right;">Rate</th>
+							<th style="text-align: right;">Amt</th>
+						</tr>
+					</thead>
+					<tbody>${items_html}</tbody>
+				</table>
+				<div class="divider"></div>
+				<div class="row"><span>Subtotal:</span><span>${format_curr(kot.total || 0)}</span></div>
+				<div class="row bold" style="font-size:14px; margin-top: 4px;"><span>TOTAL DUE:</span><span>${format_curr(kot.total || 0)}</span></div>
+				<div class="row bold" style="font-size:13px; color:#92400e;"><span>PENDING PAYMENT</span><span>${format_curr(kot.total || 0)}</span></div>
+				<div class="divider"></div>
+				<div class="text-center" style="margin-top: 10px; font-size: 11px;">
+					<p style="margin: 0;" class="bold">Please pay at the counter.</p>
+					<p style="margin: 2px 0;">Thank you for dining with us!</p>
+				</div>
+		`;
+		this.show_print_preview({
+			title: __("Bill — Pending Payment"),
+			subtitle: kot.name || "",
+			body_html,
+		});
+	}
+
 	render_kitchen_kots(kots) {
 		const $body = this.wrapper.find(".fpos-kitchen-body");
 		$body.empty();
@@ -4092,6 +4288,12 @@ foodpos.FoodPOS.Controller = class {
 		} else {
 			$badge.hide();
 		}
+		// v5.12: the same active KOTs are the pending bills — the sidebar
+		// Pending badge and the drawer count pill ride the same poll.
+		const $pending = this.wrapper.find(".fpos-pending-badge");
+		const $pendingPill = this.wrapper.find(".fpos-pending-count-pill");
+		$pendingPill.text(`${count} pending`);
+		$pending.text(count).css("display", count > 0 ? "flex" : "none");
 	}
 
 	start_kitchen_polling() {
@@ -5047,6 +5249,13 @@ foodpos.FoodPOS.Controller = class {
 			this.wrapper.find(".fpos-pos-nav-item").removeClass("active");
 			$(e.currentTarget).addClass("active");
 			if (key === "menu") this.show_pos();
+			else if (key === "pending") {
+				// v5.12: Pending Payments drawer — the POS view stays, so the
+				// Menu nav item stays highlighted, not Pending.
+				this.show_pending_drawer();
+				this.wrapper.find(".fpos-pos-nav-item").removeClass("active");
+				this.wrapper.find('.fpos-pos-nav-item[data-nav="menu"]').addClass("active");
+			}
 			else if (key === "tables" || key === "reservation") this.show_tables();
 			else if (key === "delivery") this.show_daily_report();
 			else if (key === "accounting") this.show_closing_page();
@@ -5115,6 +5324,8 @@ foodpos.FoodPOS.Controller = class {
 			this.show_kitchen_drawer();
 		});
 		this.wrapper.on("click", ".fpos-close-kitchen-drawer", () => this.hide_kitchen_drawer());
+		// v5.12: Pending Payments drawer close.
+		this.wrapper.on("click", ".fpos-close-pending-drawer", () => this.hide_pending_drawer());
 		$(document).off("click.fpos_close_kitchen").on("click.fpos_close_kitchen", ".fpos-close-kitchen-drawer", (e) => {
 			e.preventDefault();
 			e.stopPropagation();

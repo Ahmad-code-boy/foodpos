@@ -1,5 +1,23 @@
 # CHANGELOG — Food POS v5 (premium vibe)
 
+## v5.12 — Pending Payments on the sidebar (2026-11-15, user feedback)
+
+- **The flow the user asked about:** order goes to kitchen → customer
+  waits while food is made → then pays. The bill for that order now lives
+  in the left sidebar: a **Pending** nav item with a live amber count
+  badge (same 5s poll as the kitchen badge), opening a **Pending
+  Payments** drawer. Each card shows KOT, status, order type, table,
+  customer, waiting time, items and the TOTAL DUE, with a summary bar
+  ("N pending bill(s) • Total Due Rs X"). Two actions per bill:
+  **Settle & Print Bill** (loads the order into the cart → payment screen
+  → final receipt prints after payment) and **Print Bill** (prints the
+  unpaid check — items, rates, TOTAL DUE, "PENDING PAYMENT", no paid
+  amount — via the centered print-preview dialog, so the customer can see
+  the bill before paying). Server `get_active_kitchen_kots` now prices
+  each KOT's items + total from the profile price list. Drawer design
+  verified by screenshot (`ui-screenshots/v5.12/1-pending-drawer.png`).
+  Sanity **166/166 PASS**.
+
 ## v5.11 — Single-tab print preview + menu scroll fix (2026-11-15, user feedback)
 
 - **One tab only:** `window.open` is gone from the page JS entirely. Bill,
