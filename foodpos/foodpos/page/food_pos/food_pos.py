@@ -403,7 +403,9 @@ def get_items(pos_profile=None, item_group=None, search_term=None, start=0, page
 			params["item_groups"] = groups
 
 	if search_term:
-		conds.append("(item.name LIKE %(search)s OR item.item_name LIKE %(search)s OR item.description LIKE %(search)s)")
+		# v6: search also matches barcodes (Item Barcode child table) so a
+		# scanner can find the item by its barcode.
+		conds.append("(item.name LIKE %(search)s OR item.item_name LIKE %(search)s OR item.description LIKE %(search)s OR EXISTS (SELECT 1 FROM `tabItem Barcode` b WHERE b.parent = item.name AND b.barcode LIKE %(search)s))")
 		params["search"] = f"%{search_term}%"
 
 	bin_join = ""
@@ -426,6 +428,7 @@ def get_items(pos_profile=None, item_group=None, search_term=None, start=0, page
 			item.stock_uom,
 			item.image AS item_image,
 			item.is_stock_item,
+			(SELECT b.barcode FROM `tabItem Barcode` b WHERE b.parent = item.name ORDER BY b.idx ASC LIMIT 1) AS barcode,
 			{veg_col},
 			{vegan_col}
 		FROM `tabItem` item

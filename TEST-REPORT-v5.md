@@ -1,5 +1,21 @@
 # TEST REPORT — Food POS v5 (premium vibe)
 
+## v6.0 — Warm restaurant redesign (2026-11-15)
+
+- User brief: premium modern full-screen restaurant POS, warm
+  cream/white/orange/dark-brown palette, no Frappe black-and-white look,
+  instant search (name/code/barcode), food cards with images, cart panel,
+  simple checkout/payment/customer/order flow, all dialogs centered and
+  beautiful, payment success/error/loading/confirmation dialogs,
+  touchscreen + keyboard friendly. Implemented in the existing project:
+  re-themed (107 brand-color sites + vars + hero), barcode search
+  (server + client), Enter-to-add, "/" shortcut, centered warm Frappe
+  dialogs, Payment Successful banner, bigger touch targets. No logic,
+  pricing, tax, stock, cart or invoice behavior changed.
+- Sanity **175/175 PASS**, seed stub **9/9 PASS**. NOT verified live: user
+  must pull v6.0 + build + clear-cache + restart, then check the warm
+  theme, search by barcode, "/" focus, and a full order → pay → receipt.
+
 ## v5.12 — Pending Payments sidebar logic (2026-11-15)
 
 - User question: after the kitchen slip prints and the customer waits for
