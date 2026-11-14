@@ -1,5 +1,33 @@
 # TEST REPORT — Food POS v5 (premium vibe)
 
+## v5.5 — Seed data on migrate (2026-11-14)
+
+- `python3 -m py_compile` OK on the patch. Stub test
+  `scratch/v5_seed_test.py` **8/8 PASS**: run 1 creates exactly 31 docs
+  (1 Price List, 6 Item Groups, 8 Items, 8 Item Prices, 1 Branch,
+  6 Restaurant Tables, 1 POS Profile); run 2 creates nothing new;
+  a pre-existing POS Profile is never duplicated while items are still
+  seeded; the seed profile carries all 6 item groups + warehouse + PKR.
+  Logic sanity **127/127 PASS** (was 120/120).
+- NOT verified on a live bench (no Frappe here): the patch has only been
+  proven against the stub — first real `bench migrate` on the user's site
+  is the live test (see BENCH-TEST-v5.md, new seed section).
+
+## v5.4 — Home restaurant feel (2026-11-14)
+
+- `node --check food_pos.js` OK. Logic sanity **120/120 PASS** (was 109/109):
+  hero present in JS+CSS, time-based greeting, Day Open + sync pills in
+  hero, Chef's Pick from today's top item with cached-menu photo or SVG
+  fallback, Popular strip = top 3 (hidden when no sales), pick/popular open
+  the menu, home uses only the 3 existing endpoints, shift/stats/tiles/
+  recent intact, plain brand row gone.
+- Screenshots re-rendered from the v5 code and visually checked (1-home at
+  1280×1180 so the whole home fits): hero + Chef's Pick photo card, warm
+  shift card, tinted tiles, Popular Today with 3 real food photos, Recent
+  Orders below. Photo crop tuned to center 35% (burger bun + patty and
+  chowmein noodles both read well). POS screenshots unchanged.
+- NOT pushed: v5.4 is local only; GitHub main still has v5.3.
+
 ## v5.3 — Filters in the top bar, same row as search (2026-11-14)
 
 - `node --check food_pos.js` OK. Logic sanity **109/109 PASS** (was 106/106):

@@ -22,6 +22,7 @@ const FPOS_ICONS = {
 	bell: '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>',
 	home: '<path d="M3 9.5 12 3l9 6.5V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22v-8h6v8"/>',
 	chef: '<path d="M4 17h16"/><path d="M12 9a8 8 0 0 1 8 8H4a8 8 0 0 1 8-8z"/><path d="M12 9V6"/><circle cx="12" cy="4.5" r="1.4"/>',
+	cloche: '<path d="M4 16.5a8 8 0 0 1 16 0z"/><path d="M2 19.5h20M12 8.5V7"/><circle cx="12" cy="5.5" r="1.2"/>',
 	table: '<ellipse cx="12" cy="8.5" rx="7.5" ry="3"/><path d="M12 11.5V20"/><path d="M7 20h10"/>',
 	calendar: '<rect x="3" y="4.5" width="18" height="17" rx="2.5"/><path d="M16 2.5v4M8 2.5v4M3 10h18"/>',
 	truck: '<rect x="1.5" y="4" width="14" height="12" rx="1"/><path d="M15.5 9h4l3.5 3.5V16h-7.5z"/><circle cx="6" cy="18.5" r="1.8"/><circle cx="18.5" cy="18.5" r="1.8"/>',
@@ -5888,6 +5889,24 @@ foodpos.FoodPOS.Controller = class {
 		this.start_home_timers();
 	}
 
+
+	// ── v5.4 (restaurant feel): a home dish photo comes from the cached menu
+	// items (same localStorage the POS menu writes) — real ERPNext Item image
+	// when set, else a warm gradient tile + big food SVG. Never a bare letter.
+	home_cached_items() {
+		if (this.items && this.items.length) return this.items;
+		try { return JSON.parse(localStorage.getItem(`fpos_items_${this.pos_profile}`) || "[]"); }
+		catch (e) { return []; }
+	}
+
+	home_dish_photo_html(item_name, fallback_icon) {
+		const found = this.home_cached_items().find((i) => i.item_name === item_name);
+		if (found && found.item_image) {
+			return `<div class="fpos-home-dish-photo" style="background-image:url('${found.item_image}')"></div>`;
+		}
+		return `<div class="fpos-home-dish-photo fpos-home-dish-fallback">${fpos_icon(fallback_icon || "cloche", "fpos-ic-lg")}</div>`;
+	}
+
 	// ── Home screen (the main screen): Sync status, Shift / Day Open state,
 	// Day Open time + running elapsed, user-settable Day Start / Day End,
 	// four order-type tiles, bottom nav. No dialog is opened to get here.
@@ -5950,14 +5969,30 @@ foodpos.FoodPOS.Controller = class {
 		];
 		$home.html(`
 			<div class="fpos-home">
-				<div class="fpos-home-top">
-					<div class="fpos-home-brand">
-						<div class="fpos-home-title">${__("Food POS")}</div>
-						<div class="fpos-home-sub">${__("Main Branch")} &bull; ${this.pos_profile || ""}</div>
+				<!-- v5.4: restaurant hero — warm deep-green banner with a time-based
+				     greeting, Day Open status, and the Chef's Pick (today's top item
+				     with its real photo when the menu cache has one). Sync pill and
+				     Day Open state live here now; the shift card below is unchanged. -->
+				<div class="fpos-home-hero">
+					<span class="fpos-hero-cloche">${fpos_icon("cloche")}</span>
+					<div class="fpos-hero-copy">
+						<div class="fpos-hero-eyebrow">${__("Main Branch")} &bull; ${this.pos_profile || ""}</div>
+						<div class="fpos-hero-greet">${(new Date().getHours() < 12 ? __("Good morning") : new Date().getHours() < 17 ? __("Good afternoon") : __("Good evening"))}, ${__("Chef")}</div>
+						<div class="fpos-hero-sub">${day.day_open ? __("The kitchen is open — orders are flowing in.") : __("The kitchen is closed — open the day to start taking orders.")}</div>
+						<div class="fpos-hero-pills">
+							<span class="fpos-home-sync ${online ? "online" : "offline"}"><span class="fpos-sync-dot"></span> ${sync_label}</span>
+							<span class="fpos-hero-day ${day.day_open ? "open" : "closed"}">${day.day_open ? __("● Day Open") : __("○ Day Closed")}</span>
+						</div>
 					</div>
-					<div class="fpos-home-sync ${online ? "online" : "offline"}">
-						<span class="fpos-sync-dot"></span> ${sync_label}
-					</div>
+					${stat_top ? `
+					<button class="fpos-hero-pick" title="${__("Open menu")}">
+						${this.home_dish_photo_html(stat_top.item_name, "pizza")}
+						<span class="fpos-hero-pick-body">
+							<span class="fpos-hero-pick-label">${__("Chef's Pick")}</span>
+							<span class="fpos-hero-pick-name">${stat_top.item_name}</span>
+							<span class="fpos-hero-pick-sub">× ${stat_top.qty} ${__("sold today")}</span>
+						</span>
+					</button>` : ""}
 				</div>
 
 				<div class="fpos-home-shift">
@@ -6020,6 +6055,22 @@ foodpos.FoodPOS.Controller = class {
 						</button>`).join("")}
 				</div>
 
+				${(daily && daily.top_items && daily.top_items.length) ? `
+				<div class="fpos-home-popular">
+					<div class="fpos-home-popular-head">
+						<span class="fpos-home-popular-title">${__("Popular today")}</span>
+						<button class="fpos-home-popular-all">${__("Open Menu")} →</button>
+					</div>
+					<div class="fpos-home-popular-list">
+						${daily.top_items.slice(0, 3).map((t) => `
+							<button class="fpos-home-popular-card">
+								${this.home_dish_photo_html(t.item_name, "plate")}
+								<span class="fpos-home-popular-name">${t.item_name}</span>
+								<span class="fpos-home-popular-sub">× ${t.qty} ${__("sold")}</span>
+							</button>`).join("")}
+					</div>
+				</div>` : ""}
+
 				<div class="fpos-home-recent">
 					<div class="fpos-home-recent-head">
 						<span class="fpos-home-recent-title">${__("Recent Orders")}</span>
@@ -6073,6 +6124,8 @@ foodpos.FoodPOS.Controller = class {
 			else if (key === "printer") this.show_recent_orders_drawer();
 			else if (key === "settings") frappe.set_route("Form", "POS Profile", this.pos_profile);
 		});
+		// v5.4: Chef's Pick + Popular today open the POS menu.
+		$home.find(".fpos-hero-pick, .fpos-home-popular-all, .fpos-home-popular-card").on("click", () => this.show_pos());
 		// v5: Recent Orders strip — "View all" + row tap open the existing drawer.
 		$home.on("click", ".fpos-home-recent-all", () => this.show_recent_orders_drawer());
 		$home.on("click", ".fpos-home-recent-row", () => this.show_recent_orders_drawer());

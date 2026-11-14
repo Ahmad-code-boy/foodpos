@@ -1,5 +1,51 @@
 # CHANGELOG — Food POS v5 (premium vibe)
 
+## v5.5 — Seed / demo data on migrate (2026-11-14, user: "migrate kro to kuch seed data site ma add ho jae taka ma test ker sako")
+
+- New patch `foodpos/patches/v0_4_0/add_seed_data.py`, registered in
+  `patches.txt` under `[post_model_sync]` — it runs automatically on
+  `bench migrate` (which `bench install-app` also runs). Creates ONLY what
+  is missing (every create guarded by `frappe.db.exists`), so a second
+  migrate or a site with real data is untouched:
+  - 6 Item Groups: Pizza, Burgers, Noodles, Soup, Fast Food, Beverages.
+  - 8 non-stock Items with Standard Selling prices (same names + rates as
+    the v5 preview menu): Chicken Tikka Pizza 550, Margherita Pizza 520,
+    Zinger Burger 450, Chicken Chowmein 480, Hot & Sour Soup 280,
+    Fries & Cheese 220, Chicken Sandwich 350, Soft Drink 120. Non-stock
+    means no warehouse stock / Bin is needed to sell them.
+  - Branch "Main Branch" + Restaurant Tables T1–T4 (Main Hall, 4 seats)
+    and T5–T6 (Family Hall, 6 seats), all Available.
+  - POS Profile "Food POS" — ONLY if the site has no enabled POS Profile:
+    company = site default, warehouse = first warehouse of that company,
+    price list Standard Selling, item groups = the 6 seed groups, payments
+    Cash (default) + Credit Card when those Modes of Payment exist.
+    Skipped with a message when there is no company/warehouse.
+  - Walk-in customer is NOT seeded — the POS creates it on demand.
+  - No Item images are seeded (photos need real files); cards fall back
+    to the gradient + SVG food icon until the user adds images to Items.
+  - Stub-tested without a bench (`scratch/v5_seed_test.py`, fake frappe):
+    run 1 creates exactly 31 docs, run 2 creates nothing (idempotent),
+    existing profile is never duplicated. Sanity now **127/127 PASS**.
+
+## v5.4 — Home page restaurant feel (2026-11-14, user: "home page ki UI aur enhance kro, restaurant ki feel ae")
+
+- **Hero banner** (replaces the plain brand row): warm deep-green gradient
+  with a cloche watermark, time-based serif greeting ("Good morning /
+  afternoon / evening, Chef"), "The kitchen is open…" line, sync pill +
+  gold Day Open pill. **Chef's Pick** card on the right shows today's top
+  item with its real photo (from the cached menu items — same localStorage
+  the POS menu writes; gradient + big food SVG when no image), tap opens
+  the menu. New `cloche` SVG icon.
+- **Popular today** strip (tiles → Recent Orders): top 3 selling items with
+  real photos + "× N sold", tap / "Open Menu →" opens the POS menu; hidden
+  when there are no sales yet.
+- Warmer details: order tiles get tinted icon circles (green/amber/gold),
+  shift card is the warm "service counter" card (cream + gold left border).
+- No new server endpoint: home still calls only `get_day_status`,
+  `get_daily_report`, `set_day_times`. Shift card, stats, tiles, Recent
+  Orders, bottom nav — all unchanged in function. POS view untouched.
+  Sanity now **120/120 PASS**.
+
 ## v5.3 — Filters in the TOP BAR, same row as the search bar (2026-11-14, user: "search bar ka samna 1 hi row ma add kerna tha")
 
 - **Correction of v5.1 (my misread).** v5.1 moved Filters into its own row

@@ -2521,3 +2521,48 @@
 
 /* ── v5: report + attendance cards share the same surface ── */
 .fpos-report-card, .fpos-report-col, .fpos-att-mark { border-color: #e8e4da; border-radius: 18px; box-shadow: 0 1px 2px rgba(20,60,30,.06), 0 8px 24px rgba(20,60,30,.08); }
+
+/* ── v5.4: home restaurant feel — warm hero + popular-today strip ──
+   Home only; the POS view (top bar, tiles, cards, order panel) is untouched.
+   Hero photo comes from the real Item image when the menu cache has one,
+   else a warm gradient tile + big SVG (same rule as item cards). */
+.fpos-home-hero { position: relative; overflow: hidden; display: flex; align-items: stretch; gap: 20px; background: linear-gradient(115deg, #14532d 0%, #166534 52%, #1c7a3f 78%, #b45309 130%); border-radius: 20px; padding: 22px 24px; margin-bottom: 18px; box-shadow: 0 10px 30px rgba(20,60,30,.22); color: #fff; }
+.fpos-hero-cloche { position: absolute; right: 250px; top: 50%; transform: translateY(-50%); color: #fff; opacity: .1; pointer-events: none; }
+.fpos-hero-cloche .fpos-ic { width: 150px; height: 150px; }
+.fpos-hero-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 6px; position: relative; z-index: 1; }
+.fpos-hero-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: #fcd34d; }
+.fpos-hero-greet { font-family: Georgia, "Times New Roman", serif; font-size: 32px; font-weight: 700; letter-spacing: -.01em; line-height: 1.1; }
+.fpos-hero-sub { font-size: 13px; color: #dcfce7; }
+.fpos-hero-pills { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.fpos-hero-pills .fpos-home-sync { background: rgba(255,255,255,.14); border-color: rgba(255,255,255,.28); color: #fff; }
+.fpos-hero-pills .fpos-home-sync .fpos-sync-dot { background: #4ade80; }
+.fpos-hero-pills .fpos-home-sync.offline .fpos-sync-dot { background: #fbbf24; }
+.fpos-hero-day { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; padding: 8px 14px; border-radius: 999px; background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.28); }
+.fpos-hero-day.open { background: #f59e0b; border-color: #f59e0b; color: #451a03; }
+.fpos-hero-pick { flex-shrink: 0; width: 250px; text-align: left; background: #fff; border: none; border-radius: 16px; padding: 0 0 12px; cursor: pointer; overflow: hidden; box-shadow: 0 8px 20px rgba(0,0,0,.25); color: #0f172a; position: relative; z-index: 1; }
+.fpos-hero-pick:hover { transform: translateY(-2px); box-shadow: 0 12px 26px rgba(0,0,0,.3); }
+.fpos-hero-pick .fpos-home-dish-photo { height: 118px; border-radius: 0; }
+.fpos-hero-pick-body { display: flex; flex-direction: column; gap: 2px; padding: 10px 14px 0; }
+.fpos-hero-pick-label { font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: #b45309; }
+.fpos-hero-pick-name { font-size: 15px; font-weight: 800; }
+.fpos-hero-pick-sub { font-size: 12px; color: #64748b; }
+.fpos-home-dish-photo { background-size: cover; background-position: center; background-color: #f59e0b; }
+.fpos-home-dish-fallback { display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #fde68a, #f59e0b 55%, #b45309); color: #fff; }
+.fpos-home-dish-fallback .fpos-ic { width: 56px; height: 56px; }
+.fpos-home-popular { margin-bottom: 22px; }
+.fpos-home-popular-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.fpos-home-popular-title { font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #475569; }
+.fpos-home-popular-all { background: none; border: none; cursor: pointer; font-size: 13px; font-weight: 700; color: #15803d; }
+.fpos-home-popular-list { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.fpos-home-popular-card { text-align: left; background: #fff; border: 1px solid #e8e4da; border-radius: 16px; padding: 0 0 12px; cursor: pointer; overflow: hidden; box-shadow: 0 1px 3px rgba(15,23,42,.06), 0 8px 24px rgba(15,23,42,.04); color: #0f172a; }
+.fpos-home-popular-card:hover { border-color: #15803d; box-shadow: 0 6px 20px rgba(21,128,61,.16); }
+.fpos-home-popular-card .fpos-home-dish-photo { height: 104px; background-position: center 35%; }
+.fpos-home-popular-name { display: block; font-size: 14px; font-weight: 700; padding: 10px 14px 0; }
+.fpos-home-popular-sub { display: block; font-size: 12px; color: #64748b; padding: 2px 14px 0; }
+/* v5.4: order tiles get warm tinted icon circles (restaurant menu feel). */
+.fpos-home-tile .fpos-tile-icon { width: 56px; height: 56px; border-radius: 50%; background: #f0fdf4; color: #15803d; }
+.fpos-home-tile:nth-child(2) .fpos-tile-icon { background: #fffbeb; color: #b45309; }
+.fpos-home-tile:nth-child(3) .fpos-tile-icon { background: #fef3c7; color: #92400e; }
+.fpos-home-tile:nth-child(4) .fpos-tile-icon { background: #f0fdf4; color: #166534; }
+/* v5.4: shift card reads as the warm "service counter" card. */
+.fpos-home-shift .fpos-shift-card { background: #fffdf6; border-left: 4px solid #d97706; }

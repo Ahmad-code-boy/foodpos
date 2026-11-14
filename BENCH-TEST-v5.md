@@ -6,7 +6,10 @@
 > No panel, sidebar, tile row, button or screen position moved. Only colour,
 > depth, type, photos, chairs and polish changed. No new DocType, no new
 > server endpoint, no layout change.
-> Nothing here pushes to GitHub. Push only when you explicitly say so.
+> v5.5 adds ONE thing: a seed-data patch (`foodpos/patches/v0_4_0/
+> add_seed_data.py`) that runs on `bench migrate` and creates demo data
+> ONLY where the site has none (see section B1). Nothing here pushes to
+> GitHub. Push only when you explicitly say so.
 
 ## A. Before you start (2 minutes)
 
@@ -50,6 +53,29 @@ Verify migrate landed (bench console):
 - [ ] POS Opening Entry has Custom Fields `custom_fpos_day_start_time` /
       `custom_fpos_day_end_time` (if the patch ran; before migrate the home
       screen falls back to a cache entry, so do not skip migrate).
+
+### B1. v5.5 seed data — check what migrate created (only where missing)
+
+The migrate log should print `foodpos seed:` lines. Then verify:
+
+- [ ] **Item Groups**: Pizza, Burgers, Noodles, Soup, Fast Food, Beverages.
+- [ ] **Items** (8, non-stock): Chicken Tikka Pizza 550, Margherita Pizza 520,
+      Zinger Burger 450, Chicken Chowmein 480, Hot & Sour Soup 280,
+      Fries & Cheese 220, Chicken Sandwich 350, Soft Drink 120 — each with an
+      Item Price on **Standard Selling**.
+- [ ] **Branch** "Main Branch" exists; **Restaurant Tables** T1–T4 (Main Hall,
+      4 seats) + T5–T6 (Family Hall, 6 seats), all Available.
+- [ ] **POS Profile "Food POS"** exists — ONLY if the site had no enabled POS
+      Profile before. If you already had a profile, no second one is created
+      (check: still exactly one profile / your old one untouched).
+- [ ] Open `/food-pos` → the menu shows the 8 seed items in their categories
+      and the tables floor shows T1–T6. If the menu is empty, check the POS
+      Profile's Item Groups and the Standard Selling prices first.
+- [ ] Seed items have **no photos** (by design) — cards show the gradient +
+      SVG food icon until you add an Image to an Item. That is expected.
+- [ ] Run `bench --site <your-site> migrate` a second time: the seed patch
+      creates nothing new (check the log — no new `foodpos seed: created`
+      lines).
 
 ## C. Smoke test — home screen (Day Open / Close)
 
