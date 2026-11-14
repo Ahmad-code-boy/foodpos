@@ -77,10 +77,18 @@ def get_pos_profiles():
 
 		# v2: no Branch User-Permission filtering — single branch only.
 
+	# v5.6: "custom_branch" was selected here unconditionally, but the column
+	# only exists after the v0.1.0 patch runs (bench migrate). On a site
+	# where migrate had not run yet, this one SELECT crashed the whole page
+	# load ("Unknown column 'custom_branch'") and the POS stuck on
+	# "Loading Food POS environment...". The field is legacy anyway — the
+	# loop below overwrites p["branch"] with SINGLE_BRANCH — so it is not
+	# selected at all now. Migrate is still needed for Attendance, day-time
+	# fields and seed data, but the page no longer bricks without it.
 	profiles = frappe.get_all(
 		"POS Profile",
 		filters=filters,
-		fields=["name", "company", "warehouse", "selling_price_list", "currency", "custom_branch"]
+		fields=["name", "company", "warehouse", "selling_price_list", "currency"]
 	)
 	for p in profiles:
 		p["branch"] = SINGLE_BRANCH  # v2: fixed; custom_branch is legacy data only.

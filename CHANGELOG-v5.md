@@ -1,5 +1,18 @@
 # CHANGELOG — Food POS v5 (premium vibe)
 
+## v5.6 — Fix: page stuck on "Loading Food POS environment..." (2026-11-14, live bench error from user)
+
+- **Root cause:** `get_pos_profiles` selected the `custom_branch` column
+  of POS Profile unconditionally. That column only exists after the
+  v0.1.0 patch runs (`bench migrate`); on the user's site migrate had not
+  run, so the SELECT failed with `Unknown column 'custom_branch'` and the
+  page never loaded. **Fix:** the field is not selected at all — it is
+  legacy (v2 always stamps `SINGLE_BRANCH` instead). Verified it was the
+  only unguarded custom-field SELECT in the page code; every other
+  custom-field read already uses `meta.has_field` / column checks.
+- Migrate is still required for Attendance, day-time fields and seed data
+  — but the page no longer bricks before it. Sanity now **129/129 PASS**.
+
 ## v5.5 — Seed / demo data on migrate (2026-11-14, user: "migrate kro to kuch seed data site ma add ho jae taka ma test ker sako")
 
 - New patch `foodpos/patches/v0_4_0/add_seed_data.py`, registered in

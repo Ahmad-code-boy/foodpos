@@ -1,5 +1,15 @@
 # TEST REPORT — Food POS v5 (premium vibe)
 
+## v5.6 — custom_branch crash fix (2026-11-14)
+
+- Reproduced from the user's traceback: `get_pos_profiles` line 83
+  selected `custom_branch`; the column is created only by patch v0.1.0,
+  so a site without a completed migrate crashed the page load.
+- Fix: `custom_branch` removed from that SELECT (legacy field, unused —
+  branch is always `SINGLE_BRANCH`). `py_compile` OK, sanity
+  **129/129 PASS** (was 127/127), seed stub still **8/8 PASS**.
+- Live bench verification is the user's: pull + migrate per BENCH-TEST-v5.md.
+
 ## v5.5 — Seed data on migrate (2026-11-14)
 
 - `python3 -m py_compile` OK on the patch. Stub test
