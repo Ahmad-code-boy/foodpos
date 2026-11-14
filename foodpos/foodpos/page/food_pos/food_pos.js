@@ -236,8 +236,8 @@ foodpos.FoodPOS.Controller = class {
 	async check_pos_profile() {
 		this.wrapper.html(`
 			<div class="fpos-loading-screen" style="display:flex;align-items:center;justify-content:center;height:70vh;flex-direction:column;gap:12px;">
-				<div class="fpos-spinner" style="width:36px;height:36px;border:3px solid #eadfd2;border-top-color:#ea580c;border-radius:50%;animation:fpos-spin .8s linear infinite;"></div>
-				<span style="color:#78716c;font-size:14px;">${__("Loading Food POS environment...")}</span>
+				<div class="fpos-spinner" style="width:36px;height:36px;border:3px solid #e2e8f0;border-top-color:#15803d;border-radius:50%;animation:fpos-spin .8s linear infinite;"></div>
+				<span style="color:#64748b;font-size:14px;">${__("Loading Food POS environment...")}</span>
 			</div>
 		`);
 
@@ -253,7 +253,7 @@ foodpos.FoodPOS.Controller = class {
 					<div class="fpos-empty-profile" style="max-width:480px;margin:80px auto;text-align:center;background:#fff;padding:40px;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.08);">
 						<div style="margin-bottom:12px;color:#f59e0b;">${fpos_icon("alert", "fpos-ic-lg")}</div>
 						<h3>${__("No POS Profile Found")}</h3>
-						<p style="color:#78716c;margin:12px 0 20px;">${__("Please create or assign a POS Profile for your user in ERPNext to begin sales operations.")}</p>
+						<p style="color:#64748b;margin:12px 0 20px;">${__("Please create or assign a POS Profile for your user in ERPNext to begin sales operations.")}</p>
 						<button class="btn btn-primary" onclick="frappe.set_route('List', 'POS Profile')">${__("Open POS Profiles")}</button>
 					</div>
 				`);
@@ -458,10 +458,10 @@ foodpos.FoodPOS.Controller = class {
 
 		// Show informative placeholder in main view while shift opening dialog is open
 		this.wrapper.html(`
-			<div class="fpos-shift-pending" style="display:flex;align-items:center;justify-content:center;height:65vh;flex-direction:column;gap:14px;color:#57534e;">
-				<div style="color:#a8a29e;">${fpos_icon("receipt", "fpos-ic-lg")}</div>
-				<div style="font-size:16px;font-weight:700;color:#292524;">${__("Register Shift Not Open")}</div>
-				<p style="font-size:13px;color:#78716c;max-width:380px;text-align:center;margin:0;">${__("Please enter opening float cash in the dialog to start sales operations for {0}.", [this.branch || this.pos_profile])}</p>
+			<div class="fpos-shift-pending" style="display:flex;align-items:center;justify-content:center;height:65vh;flex-direction:column;gap:14px;color:#475569;">
+				<div style="color:#94a3b8;">${fpos_icon("receipt", "fpos-ic-lg")}</div>
+				<div style="font-size:16px;font-weight:700;color:#1e293b;">${__("Register Shift Not Open")}</div>
+				<p style="font-size:13px;color:#64748b;max-width:380px;text-align:center;margin:0;">${__("Please enter opening float cash in the dialog to start sales operations for {0}.", [this.branch || this.pos_profile])}</p>
 				<button class="btn btn-primary btn-sm fpos-reopen-shift-dialog-btn" style="margin-top:6px;font-weight:600;">${fpos_icon("refresh", "fpos-ic-sm")} ${__("Open Shift Dialog")}</button>
 			</div>
 		`);
@@ -652,8 +652,8 @@ foodpos.FoodPOS.Controller = class {
 		let category = "Other Fast Food";
 		// v5: `icon` is an FPOS_ICONS key (SVG food icon), never an emoji.
 		let icon = "plate";
-		let badge_color = "#57534e";
-		let badge_bg = "#f5efe4";
+		let badge_color = "#475569";
+		let badge_bg = "#f1f5f9";
 
 		if (/burger|cheeseburger|whopper|patty|zinger|beef burger|chicken burger|smashburger|slider|bun/.test(text)) {
 			category = "Burgers";
@@ -693,8 +693,8 @@ foodpos.FoodPOS.Controller = class {
 		} else if (item.item_group && item.item_group !== "All Item Groups" && item.item_group !== "Products") {
 			category = item.item_group;
 			icon = "plate";
-			badge_color = "#57534e";
-			badge_bg = "#f5efe4";
+			badge_color = "#475569";
+			badge_bg = "#f1f5f9";
 		}
 
 		const is_veg = Boolean(item.is_vegetarian || /veg|vegetarian|paneer|falafel|vegan|plant-based|tofu/.test(name));
@@ -821,7 +821,7 @@ foodpos.FoodPOS.Controller = class {
 					<div class="fpos-header-center">
 						<div class="fpos-topbar-search">
 							<span class="fpos-search-icon">${fpos_icon("search", "fpos-ic-sm")}</span>
-							<input class="fpos-search-input form-control" type="text" placeholder="${__("Search food, code or barcode...  ( / )")}" />
+							<input class="fpos-search-input form-control" type="text" placeholder="${__("Search Product here...")}" />
 						<!-- v5.3: Filters live in the TOP BAR, same single row as the
 						     search bar (user asked: "search bar ka samna 1 hi row ma").
 						     v5.1 had wrongly moved it below the search bar — undone. -->
@@ -970,15 +970,15 @@ foodpos.FoodPOS.Controller = class {
 						<div class="fpos-cart-items-wrapper">
 							<div class="fpos-cart-items"></div>
 							<div class="fpos-cart-empty">
-								<div style="margin-bottom:8px;color:#a8a29e;">${fpos_icon("cart")}</div>
-								<p style="font-weight:600;font-size:14px;color:#78716c;margin:0 0 4px;">${__("Current order is empty")}</p>
-								<small style="color:#a8a29e;">${__("Tap items on the left to add them")}</small>
+								<div style="margin-bottom:8px;color:#94a3b8;">${fpos_icon("cart")}</div>
+								<p style="font-weight:600;font-size:14px;color:#64748b;margin:0 0 4px;">${__("Current order is empty")}</p>
+								<small style="color:#94a3b8;">${__("Tap items on the left to add them")}</small>
 							</div>
 						</div>
 
 						<!-- Pricing Summary -->
 						<div class="fpos-cart-totals">
-							<div class="fpos-total-row" style="display:flex;justify-content:space-between;margin-bottom:5px;font-size:13px;color:#57534e;">
+							<div class="fpos-total-row" style="display:flex;justify-content:space-between;margin-bottom:5px;font-size:13px;color:#475569;">
 								<span>${__("Subtotal")}</span>
 								<span class="fpos-subtotal-val">Rs 0.00</span>
 							</div>
@@ -1062,7 +1062,7 @@ foodpos.FoodPOS.Controller = class {
 						</div>
 						<button class="fpos-drawer-close fpos-close-kitchen-drawer">&times;</button>
 					</div>
-					<div class="fpos-kitchen-station-filters" style="padding:10px 16px;background:#faf6f0;border-bottom:1px solid #eadfd2;display:flex;gap:6px;overflow-x:auto;">
+					<div class="fpos-kitchen-station-filters" style="padding:10px 16px;background:#f8fafc;border-bottom:1px solid #e2e8f0;display:flex;gap:6px;overflow-x:auto;">
 						<button type="button" class="btn btn-default btn-xs fpos-kds-station-btn active" data-station="All" style="font-weight:700;border-radius:6px;">${__("All Stations")}</button>
 						<button type="button" class="btn btn-default btn-xs fpos-kds-station-btn" data-station="Main Kitchen" style="font-weight:700;border-radius:6px;">${__("Main Kitchen")}</button>
 						<button type="button" class="btn btn-default btn-xs fpos-kds-station-btn" data-station="Grill" style="font-weight:700;border-radius:6px;">${__("Grill")}</button>
@@ -1174,18 +1174,15 @@ foodpos.FoodPOS.Controller = class {
 			list = list.filter((i) => i._is_spicy);
 		}
 
-		// 3. Search Term Filter — name, code, category AND barcode (v6).
+		// 3. Search Term Filter
 		if (this.search_term) {
 			const term = this.search_term.toLowerCase().trim();
 			list = list.filter((i) =>
 				(i.item_name || "").toLowerCase().includes(term) ||
 				(i.item_code || "").toLowerCase().includes(term) ||
-				(i.barcode || "").toLowerCase().includes(term) ||
 				(i._ff_category || "").toLowerCase().includes(term)
 			);
 		}
-		// v6: keep the last filtered list for Enter-to-add (barcode scan).
-		this._last_search_results = list;
 
 		// 4. Sort
 		if (this.sort_by === "price-asc") {
@@ -1198,9 +1195,9 @@ foodpos.FoodPOS.Controller = class {
 
 		if (list.length === 0) {
 			$grid.html(`
-				<div style="grid-column:1/-1;text-align:center;padding:50px 20px;color:#a8a29e;">
-					<div style="margin-bottom:10px;color:#a8a29e;">${fpos_icon("search", "fpos-ic-lg")}</div>
-					<h4 style="color:#78716c;font-weight:600;margin-bottom:6px;">${__("No matching food items found")}</h4>
+				<div style="grid-column:1/-1;text-align:center;padding:50px 20px;color:#94a3b8;">
+					<div style="margin-bottom:10px;color:#94a3b8;">${fpos_icon("search", "fpos-ic-lg")}</div>
+					<h4 style="color:#64748b;font-weight:600;margin-bottom:6px;">${__("No matching food items found")}</h4>
 					<p style="font-size:13px;">${__("Try clearing search filters or selecting another product category.")}</p>
 					<button class="btn btn-default btn-xs fpos-reset-filters-btn" style="margin-top:10px;">${__("Reset Filters")}</button>
 				</div>
@@ -1335,7 +1332,7 @@ foodpos.FoodPOS.Controller = class {
 				{
 					fieldname: "info_html",
 					fieldtype: "HTML",
-					options: `<div style="padding:4px 0 10px;color:#78716c;font-size:13px;line-height:1.4;">${details || __("This privileged action requires Manager PIN override.")}</div>`,
+					options: `<div style="padding:4px 0 10px;color:#64748b;font-size:13px;line-height:1.4;">${details || __("This privileged action requires Manager PIN override.")}</div>`,
 				},
 				{
 					fieldname: "pin",
@@ -1840,20 +1837,20 @@ foodpos.FoodPOS.Controller = class {
 			const $tab = $(`
 				<div class="fpos-tab-pill ${is_active ? "active" : ""}" data-tab-id="${key}" style="
 					display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border-radius:12px;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap;
-					background:${is_active ? "#ffffff" : "#f5efe4"};
-					color:${is_active ? "#292524" : "#57534e"};
-					border:1.5px solid ${is_active ? "#ea580c" : "#d8cbb8"};
-					box-shadow:${is_active ? "0 2px 8px rgba(234,88,12,0.18)" : "none"};
+					background:${is_active ? "#ffffff" : "#f1f5f9"};
+					color:${is_active ? "#0f172a" : "#475569"};
+					border:1.5px solid ${is_active ? "#15803d" : "#cbd5e1"};
+					box-shadow:${is_active ? "0 2px 8px rgba(21,128,61,0.18)" : "none"};
 					transition:all .15s ease;
 				">
-					${is_active ? `<span style="width:7px;height:7px;border-radius:50%;background:#ea580c;display:inline-block;"></span>` : ""}
+					${is_active ? `<span style="width:7px;height:7px;border-radius:50%;background:#15803d;display:inline-block;"></span>` : ""}
 					<span style="font-size:14px;">${icon}</span>
 					<span class="fpos-tab-title" style="font-weight:700;max-width:140px;overflow:hidden;text-overflow:ellipsis;">${tab.title || __("Tab")}</span>
-					<span class="fpos-tab-items-count" style="font-size:11px;color:${is_active ? "#78716c" : "#a8a29e"};background:${is_active ? "#faf6f0" : "#eadfd2"};padding:2px 7px;border-radius:10px;font-weight:600;">${count_str}</span>
-					<span class="fpos-tab-total" style="font-size:12px;font-weight:800;color:${is_active ? "#ea580c" : "#78716c"};">${total_str}</span>
+					<span class="fpos-tab-items-count" style="font-size:11px;color:${is_active ? "#64748b" : "#94a3b8"};background:${is_active ? "#f8fafc" : "#e2e8f0"};padding:2px 7px;border-radius:10px;font-weight:600;">${count_str}</span>
+					<span class="fpos-tab-total" style="font-size:12px;font-weight:800;color:${is_active ? "#15803d" : "#64748b"};">${total_str}</span>
 					${tab_keys.length > 1 ? `
 						<span class="fpos-close-tab-btn" data-tab-id="${key}" title="${__("Close / Discard Tab")}" style="
-							color:#a8a29e;font-size:14px;line-height:1;margin-left:4px;cursor:pointer;padding:2px 5px;border-radius:50%;
+							color:#94a3b8;font-size:14px;line-height:1;margin-left:4px;cursor:pointer;padding:2px 5px;border-radius:50%;
 							transition:background .15s ease, color .15s ease;
 						">×</span>
 					` : ""}
@@ -1868,7 +1865,7 @@ foodpos.FoodPOS.Controller = class {
 			$tab.find(".fpos-close-tab-btn").on("mouseenter", function() {
 				$(this).css({ background: "#fee2e2", color: "#dc2626" });
 			}).on("mouseleave", function() {
-				$(this).css({ background: "transparent", color: "#a8a29e" });
+				$(this).css({ background: "transparent", color: "#94a3b8" });
 			});
 
 			$tab.find(".fpos-close-tab-btn").on("click", (e) => {
@@ -2105,7 +2102,7 @@ foodpos.FoodPOS.Controller = class {
 					Reserved: "#f59e0b",
 					Cleaning: "#3b82f6",
 				};
-				const color = status_colors[data.status] || "#a8a29e";
+				const color = status_colors[data.status] || "#94a3b8";
 				card.find(".fpos-tbl-dot").css("background", color);
 				card.find(".fpos-tbl-status").text(data.status).css("color", color);
 			}
@@ -2160,7 +2157,7 @@ foodpos.FoodPOS.Controller = class {
 		const body = $(d.wrapper).find(".modal-body");
 		body.html(`
 			<div style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
-				<div style="font-size:13px;color:#78716c;">
+				<div style="font-size:13px;color:#64748b;">
 					${this.tables.length} tables &bull; Main Branch
 				</div>
 				<div style="display:flex;gap:12px;font-size:11px;">
@@ -2174,7 +2171,7 @@ foodpos.FoodPOS.Controller = class {
 		const grid = body.find(".fpos-table-grid");
 
 		if (this.tables.length === 0) {
-			grid.html(`<div style="grid-column:1/-1;text-align:center;padding:30px 10px;color:#78716c;">${__("No tables found. Add Restaurant Tables in Desk.")}</div>`);
+			grid.html(`<div style="grid-column:1/-1;text-align:center;padding:30px 10px;color:#64748b;">${__("No tables found. Add Restaurant Tables in Desk.")}</div>`);
 		} else {
 			this.tables.forEach((t) => {
 				const is_occupied = t.status === "Occupied";
@@ -2185,15 +2182,15 @@ foodpos.FoodPOS.Controller = class {
 					Reserved: "#f59e0b",
 					Cleaning: "#3b82f6",
 				};
-				const color = status_colors[t.status] || "#a8a29e";
+				const color = status_colors[t.status] || "#94a3b8";
 				const has_tab = this.is_table_in_any_tab(t.name);
 				const display_name = t.table_no ? `Table ${t.table_no}` : t.name;
 
 				const card = $(`
-					<div class="fpos-tbl-card" data-table="${t.name}" style="border:2px solid ${t.name === this.selected_table ? "#ea580c" : "#eadfd2"};background:#fff;border-radius:10px;padding:12px;text-align:center;cursor:pointer;position:relative;transition:all .2s ease;">
+					<div class="fpos-tbl-card" data-table="${t.name}" style="border:2px solid ${t.name === this.selected_table ? "#15803d" : "#e2e8f0"};background:#fff;border-radius:10px;padding:12px;text-align:center;cursor:pointer;position:relative;transition:all .2s ease;">
 						<div class="fpos-tbl-dot" style="width:10px;height:10px;border-radius:50%;background:${color};margin:0 auto 6px;"></div>
-						<div style="font-weight:700;font-size:14px;color:#292524;">${display_name}</div>
-						<small style="color:#78716c;font-size:11px;">${t.capacity || 4} ${__("Seats")}</small>
+						<div style="font-weight:700;font-size:14px;color:#0f172a;">${display_name}</div>
+						<small style="color:#64748b;font-size:11px;">${t.capacity || 4} ${__("Seats")}</small>
 						<div class="fpos-tbl-status" style="font-size:10px;color:${color};font-weight:700;margin-top:4px;">${__(t.status)}</div>
 						${is_occupied && t.occupied_since ? `<div class="fpos-tbl-timer" data-since="${t.occupied_since}" style="font-size:11px;color:#b45309;font-weight:700;margin-top:2px;">⏱ ${this.format_elapsed(t.occupied_since)}</div>` : ""}
 						${has_tab ? `<span style="position:absolute;top:4px;right:6px;font-size:10px;background:#e0f2fe;color:#0284c7;padding:1px 5px;border-radius:6px;font-weight:700;">${__("Tab")}</span>` : ""}
@@ -2665,13 +2662,13 @@ foodpos.FoodPOS.Controller = class {
 		this.active_payment_mode = default_mode;
 
 		const cart_rows = this.cart_items.map((it) => `
-			<tr style="border-bottom:1px solid #f5efe4;">
+			<tr style="border-bottom:1px solid #f1f5f9;">
 				<td style="padding:6px 0;">
-					<div style="font-weight:700;color:#292524;">${it.item_name}</div>
+					<div style="font-weight:700;color:#1e293b;">${it.item_name}</div>
 					${it.item_note ? `<div style="font-size:10px;color:#d97706;">${it.item_note}</div>` : ""}
 				</td>
-				<td style="padding:6px 10px;text-align:center;font-weight:700;color:#78716c;">${it.qty}</td>
-				<td style="padding:6px 0;text-align:right;font-weight:700;color:#292524;">${format_curr(it.amount)}</td>
+				<td style="padding:6px 10px;text-align:center;font-weight:700;color:#64748b;">${it.qty}</td>
+				<td style="padding:6px 0;text-align:right;font-weight:700;color:#0f172a;">${format_curr(it.amount)}</td>
 			</tr>
 		`).join("");
 
@@ -2684,25 +2681,25 @@ foodpos.FoodPOS.Controller = class {
 			const init_amt = flt(this.payment_splits[mop] || 0);
 
 			return `
-				<div class="fpos-split-row" data-mode="${mop}" style="background:#fff;border:2px solid ${is_active ? "#ea580c" : "#eadfd2"};border-radius:12px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;">
+				<div class="fpos-split-row" data-mode="${mop}" style="background:#fff;border:2px solid ${is_active ? "#15803d" : "#e2e8f0"};border-radius:12px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;">
 					<div style="display:flex;align-items:center;gap:10px;min-width:140px;">
-						<span style="color:#ea580c;">${fpos_icon(icon)}</span>
+						<span style="color:#15803d;">${fpos_icon(icon)}</span>
 						<div>
-							<div style="font-weight:800;color:#292524;font-size:14px;">${mop}</div>
-							<div style="font-size:11px;color:#78716c;">${m.type || "Payment"}</div>
+							<div style="font-weight:800;color:#0f172a;font-size:14px;">${mop}</div>
+							<div style="font-size:11px;color:#64748b;">${m.type || "Payment"}</div>
 						</div>
 					</div>
 
 					<div style="display:flex;align-items:center;gap:8px;flex:1;justify-content:flex-end;">
-						<button type="button" class="btn btn-default btn-xs fpos-split-fill-btn" data-mode="${mop}" style="font-weight:700;font-size:11px;padding:4px 8px;border-radius:6px;background:#faf6f0;">
+						<button type="button" class="btn btn-default btn-xs fpos-split-fill-btn" data-mode="${mop}" style="font-weight:700;font-size:11px;padding:4px 8px;border-radius:6px;background:#f8fafc;">
 							${__("Exact")}
 						</button>
-						<button type="button" class="btn btn-default btn-xs fpos-split-clear-btn" data-mode="${mop}" style="font-weight:700;font-size:11px;padding:4px 8px;border-radius:6px;color:#ef4444;background:#faf6f0;">
+						<button type="button" class="btn btn-default btn-xs fpos-split-clear-btn" data-mode="${mop}" style="font-weight:700;font-size:11px;padding:4px 8px;border-radius:6px;color:#ef4444;background:#f8fafc;">
 							0
 						</button>
 						<div style="position:relative;width:150px;">
-							<span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:13px;font-weight:700;color:#78716c;">Rs</span>
-							<input type="text" class="form-control fpos-split-input" data-mode="${mop}" style="font-size:16px;font-weight:900;text-align:right;padding-left:45px;height:42px;border-radius:8px;border:1.5px solid #d8cbb8;color:#292524;" value="${init_amt.toFixed(2)}" />
+							<span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:13px;font-weight:700;color:#64748b;">Rs</span>
+							<input type="text" class="form-control fpos-split-input" data-mode="${mop}" style="font-size:16px;font-weight:900;text-align:right;padding-left:45px;height:42px;border-radius:8px;border:1.5px solid #cbd5e1;color:#0f172a;" value="${init_amt.toFixed(2)}" />
 						</div>
 					</div>
 				</div>
@@ -2712,18 +2709,18 @@ foodpos.FoodPOS.Controller = class {
 		const $page = this.wrapper.find(".fpos-payment-page");
 		$page.html(`
 			<!-- Top Page Header -->
-			<div class="fpos-payment-header" style="background:#fff;border-bottom:1px solid #eadfd2;padding:14px 24px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+			<div class="fpos-payment-header" style="background:#fff;border-bottom:1px solid #e2e8f0;padding:14px 24px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 1px 3px rgba(0,0,0,0.03);">
 				<div style="display:flex;align-items:center;gap:14px;">
 					<button class="btn btn-default fpos-pay-back-btn" style="display:inline-flex;align-items:center;gap:6px;font-weight:700;border-radius:8px;padding:8px 16px;">
 						<span>←</span>
 						<span>${__("Return to Order")}</span>
 					</button>
 					<div>
-						<h3 style="margin:0;font-size:18px;font-weight:800;color:#292524;display:flex;align-items:center;gap:8px;">
+						<h3 style="margin:0;font-size:18px;font-weight:800;color:#0f172a;display:flex;align-items:center;gap:8px;">
 							<span>${fpos_icon("card")}</span> ${__("Payment & Order Settlement")}
 						</h3>
-						<div style="font-size:12px;color:#78716c;margin-top:2px;">
-							${this.branch ? `<b style="color:#ea580c;">${this.branch}</b> &bull; ` : ""}
+						<div style="font-size:12px;color:#64748b;margin-top:2px;">
+							${this.branch ? `<b style="color:#15803d;">${this.branch}</b> &bull; ` : ""}
 							<span>${this.order_type}</span>
 							${this.selected_table_no ? `&bull; <b>Table ${this.selected_table_no}</b>` : ""}
 							&bull; <span>Customer: <b>${this.customer || "Walk-in Customer"}</b></span>
@@ -2732,9 +2729,9 @@ foodpos.FoodPOS.Controller = class {
 				</div>
 
 				<div style="display:flex;align-items:center;gap:12px;">
-					<div style="background:#ffedd5;border:1px solid #fed7aa;padding:8px 16px;border-radius:12px;text-align:right;">
-						<span style="font-size:11px;color:#c2410c;font-weight:700;text-transform:uppercase;">${__("Amount Due")}</span>
-						<div style="font-size:22px;font-weight:900;color:#ea580c;line-height:1.2;">${format_curr(total)}</div>
+					<div style="background:#f0fdf4;border:1px solid #fed7aa;padding:8px 16px;border-radius:12px;text-align:right;">
+						<span style="font-size:11px;color:#166534;font-weight:700;text-transform:uppercase;">${__("Amount Due")}</span>
+						<div style="font-size:22px;font-weight:900;color:#15803d;line-height:1.2;">${format_curr(total)}</div>
 					</div>
 				</div>
 			</div>
@@ -2742,12 +2739,12 @@ foodpos.FoodPOS.Controller = class {
 			<!-- Main 2-Column Responsive Body -->
 			<div style="max-width:1150px;margin:24px auto;width:100%;padding:0 24px;display:grid;grid-template-columns:1.25fr 0.85fr;gap:24px;">
 				<!-- Left Column: Payment Modes, Split Inputs & Touch Keypad -->
-				<div style="background:#fff;border-radius:16px;border:1px solid #eadfd2;padding:24px;box-shadow:0 2px 8px rgba(0,0,0,0.04);display:flex;flex-direction:column;gap:18px;">
+				<div style="background:#fff;border-radius:16px;border:1px solid #e2e8f0;padding:24px;box-shadow:0 2px 8px rgba(0,0,0,0.04);display:flex;flex-direction:column;gap:18px;">
 					<!-- 1. Quick Full Pay Pills -->
 					<div>
 						<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-							<label style="font-size:13px;font-weight:800;color:#44403c;margin:0;">${__("1. Quick 100% Payment")}</label>
-							<span style="font-size:11px;color:#78716c;">${__("Sets entire bill to single mode")}</span>
+							<label style="font-size:13px;font-weight:800;color:#334155;margin:0;">${__("1. Quick 100% Payment")}</label>
+							<span style="font-size:11px;color:#64748b;">${__("Sets entire bill to single mode")}</span>
 						</div>
 						<div class="fpos-quick-full-mops" style="display:flex;gap:8px;flex-wrap:wrap;">
 							${methods.map(m => `
@@ -2762,8 +2759,8 @@ foodpos.FoodPOS.Controller = class {
 					<!-- 2. Split Payment Mode Rows -->
 					<div>
 						<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-							<label style="font-size:13px;font-weight:800;color:#44403c;margin:0;">${__("2. Payment Breakdown / Split")}</label>
-							<span style="font-size:11px;color:#78716c;">${__("Enter split amounts across multiple modes")}</span>
+							<label style="font-size:13px;font-weight:800;color:#334155;margin:0;">${__("2. Payment Breakdown / Split")}</label>
+							<span style="font-size:11px;color:#64748b;">${__("Enter split amounts across multiple modes")}</span>
 						</div>
 						<div class="fpos-split-mop-list" style="display:flex;flex-direction:column;gap:8px;">
 							${mop_rows_html}
@@ -2771,10 +2768,10 @@ foodpos.FoodPOS.Controller = class {
 					</div>
 
 					<!-- 3. Active Mode Quick Cash Pills & Touch Keypad -->
-					<div style="border-top:1px solid #f5efe4;padding-top:14px;">
+					<div style="border-top:1px solid #f1f5f9;padding-top:14px;">
 						<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-							<label style="font-size:12px;font-weight:800;color:#44403c;margin:0;">
-								${__("Numpad for:")} <span class="fpos-active-mode-label" style="color:#ea580c;font-weight:900;">${default_mode}</span>
+							<label style="font-size:12px;font-weight:800;color:#334155;margin:0;">
+								${__("Numpad for:")} <span class="fpos-active-mode-label" style="color:#15803d;font-weight:900;">${default_mode}</span>
 							</label>
 							<div class="fpos-cash-pills" style="display:flex;gap:6px;flex-wrap:wrap;">
 								<button type="button" class="btn btn-default btn-xs fpos-cp fpos-cp-exact" data-exact="1" data-amt="${total}">${__("Exact")} (${format_curr(total)})</button>
@@ -2801,9 +2798,9 @@ foodpos.FoodPOS.Controller = class {
 					</div>
 
 					<!-- Order Line Items Review -->
-					<div style="border-top:1px solid #f5efe4;padding-top:10px;">
+					<div style="border-top:1px solid #f1f5f9;padding-top:10px;">
 						<details style="cursor:pointer;">
-							<summary style="font-size:12px;font-weight:700;color:#78716c;user-select:none;">
+							<summary style="font-size:12px;font-weight:700;color:#64748b;user-select:none;">
 								${fpos_icon("cart", "fpos-ic-sm")} ${__("Review Line Items")} (${this.cart_items.length} ${__("items")})
 							</summary>
 							<div style="margin-top:8px;max-height:140px;overflow-y:auto;">
@@ -2817,14 +2814,14 @@ foodpos.FoodPOS.Controller = class {
 
 				<!-- Right Column: Settlement Confirmation Card -->
 				<div style="display:flex;flex-direction:column;gap:16px;">
-					<div style="background:#fff;border-radius:16px;border:1px solid #eadfd2;padding:24px;box-shadow:0 2px 8px rgba(0,0,0,0.04);display:flex;flex-direction:column;gap:14px;">
-						<div style="font-size:15px;font-weight:800;color:#292524;border-bottom:1px solid #f5efe4;padding-bottom:10px;">
+					<div style="background:#fff;border-radius:16px;border:1px solid #e2e8f0;padding:24px;box-shadow:0 2px 8px rgba(0,0,0,0.04);display:flex;flex-direction:column;gap:14px;">
+						<div style="font-size:15px;font-weight:800;color:#0f172a;border-bottom:1px solid #f1f5f9;padding-bottom:10px;">
 							${__("Settlement Breakdown")}
 						</div>
 
-						<div style="display:flex;justify-content:space-between;font-size:13px;color:#78716c;">
+						<div style="display:flex;justify-content:space-between;font-size:13px;color:#64748b;">
 							<span>${__("Subtotal")}</span>
-							<strong style="color:#292524;">${format_curr(this.totals.subtotal)}</strong>
+							<strong style="color:#0f172a;">${format_curr(this.totals.subtotal)}</strong>
 						</div>
 
 						${this.totals.discount > 0 ? `
@@ -2834,12 +2831,12 @@ foodpos.FoodPOS.Controller = class {
 						</div>` : ""}
 						<!-- v5.2: NO TAX line — Subtotal − Discount (Rs) + Delivery Fee only. -->
 
-						<div style="display:flex;justify-content:space-between;font-size:18px;font-weight:900;color:#292524;border-top:2px dashed #eadfd2;padding-top:10px;">
+						<div style="display:flex;justify-content:space-between;font-size:18px;font-weight:900;color:#0f172a;border-top:2px dashed #e2e8f0;padding-top:10px;">
 							<span>${__("Grand Total Due")}</span>
-							<span style="color:#ea580c;">${format_curr(total)}</span>
+							<span style="color:#15803d;">${format_curr(total)}</span>
 						</div>
 
-						<div style="display:flex;justify-content:space-between;font-size:14px;font-weight:700;color:#292524;background:#faf6f0;padding:10px 14px;border-radius:10px;">
+						<div style="display:flex;justify-content:space-between;font-size:14px;font-weight:700;color:#1e293b;background:#f8fafc;padding:10px 14px;border-radius:10px;">
 							<span>${__("Total Tendered")}</span>
 							<span class="fpos-pay-summary-tendered">${format_curr(total)}</span>
 						</div>
@@ -2848,17 +2845,17 @@ foodpos.FoodPOS.Controller = class {
 						<div class="fpos-split-summary-pills" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
 
 						<!-- Live Change or Shortage Display -->
-						<div class="fpos-pay-change-card" style="background:#ffedd5;border:1px solid #bbf7d0;border-radius:10px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;">
+						<div class="fpos-pay-change-card" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;">
 							<div>
-								<div class="fpos-pay-change-title" style="font-size:11px;font-weight:700;color:#ea580c;text-transform:uppercase;">${__("Change to Return")}</div>
+								<div class="fpos-pay-change-title" style="font-size:11px;font-weight:700;color:#15803d;text-transform:uppercase;">${__("Change to Return")}</div>
 								<div class="fpos-pay-summary-change" style="font-size:20px;font-weight:900;color:#16a34a;">${format_curr(0)}</div>
 							</div>
-							<span class="fpos-pay-change-icon" style="color:#ea580c;">${fpos_icon("cash")}</span>
+							<span class="fpos-pay-change-icon" style="color:#15803d;">${fpos_icon("cash")}</span>
 						</div>
 
 						<!-- Customer POS Slip Toggle -->
-						<div style="display:flex;align-items:center;gap:8px;margin-top:6px;font-size:13px;color:#57534e;">
-							<input type="checkbox" id="fpos-auto-print-slip" ${this.auto_print_slip ? "checked" : ""} style="width:16px;height:16px;accent-color:#ea580c;cursor:pointer;" />
+						<div style="display:flex;align-items:center;gap:8px;margin-top:6px;font-size:13px;color:#475569;">
+							<input type="checkbox" id="fpos-auto-print-slip" ${this.auto_print_slip ? "checked" : ""} style="width:16px;height:16px;accent-color:#15803d;cursor:pointer;" />
 							<label for="fpos-auto-print-slip" style="margin:0;cursor:pointer;font-weight:600;">${__("Generate & Print POS Slip on Settlement")}</label>
 						</div>
 
@@ -2890,7 +2887,7 @@ foodpos.FoodPOS.Controller = class {
 				total_tendered += amt;
 				if (amt > 0) {
 					pills.push(`
-						<span style="font-size:11px;font-weight:700;background:#f5efe4;color:#44403c;border:1px solid #d8cbb8;padding:3px 8px;border-radius:6px;">
+						<span style="font-size:11px;font-weight:700;background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;padding:3px 8px;border-radius:6px;">
 							${fpos_icon(m.icon || "card", "fpos-ic-sm")} ${mop}: <b>${format_curr(amt)}</b>
 						</span>
 					`);
@@ -2910,8 +2907,8 @@ foodpos.FoodPOS.Controller = class {
 
 			if (diff >= -0.001) {
 				const change = Math.max(0, diff);
-				$card.css({ background: "#ffedd5", borderColor: "#bbf7d0" });
-				$title.css("color", "#ea580c").text(__("Change to Return"));
+				$card.css({ background: "#f0fdf4", borderColor: "#bbf7d0" });
+				$title.css("color", "#15803d").text(__("Change to Return"));
 				$change_val.css("color", "#16a34a").text(format_curr(change));
 				$icon.text("");
 				$confirm_btn.prop("disabled", false).css({ background: "#22c55e", cursor: "pointer", opacity: 1 });
@@ -2922,7 +2919,7 @@ foodpos.FoodPOS.Controller = class {
 				$title.css("color", "#b91c1c").text(__("Remaining Amount Due"));
 				$change_val.css("color", "#b91c1c").text(`-${format_curr(shortage)}`);
 				$icon.text("");
-				$confirm_btn.prop("disabled", true).css({ background: "#a8a29e", cursor: "not-allowed", opacity: 0.7 });
+				$confirm_btn.prop("disabled", true).css({ background: "#94a3b8", cursor: "not-allowed", opacity: 0.7 });
 				$btn_label.text(__("Remaining Due: {0}", [format_curr(shortage)]));
 			}
 		};
@@ -2934,9 +2931,9 @@ foodpos.FoodPOS.Controller = class {
 			$page.find(".fpos-split-row").each(function () {
 				const row_mode = $(this).data("mode");
 				if (row_mode === mop) {
-					$(this).css({ borderColor: "#ea580c", background: "#fffaf5" });
+					$(this).css({ borderColor: "#15803d", background: "#fffaf5" });
 				} else {
-					$(this).css({ borderColor: "#eadfd2", background: "#fff" });
+					$(this).css({ borderColor: "#e2e8f0", background: "#fff" });
 				}
 			});
 		};
@@ -3223,10 +3220,10 @@ foodpos.FoodPOS.Controller = class {
 		const change_due = flt(receipt_data.change_amount) || Math.max(0, flt(receipt_data.paid_amount) - flt(receipt_data.grand_total));
 
 		const items_html = (receipt_data.items || []).map(i => `
-			<tr style="border-bottom: 1px dashed #d8cbb8;">
+			<tr style="border-bottom: 1px dashed #cbd5e1;">
 				<td style="padding: 4px 0; text-align: left; vertical-align: top;">
 					<div style="font-weight: 700;">${i.item_name}</div>
-					${i.item_note ? `<div style="font-size: 10px; color: #78716c; font-style: italic;">* ${i.item_note}</div>` : ""}
+					${i.item_note ? `<div style="font-size: 10px; color: #64748b; font-style: italic;">* ${i.item_note}</div>` : ""}
 				</td>
 				<td style="padding: 4px 6px; text-align: center; vertical-align: top;">${i.qty}</td>
 				<td style="padding: 4px 6px; text-align: right; vertical-align: top;">${format_curr(i.rate)}</td>
@@ -3249,19 +3246,12 @@ foodpos.FoodPOS.Controller = class {
 		$container.html(`
 			<div class="fpos-slip-modal-overlay">
 				<div class="fpos-slip-card" style="position: relative;">
-					<div class="fpos-slip-close-icon" style="position: absolute; top: 12px; right: 14px; cursor: pointer; font-size: 18px; color: #a8a29e; line-height: 1; padding: 4px;" title="${__("Close (Esc)")}">✕</div>
-
-					${is_settlement ? `
-					<div style="text-align: center; margin-bottom: 12px;">
-						<div style="width: 54px; height: 54px; border-radius: 50%; background: #dcfce7; color: #16a34a; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 900; margin: 0 auto 6px;">✓</div>
-						<div style="font-size: 17px; font-weight: 900; color: #16a34a;">${__("Payment Successful")}</div>
-						<div style="font-size: 12px; color: #78716c;">${__("Invoice")} ${receipt_data.invoice}</div>
-					</div>` : ""}
+					<div class="fpos-slip-close-icon" style="position: absolute; top: 12px; right: 14px; cursor: pointer; font-size: 18px; color: #94a3b8; line-height: 1; padding: 4px;" title="${__("Close (Esc)")}">✕</div>
 
 					<div style="text-align: center; margin-bottom: 8px;">
-						<div style="font-size: 20px; font-weight: 900; color: #292524;">${receipt_data.company || "FOOD POS RESTAURANT"}</div>
-						<div style="font-size: 11px; color: #78716c;">${receipt_data.branch ? `<b style="color:#ea580c;">${receipt_data.branch}</b> &bull; ` : ""}${receipt_data.pos_profile || this.pos_profile} &bull; Register Receipt</div>
-						<div style="font-size: 11px; color: #78716c;">${receipt_data.posting_date || ""} ${this.format_time_hh_mm(receipt_data.posting_time)}</div>
+						<div style="font-size: 20px; font-weight: 900; color: #0f172a;">${receipt_data.company || "FOOD POS RESTAURANT"}</div>
+						<div style="font-size: 11px; color: #64748b;">${receipt_data.branch ? `<b style="color:#15803d;">${receipt_data.branch}</b> &bull; ` : ""}${receipt_data.pos_profile || this.pos_profile} &bull; Register Receipt</div>
+						<div style="font-size: 11px; color: #64748b;">${receipt_data.posting_date || ""} ${this.format_time_hh_mm(receipt_data.posting_time)}</div>
 					</div>
 
 					<div class="fpos-slip-divider"></div>
@@ -3269,7 +3259,7 @@ foodpos.FoodPOS.Controller = class {
 					<div style="font-size: 11px; display: flex; flex-direction: column; gap: 2px;">
 						<div style="display: flex; justify-content: space-between;">
 							<span>Invoice #:</span>
-							<strong style="color: #292524;">${receipt_data.invoice}</strong>
+							<strong style="color: #0f172a;">${receipt_data.invoice}</strong>
 						</div>
 						${receipt_data.kot_numbers && receipt_data.kot_numbers.length ? `
 						<div style="display: flex; justify-content: space-between;">
@@ -3305,7 +3295,7 @@ foodpos.FoodPOS.Controller = class {
 
 					<table style="width: 100%; font-size: 11px; border-collapse: collapse;">
 						<thead>
-							<tr style="border-bottom: 1px solid #292524; text-transform: uppercase; font-size: 10px;">
+							<tr style="border-bottom: 1px solid #0f172a; text-transform: uppercase; font-size: 10px;">
 								<th style="text-align: left; padding: 2px 0;">Item</th>
 								<th style="text-align: center; padding: 2px 6px;">Qty</th>
 								<th style="text-align: right; padding: 2px 6px;">Rate</th>
@@ -3335,7 +3325,7 @@ foodpos.FoodPOS.Controller = class {
 							<span>Delivery Fee:</span>
 							<span>+${format_curr(receipt_data.delivery_charges)}</span>
 						</div>` : ""}
-						<div style="display: flex; justify-content: space-between; font-size: 14px; font-weight: 900; border-top: 1px solid #292524; padding-top: 4px; margin-top: 2px;">
+						<div style="display: flex; justify-content: space-between; font-size: 14px; font-weight: 900; border-top: 1px solid #0f172a; padding-top: 4px; margin-top: 2px;">
 							<span>TOTAL DUE:</span>
 							<span>${format_curr(receipt_data.grand_total)}</span>
 						</div>
@@ -3346,7 +3336,7 @@ foodpos.FoodPOS.Controller = class {
 					<div style="display: flex; flex-direction: column; gap: 3px;">
 						${payments_html}
 						${change_due > 0 ? `
-						<div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 800; color: #ea580c; background: #ffedd5; padding: 4px 6px; border-radius: 4px; margin-top: 4px;">
+						<div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 800; color: #15803d; background: #f0fdf4; padding: 4px 6px; border-radius: 4px; margin-top: 4px;">
 							<span>Change Due:</span>
 							<span>${format_curr(change_due)}</span>
 						</div>` : ""}
@@ -3354,10 +3344,10 @@ foodpos.FoodPOS.Controller = class {
 
 					<div class="fpos-slip-divider"></div>
 
-					<div style="text-align: center; margin-top: 10px; font-size: 11px; color: #78716c;">
-						<p style="margin: 0; font-weight: 700; color: #292524;">Thank you for dining with us!</p>
+					<div style="text-align: center; margin-top: 10px; font-size: 11px; color: #64748b;">
+						<p style="margin: 0; font-weight: 700; color: #0f172a;">Thank you for dining with us!</p>
 						<p style="margin: 2px 0 0;">Please visit us again.</p>
-						<div style="letter-spacing: 4px; font-size: 16px; margin-top: 8px; color: #a8a29e;">|||| | ||||| || ||||||</div>
+						<div style="letter-spacing: 4px; font-size: 16px; margin-top: 8px; color: #94a3b8;">|||| | ||||| || ||||||</div>
 					</div>
 
 					<!-- Slip Actions -->
@@ -3365,7 +3355,7 @@ foodpos.FoodPOS.Controller = class {
 						<button class="btn btn-default fpos-close-slip-btn" style="flex: 1; font-weight: 700; border-radius: 8px; cursor: pointer;">
 							${is_settlement ? __("Next Order (Close)") : __("Close")}
 						</button>
-						<button class="btn btn-primary fpos-print-slip-btn" style="flex: 1; font-weight: 700; background: #ea580c; border-color: #ea580c; border-radius: 8px; cursor: pointer;">
+						<button class="btn btn-primary fpos-print-slip-btn" style="flex: 1; font-weight: 700; background: #15803d; border-color: #15803d; border-radius: 8px; cursor: pointer;">
 							${fpos_icon("printer", "fpos-ic-sm")} ${__("Print Slip")}
 						</button>
 					</div>
@@ -3572,7 +3562,7 @@ foodpos.FoodPOS.Controller = class {
 				${flt(receipt_data.outstanding_amount) > 0 ? `<div class="row bold" style="font-size:13px; color:#92400e;"><span>PENDING PAYMENT:</span><span>${format_curr(receipt_data.outstanding_amount)}</span></div>` : ""}
 				<div class="divider"></div>
 				<div class="row"><span>Paid Amount:</span><span>${format_curr(receipt_data.paid_amount || receipt_data.grand_total)}</span></div>
-				${(flt(receipt_data.change_amount) || Math.max(0, flt(receipt_data.paid_amount) - flt(receipt_data.grand_total))) > 0 ? `<div class="row bold" style="font-size:13px; color:#ea580c;"><span>Change Due:</span><span>${format_curr(flt(receipt_data.change_amount) || Math.max(0, flt(receipt_data.paid_amount) - flt(receipt_data.grand_total)))}</span></div>` : ""}
+				${(flt(receipt_data.change_amount) || Math.max(0, flt(receipt_data.paid_amount) - flt(receipt_data.grand_total))) > 0 ? `<div class="row bold" style="font-size:13px; color:#15803d;"><span>Change Due:</span><span>${format_curr(flt(receipt_data.change_amount) || Math.max(0, flt(receipt_data.paid_amount) - flt(receipt_data.grand_total)))}</span></div>` : ""}
 				<div class="divider"></div>
 				<div class="text-center" style="margin-top: 10px; font-size: 11px;">
 					<p style="margin: 0;" class="bold">Thank you for dining with us!</p>
@@ -3622,8 +3612,8 @@ foodpos.FoodPOS.Controller = class {
 		} else {
 			body.html(`
 				<div style="display:flex;justify-content:center;align-items:center;height:180px;flex-direction:column;gap:10px;">
-					<div class="fpos-spinner" style="width:32px;height:32px;border:3px solid #eadfd2;border-top-color:#ea580c;border-radius:50%;animation:fpos-spin .8s linear infinite;"></div>
-					<span style="color:#78716c;font-size:13px;">${__("Loading recent orders...")}</span>
+					<div class="fpos-spinner" style="width:32px;height:32px;border:3px solid #e2e8f0;border-top-color:#15803d;border-radius:50%;animation:fpos-spin .8s linear infinite;"></div>
+					<span style="color:#64748b;font-size:13px;">${__("Loading recent orders...")}</span>
 				</div>
 			`);
 		}
@@ -3666,9 +3656,9 @@ foodpos.FoodPOS.Controller = class {
 
 		if (!orders || orders.length === 0) {
 			$body.html(`
-				<div style="text-align:center;padding:50px 20px;color:#a8a29e;">
-					<div style="margin-bottom:8px;color:#a8a29e;">${fpos_icon("receipt")}</div>
-					<div style="font-weight:600;font-size:14px;color:#78716c;">${__("No recent customer orders today")}</div>
+				<div style="text-align:center;padding:50px 20px;color:#94a3b8;">
+					<div style="margin-bottom:8px;color:#94a3b8;">${fpos_icon("receipt")}</div>
+					<div style="font-weight:600;font-size:14px;color:#64748b;">${__("No recent customer orders today")}</div>
 					<p style="font-size:12px;margin-top:4px;">${__("Completed POS invoices will appear here.")}</p>
 				</div>
 			`);
@@ -3681,7 +3671,7 @@ foodpos.FoodPOS.Controller = class {
 			const format_curr = (val) => this.format_money(val);
 			const is_paid = flt(o.outstanding_amount) <= 0.001;
 			const status_badge = is_paid
-				? `<span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:800;">PAID</span>`
+				? `<span style="background:#dcfce7;color:#15803d;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:800;">PAID</span>`
 				: `<span style="background:#fee2e2;color:#b91c1c;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:800;">UNPAID</span>`;
 
 			const items_preview = (o.items || []).map(i => `${i.qty}x ${i.item_name}`).join(", ");
@@ -3692,26 +3682,26 @@ foodpos.FoodPOS.Controller = class {
 				<div class="fpos-recent-card" data-idx="${index}">
 					<div style="display:flex;justify-content:space-between;align-items:flex-start;">
 						<div>
-							<div style="font-weight:800;font-size:14px;color:#292524;">${o.name}</div>
-							<div style="font-size:12px;color:#292524;font-weight:600;margin-top:2px;">
+							<div style="font-weight:800;font-size:14px;color:#0f172a;">${o.name}</div>
+							<div style="font-size:12px;color:#1e293b;font-weight:600;margin-top:2px;">
 								${fpos_icon("user", "fpos-ic-sm")} ${o.customer_name || o.customer || "Walk-in"}
 							</div>
-							<div style="font-size:11px;color:#78716c;margin-top:2px;">
+							<div style="font-size:11px;color:#64748b;margin-top:2px;">
 								${o.order_type || o.custom_order_type || "Takeaway"}${recent_tbl_label ? ` &bull; ${recent_tbl_label}` : ""} &bull; ${this.format_time_hh_mm(o.posting_time)}
 							</div>
 						</div>
 						<div style="text-align:right;">
-							<div style="font-weight:800;font-size:15px;color:#ea580c;">${format_curr(o.grand_total)}</div>
+							<div style="font-weight:800;font-size:15px;color:#15803d;">${format_curr(o.grand_total)}</div>
 							<div style="margin-top:4px;">${status_badge}</div>
 						</div>
 					</div>
 
-					<div style="font-size:11px;color:#57534e;background:#faf6f0;padding:6px 10px;border-radius:6px;line-height:1.4;">
-						<b style="color:#292524;">${o.items_count || (o.items || []).length} items:</b> ${items_preview || "Items ordered"}
+					<div style="font-size:11px;color:#475569;background:#f8fafc;padding:6px 10px;border-radius:6px;line-height:1.4;">
+						<b style="color:#0f172a;">${o.items_count || (o.items || []).length} items:</b> ${items_preview || "Items ordered"}
 					</div>
 
 					<!-- Restaurant Actions: Edit / Reload to Cart & Print Slip -->
-					<div style="display:flex;gap:8px;margin-top:4px;border-top:1px dashed #eadfd2;padding-top:8px;">
+					<div style="display:flex;gap:8px;margin-top:4px;border-top:1px dashed #e2e8f0;padding-top:8px;">
 						<button class="btn btn-default btn-xs fpos-reload-order-btn" style="flex:1;font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:4px;color:#2563eb;background:#eff6ff;border-color:#bfdbfe;border-radius:6px;padding:6px 10px;">
 							<span>${fpos_icon("edit", "fpos-ic-sm")}</span>
 							<span>${__("Edit / Reload Cart")}</span>
@@ -3817,8 +3807,8 @@ foodpos.FoodPOS.Controller = class {
 		$drawer.addClass("active");
 		$body.html(`
 			<div style="display:flex;justify-content:center;align-items:center;height:200px;flex-direction:column;gap:10px;">
-				<div class="fpos-spinner" style="width:32px;height:32px;border:3px solid #eadfd2;border-top-color:#ea580c;border-radius:50%;animation:fpos-spin .8s linear infinite;"></div>
-				<span style="color:#78716c;font-size:13px;">${__("Loading active kitchen tickets...")}</span>
+				<div class="fpos-spinner" style="width:32px;height:32px;border:3px solid #e2e8f0;border-top-color:#15803d;border-radius:50%;animation:fpos-spin .8s linear infinite;"></div>
+				<span style="color:#64748b;font-size:13px;">${__("Loading active kitchen tickets...")}</span>
 			</div>
 		`);
 
@@ -3841,7 +3831,7 @@ foodpos.FoodPOS.Controller = class {
 		} catch (e) {
 			$body.html(`
 				<div style="text-align:center;padding:30px;color:#ef4444;">
-					<div style="margin-bottom:8px;color:#a8a29e;">${fpos_icon("chef", "fpos-ic-lg")}</div>
+					<div style="margin-bottom:8px;color:#94a3b8;">${fpos_icon("chef", "fpos-ic-lg")}</div>
 					<div style="font-weight:600;">${__("Failed to load kitchen tickets")}</div>
 					<button class="btn btn-default btn-xs fpos-retry-kitchen-btn" style="margin-top:10px;font-weight:700;">${fpos_icon("refresh", "fpos-ic-sm")} ${__("Retry")}</button>
 				</div>
@@ -3877,8 +3867,8 @@ foodpos.FoodPOS.Controller = class {
 		$drawer.addClass("active");
 		$body.html(`
 			<div style="display:flex;justify-content:center;align-items:center;height:200px;flex-direction:column;gap:10px;">
-				<div class="fpos-spinner" style="width:32px;height:32px;border:3px solid #eadfd2;border-top-color:#ea580c;border-radius:50%;animation:fpos-spin .8s linear infinite;"></div>
-				<span style="color:#78716c;font-size:13px;">${__("Loading pending payments...")}</span>
+				<div class="fpos-spinner" style="width:32px;height:32px;border:3px solid #e2e8f0;border-top-color:#15803d;border-radius:50%;animation:fpos-spin .8s linear infinite;"></div>
+				<span style="color:#64748b;font-size:13px;">${__("Loading pending payments...")}</span>
 			</div>
 		`);
 
@@ -3897,7 +3887,7 @@ foodpos.FoodPOS.Controller = class {
 		} catch (e) {
 			$body.html(`
 				<div style="text-align:center;padding:30px;color:#ef4444;">
-					<div style="margin-bottom:8px;color:#a8a29e;">${fpos_icon("receipt", "fpos-ic-lg")}</div>
+					<div style="margin-bottom:8px;color:#94a3b8;">${fpos_icon("receipt", "fpos-ic-lg")}</div>
 					<div style="font-weight:600;">${__("Failed to load pending payments")}</div>
 					<button class="btn btn-default btn-xs fpos-retry-pending-btn" style="margin-top:10px;font-weight:700;">${fpos_icon("refresh", "fpos-ic-sm")} ${__("Retry")}</button>
 				</div>
@@ -3922,9 +3912,9 @@ foodpos.FoodPOS.Controller = class {
 
 		if (!kots || kots.length === 0) {
 			$body.html(`
-				<div style="text-align:center;padding:50px 20px;color:#a8a29e;">
-					<div style="margin-bottom:8px;color:#a8a29e;">${fpos_icon("receipt", "fpos-ic-lg")}</div>
-					<div style="font-weight:600;font-size:14px;color:#78716c;">${__("No pending payments")}</div>
+				<div style="text-align:center;padding:50px 20px;color:#94a3b8;">
+					<div style="margin-bottom:8px;color:#94a3b8;">${fpos_icon("receipt", "fpos-ic-lg")}</div>
+					<div style="font-weight:600;font-size:14px;color:#64748b;">${__("No pending payments")}</div>
 					<p style="font-size:12px;margin-top:4px;">${__("When a kitchen order is waiting for payment, it will appear here with its bill amount.")}</p>
 				</div>
 			`);
@@ -3943,9 +3933,9 @@ foodpos.FoodPOS.Controller = class {
 			const status_colors = {
 				Pending: { bg: "#fef9c3", text: "#854d0e" },
 				"In Progress": { bg: "#dbeafe", text: "#1d4ed8" },
-				Ready: { bg: "#dcfce7", text: "#166534" },
+				Ready: { bg: "#dcfce7", text: "#15803d" },
 			};
-			const sc = status_colors[kot.status] || { bg: "#f5efe4", text: "#57534e" };
+			const sc = status_colors[kot.status] || { bg: "#f1f5f9", text: "#475569" };
 			const items = kot.items || [];
 			const shown = items.slice(0, 3).map((it) => `${it.qty}× ${it.item_name}`).join(", ");
 			const more = items.length > 3 ? ` +${items.length - 3} more` : "";
@@ -3955,10 +3945,10 @@ foodpos.FoodPOS.Controller = class {
 					<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
 						<div>
 							<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-								<span style="font-weight:800;font-size:14px;color:#292524;">${kot.name}</span>
+								<span style="font-weight:800;font-size:14px;color:#0f172a;">${kot.name}</span>
 								<span style="background:${sc.bg};color:${sc.text};padding:2px 7px;border-radius:10px;font-size:10px;font-weight:800;text-transform:uppercase;">${kot.status}</span>
 							</div>
-							<div style="font-size:11px;color:#78716c;margin-top:3px;">
+							<div style="font-size:11px;color:#64748b;margin-top:3px;">
 								<span>${kot.order_type || "Dine In"}</span>
 								${kot.table_no ? `&bull; <b>Table ${kot.table_no}</b>` : ""}
 								${kot.customer ? `&bull; ${kot.customer}` : ""}
@@ -3967,13 +3957,13 @@ foodpos.FoodPOS.Controller = class {
 						</div>
 						<div style="text-align:right;flex-shrink:0;">
 							<div style="font-size:11px;color:#92400e;font-weight:700;">${__("TOTAL DUE")}</div>
-							<div style="font-size:18px;font-weight:800;color:#ea580c;">${this.format_money(kot.total || 0)}</div>
+							<div style="font-size:18px;font-weight:800;color:#15803d;">${this.format_money(kot.total || 0)}</div>
 						</div>
 					</div>
-					<div style="font-size:12px;color:#57534e;">${shown}${more}</div>
+					<div style="font-size:12px;color:#475569;">${shown}${more}</div>
 					<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
-						<button class="btn btn-default btn-xs fpos-pending-print-btn" data-kot="${kot.name}" style="font-weight:700;background:#faf6f0;color:#44403c;border-color:#d8cbb8;border-radius:6px;padding:5px 12px;">${fpos_icon("printer", "fpos-ic-sm")} ${__("Print Bill")}</button>
-						<button class="btn btn-default btn-xs fpos-pending-settle-btn" data-kot="${kot.name}" style="font-weight:700;background:#ea580c;color:#fff;border-color:#ea580c;border-radius:6px;padding:5px 12px;">${__("Settle & Print Bill")}</button>
+						<button class="btn btn-default btn-xs fpos-pending-print-btn" data-kot="${kot.name}" style="font-weight:700;background:#f8fafc;color:#334155;border-color:#cbd5e1;border-radius:6px;padding:5px 12px;">${fpos_icon("printer", "fpos-ic-sm")} ${__("Print Bill")}</button>
+						<button class="btn btn-default btn-xs fpos-pending-settle-btn" data-kot="${kot.name}" style="font-weight:700;background:#15803d;color:#fff;border-color:#15803d;border-radius:6px;padding:5px 12px;">${__("Settle & Print Bill")}</button>
 					</div>
 				</div>
 			`);
@@ -4048,9 +4038,9 @@ foodpos.FoodPOS.Controller = class {
 
 		if (!kots || kots.length === 0) {
 			$body.html(`
-				<div style="text-align:center;padding:50px 20px;color:#a8a29e;">
-					<div style="margin-bottom:8px;color:#a8a29e;">${fpos_icon("chef", "fpos-ic-lg")}</div>
-					<div style="font-weight:600;font-size:14px;color:#78716c;">${__("No pending kitchen tickets")}</div>
+				<div style="text-align:center;padding:50px 20px;color:#94a3b8;">
+					<div style="margin-bottom:8px;color:#94a3b8;">${fpos_icon("chef", "fpos-ic-lg")}</div>
+					<div style="font-weight:600;font-size:14px;color:#64748b;">${__("No pending kitchen tickets")}</div>
 					<p style="font-size:12px;margin-top:4px;">${__("When orders are sent to kitchen, they will appear here with live preparation status.")}</p>
 				</div>
 			`);
@@ -4061,21 +4051,21 @@ foodpos.FoodPOS.Controller = class {
 			const status_colors = {
 				Pending: { bg: "#fef9c3", text: "#854d0e", border: "#facc15" },
 				"In Progress": { bg: "#dbeafe", text: "#1d4ed8", border: "#60a5fa" },
-				Ready: { bg: "#dcfce7", text: "#166534", border: "#4ade80" },
+				Ready: { bg: "#dcfce7", text: "#15803d", border: "#4ade80" },
 			};
-			const sc = status_colors[kot.status] || { bg: "#f5efe4", text: "#57534e", border: "#d8cbb8" };
+			const sc = status_colors[kot.status] || { bg: "#f1f5f9", text: "#475569", border: "#cbd5e1" };
 
 			const items_list = (kot.items || []).map((it) => {
 				const is_done = Boolean(it.is_done);
 				return `
-					<div class="fpos-kot-item-row" data-kot="${kot.name}" data-item="${it.item_name}" data-row="${it.name || ''}" style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid #f5efe4;${is_done ? "opacity:0.5;text-decoration:line-through;" : ""}">
+					<div class="fpos-kot-item-row" data-kot="${kot.name}" data-item="${it.item_name}" data-row="${it.name || ''}" style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid #f1f5f9;${is_done ? "opacity:0.5;text-decoration:line-through;" : ""}">
 						<input type="checkbox" class="fpos-kot-item-check" data-kot="${kot.name}" data-item="${it.item_name}" data-row="${it.name || ''}" ${is_done ? "checked" : ""} style="width:16px;height:16px;accent-color:#22c55e;cursor:pointer;margin-top:2px;" />
 						<div style="flex:1;">
 							<div style="display:flex;justify-content:space-between;align-items:center;">
-								<span style="font-weight:700;font-size:13px;color:#292524;">${it.qty}x ${it.item_name}</span>
-								${is_done ? `<span style="font-size:10px;background:#dcfce7;color:#166534;padding:1px 6px;border-radius:8px;font-weight:700;">DONE</span>` : `<span style="font-size:10px;background:#fef3c7;color:#b45309;padding:1px 6px;border-radius:8px;font-weight:700;">COOKING</span>`}
+								<span style="font-weight:700;font-size:13px;color:#1e293b;">${it.qty}x ${it.item_name}</span>
+								${is_done ? `<span style="font-size:10px;background:#dcfce7;color:#15803d;padding:1px 6px;border-radius:8px;font-weight:700;">DONE</span>` : `<span style="font-size:10px;background:#fef3c7;color:#b45309;padding:1px 6px;border-radius:8px;font-weight:700;">COOKING</span>`}
 							</div>
-							${it.item_note ? `<div style="font-size:11px;color:#ea580c;background:#ffedd5;padding:2px 6px;border-radius:4px;margin-top:3px;display:inline-block;">${it.item_note}</div>` : ""}
+							${it.item_note ? `<div style="font-size:11px;color:#15803d;background:#f0fdf4;padding:2px 6px;border-radius:4px;margin-top:3px;display:inline-block;">${it.item_note}</div>` : ""}
 						</div>
 					</div>
 				`;
@@ -4086,9 +4076,9 @@ foodpos.FoodPOS.Controller = class {
 			if (kot.status === "Pending") {
 				stage_btn = `<button class="btn btn-default btn-xs fpos-kot-stage-btn" data-kot="${kot.name}" data-stage="In Progress" style="font-weight:700;background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe;border-radius:6px;padding:5px 12px;">▶ ${__("Start Cooking")}</button>`;
 			} else if (kot.status === "In Progress") {
-				stage_btn = `<button class="btn btn-default btn-xs fpos-kot-stage-btn" data-kot="${kot.name}" data-stage="Ready" style="font-weight:700;background:#ffedd5;color:#ea580c;border-color:#bbf7d0;border-radius:6px;padding:5px 12px;">${fpos_icon("check", "fpos-ic-sm")} ${__("Mark Ready")}</button>`;
+				stage_btn = `<button class="btn btn-default btn-xs fpos-kot-stage-btn" data-kot="${kot.name}" data-stage="Ready" style="font-weight:700;background:#f0fdf4;color:#15803d;border-color:#bbf7d0;border-radius:6px;padding:5px 12px;">${fpos_icon("check", "fpos-ic-sm")} ${__("Mark Ready")}</button>`;
 			} else if (kot.status === "Ready") {
-				stage_btn = `<button class="btn btn-default btn-xs fpos-kot-stage-btn" data-kot="${kot.name}" data-stage="Served" style="font-weight:700;background:#faf6f0;color:#44403c;border-color:#d8cbb8;border-radius:6px;padding:5px 12px;">${fpos_icon("check", "fpos-ic-sm")} ${__("Mark Served")}</button>`;
+				stage_btn = `<button class="btn btn-default btn-xs fpos-kot-stage-btn" data-kot="${kot.name}" data-stage="Served" style="font-weight:700;background:#f8fafc;color:#334155;border-color:#cbd5e1;border-radius:6px;padding:5px 12px;">${fpos_icon("check", "fpos-ic-sm")} ${__("Mark Served")}</button>`;
 			}
 
 			const card = $(`
@@ -4096,13 +4086,13 @@ foodpos.FoodPOS.Controller = class {
 					<div style="display:flex;justify-content:space-between;align-items:flex-start;">
 						<div>
 							<div style="display:flex;align-items:center;gap:6px;">
-								<span style="font-weight:800;font-size:14px;color:#292524;">${kot.name}</span>
+								<span style="font-weight:800;font-size:14px;color:#0f172a;">${kot.name}</span>
 								<span style="background:${sc.bg};color:${sc.text};padding:2px 7px;border-radius:10px;font-size:10px;font-weight:800;text-transform:uppercase;">
 									${kot.status}
 								</span>
 								${kot.kitchen_station ? `<span style="background:#e0f2fe;color:#0369a1;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700;">${kot.kitchen_station.split("-").pop()}</span>` : ""}
 							</div>
-							<div style="font-size:11px;color:#78716c;margin-top:3px;">
+							<div style="font-size:11px;color:#64748b;margin-top:3px;">
 								<span>${kot.order_type || "Dine In"}</span>
 								${kot.table_no ? `&bull; <b>Table ${kot.table_no}</b>` : ""}
 								&bull; <span>${kot.time_ago || (kot.creation ? frappe.datetime.prettyDate(kot.creation) : "Just now")}</span>
@@ -4110,7 +4100,7 @@ foodpos.FoodPOS.Controller = class {
 						</div>
 
 						<div style="text-align:right;">
-							<div style="font-size:12px;font-weight:800;color:${kot.status !== "Ready" && kot.remaining_items > 0 ? "#ea580c" : "#166534"};background:${kot.status !== "Ready" && kot.remaining_items > 0 ? "#ffedd5" : "#dcfce7"};padding:4px 8px;border-radius:8px;">
+							<div style="font-size:12px;font-weight:800;color:${kot.status !== "Ready" && kot.remaining_items > 0 ? "#15803d" : "#15803d"};background:${kot.status !== "Ready" && kot.remaining_items > 0 ? "#f0fdf4" : "#dcfce7"};padding:4px 8px;border-radius:8px;">
 								${kot.status !== "Ready" && kot.remaining_items > 0 ? `${kot.remaining_items} of ${kot.total_items} left` : `✓ All Ready`}
 							</div>
 						</div>
@@ -4118,7 +4108,7 @@ foodpos.FoodPOS.Controller = class {
 
 					<!-- Remaining items alert indicator -->
 					${kot.status !== "Ready" && kot.remaining_items > 0 ? `
-						<div style="font-size:11px;font-weight:600;color:#c2410c;background:#ffedd5;padding:4px 8px;border-radius:6px;">
+						<div style="font-size:11px;font-weight:600;color:#166534;background:#f0fdf4;padding:4px 8px;border-radius:6px;">
 							${__("{0} cooking item(s) remaining for this ticket", [kot.remaining_items])}
 						</div>
 					` : ""}
@@ -4129,12 +4119,12 @@ foodpos.FoodPOS.Controller = class {
 					</div>
 
 					<!-- Bottom Controls: Stage transition, Settle & Print Bill -->
-					<div style="display:flex;justify-content:space-between;align-items:center;border-top:1px dashed #eadfd2;padding-top:8px;">
-						<span style="font-size:11px;color:#a8a29e;">${kot.customer || "Walk-in"}</span>
+					<div style="display:flex;justify-content:space-between;align-items:center;border-top:1px dashed #e2e8f0;padding-top:8px;">
+						<span style="font-size:11px;color:#94a3b8;">${kot.customer || "Walk-in"}</span>
 						<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
 							${stage_btn}
-							<button class="btn btn-default btn-xs fpos-kot-print-btn" data-kot="${kot.name}" style="font-weight:700;background:#faf6f0;color:#44403c;border-color:#d8cbb8;border-radius:6px;padding:5px 12px;">${fpos_icon("printer", "fpos-ic-sm")} ${__("Print")}</button>
-							<button class="btn btn-default btn-xs fpos-kot-settle-btn" data-kot="${kot.name}" style="font-weight:700;background:#ea580c;color:#fff;border-color:#ea580c;border-radius:6px;padding:5px 12px;">${__("Settle & Print Bill")}</button>
+							<button class="btn btn-default btn-xs fpos-kot-print-btn" data-kot="${kot.name}" style="font-weight:700;background:#f8fafc;color:#334155;border-color:#cbd5e1;border-radius:6px;padding:5px 12px;">${fpos_icon("printer", "fpos-ic-sm")} ${__("Print")}</button>
+							<button class="btn btn-default btn-xs fpos-kot-settle-btn" data-kot="${kot.name}" style="font-weight:700;background:#15803d;color:#fff;border-color:#15803d;border-radius:6px;padding:5px 12px;">${__("Settle & Print Bill")}</button>
 						</div>
 					</div>
 				</div>
@@ -4368,8 +4358,8 @@ foodpos.FoodPOS.Controller = class {
 		const body = $(d.wrapper).find(".modal-body");
 		body.html(`
 			<div style="display:flex;justify-content:center;align-items:center;height:180px;flex-direction:column;gap:10px;">
-				<div class="fpos-spinner" style="width:32px;height:32px;border:3px solid #eadfd2;border-top-color:#dc2626;border-radius:50%;animation:fpos-spin .8s linear infinite;"></div>
-				<span style="color:#78716c;font-size:13px;">${__("Loading served KOT exceptions...")}</span>
+				<div class="fpos-spinner" style="width:32px;height:32px;border:3px solid #e2e8f0;border-top-color:#dc2626;border-radius:50%;animation:fpos-spin .8s linear infinite;"></div>
+				<span style="color:#64748b;font-size:13px;">${__("Loading served KOT exceptions...")}</span>
 			</div>
 		`);
 		this.style_dialog(d);
@@ -4394,10 +4384,10 @@ foodpos.FoodPOS.Controller = class {
 
 		if (!exceptions || exceptions.length === 0) {
 			$body.html(`
-				<div style="text-align:center;padding:50px 20px;color:#ea580c;">
-					<div style="margin-bottom:8px;color:#ea580c;">${fpos_icon("checkCircle")}</div>
-					<div style="font-weight:800;font-size:15px;color:#c2410c;">${__("All Served KOTs Fully Settled")}</div>
-					<p style="font-size:12px;color:#78716c;margin-top:4px;">${__("No un-invoiced or un-voided kitchen tickets found. Shift data integrity intact.")}</p>
+				<div style="text-align:center;padding:50px 20px;color:#15803d;">
+					<div style="margin-bottom:8px;color:#15803d;">${fpos_icon("checkCircle")}</div>
+					<div style="font-weight:800;font-size:15px;color:#166534;">${__("All Served KOTs Fully Settled")}</div>
+					<p style="font-size:12px;color:#64748b;margin-top:4px;">${__("No un-invoiced or un-voided kitchen tickets found. Shift data integrity intact.")}</p>
 				</div>
 			`);
 			return;
@@ -4419,10 +4409,10 @@ foodpos.FoodPOS.Controller = class {
 					<div style="display:flex;justify-content:space-between;align-items:flex-start;">
 						<div>
 							<div style="display:flex;align-items:center;gap:8px;">
-								<span style="font-weight:900;font-size:15px;color:#292524;">${ex.name}</span>
+								<span style="font-weight:900;font-size:15px;color:#0f172a;">${ex.name}</span>
 								<span style="background:${(ex.status || '').includes('Mismatch') ? '#fef3c7' : '#fee2e2'};color:${(ex.status || '').includes('Mismatch') ? '#92400e' : '#b91c1c'};padding:2px 8px;border-radius:12px;font-size:10.5px;font-weight:800;">${(ex.status || 'Served (Uninvoiced)').toUpperCase()}</span>
 							</div>
-							<div style="font-size:12px;color:#57534e;margin-top:3px;font-weight:600;">
+							<div style="font-size:12px;color:#475569;margin-top:3px;font-weight:600;">
 								${ex.branch} &bull; ${ex.order_type}${ex.table && ex.table !== 'N/A' ? ` &bull; Table ${ex.table_no}` : ''} &bull; ${ex.customer}
 							</div>
 							<div style="font-size:11px;color:#dc2626;font-weight:700;margin-top:2px;">
@@ -4430,17 +4420,17 @@ foodpos.FoodPOS.Controller = class {
 							</div>
 						</div>
 						<div style="text-align:right;">
-							<div style="font-size:11px;color:#78716c;font-weight:600;">Estimated Value</div>
-							<div style="font-size:16px;font-weight:900;color:#ea580c;">${format_curr(ex.estimated_total)}</div>
+							<div style="font-size:11px;color:#64748b;font-weight:600;">Estimated Value</div>
+							<div style="font-size:16px;font-weight:900;color:#15803d;">${format_curr(ex.estimated_total)}</div>
 						</div>
 					</div>
 
-					<div style="margin-top:10px;padding:8px 12px;background:#faf6f0;border-radius:6px;font-size:12px;color:#292524;border:1px dashed #eadfd2;">
+					<div style="margin-top:10px;padding:8px 12px;background:#f8fafc;border-radius:6px;font-size:12px;color:#1e293b;border:1px dashed #e2e8f0;">
 						<b>Items Ordered:</b> ${items_str || "None"}
 						${ex.sales_invoice ? `<div style="margin-top:4px;"><b>Linked invoice:</b> ${ex.sales_invoice}${(ex.invoice_item_rows || []).length ? ` — billed: ${(ex.invoice_item_rows || []).map(i => `${i.qty}x ${i.item_name}`).join(", ")}` : ''}</div>` : ''}
 					</div>
 
-					<div style="display:flex;gap:10px;margin-top:12px;border-top:1px solid #f5efe4;padding-top:10px;">
+					<div style="display:flex;gap:10px;margin-top:12px;border-top:1px solid #f1f5f9;padding-top:10px;">
 						<button class="btn btn-default btn-xs fpos-settle-kot-btn" style="flex:1;background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe;font-weight:700;padding:6px 12px;border-radius:6px;">
 							<span>${fpos_icon("card", "fpos-ic-sm")} ${__("Load to Cart & Settle")}</span>
 						</button>
@@ -4484,7 +4474,7 @@ foodpos.FoodPOS.Controller = class {
 							fieldname: "info",
 							fieldtype: "HTML",
 							options: `
-								<div style="padding:4px 0 10px;font-size:12px;color:#78716c;line-height:1.4;">
+								<div style="padding:4px 0 10px;font-size:12px;color:#64748b;line-height:1.4;">
 									You are recording an authorized void for <b>${ex.name}</b> (${format_curr(ex.estimated_total)}).
 									This trace will be permanently recorded in the <b>Food POS Audit Log</b>.
 								</div>
@@ -4554,8 +4544,8 @@ foodpos.FoodPOS.Controller = class {
 		}
 		$body.html(`
 			<div style="display:flex;justify-content:center;align-items:center;height:200px;flex-direction:column;gap:10px;">
-				<div class="fpos-spinner" style="width:32px;height:32px;border:3px solid #eadfd2;border-top-color:#b45309;border-radius:50%;animation:fpos-spin .8s linear infinite;"></div>
-				<span style="color:#78716c;font-size:13px;">${__("Loading held orders...")}</span>
+				<div class="fpos-spinner" style="width:32px;height:32px;border:3px solid #e2e8f0;border-top-color:#b45309;border-radius:50%;animation:fpos-spin .8s linear infinite;"></div>
+				<span style="color:#64748b;font-size:13px;">${__("Loading held orders...")}</span>
 			</div>
 		`);
 
@@ -4591,9 +4581,9 @@ foodpos.FoodPOS.Controller = class {
 
 		if (!orders || orders.length === 0) {
 			$body.html(`
-				<div style="text-align:center;padding:50px 20px;color:#a8a29e;">
-					<div style="margin-bottom:8px;color:#a8a29e;">${fpos_icon("pause")}</div>
-					<div style="font-weight:600;font-size:14px;color:#78716c;">${__("No held orders")}</div>
+				<div style="text-align:center;padding:50px 20px;color:#94a3b8;">
+					<div style="margin-bottom:8px;color:#94a3b8;">${fpos_icon("pause")}</div>
+					<div style="font-weight:600;font-size:14px;color:#64748b;">${__("No held orders")}</div>
 					<p style="font-size:12px;margin-top:4px;">${__("When you put an order on hold, it will appear here so you can resume it later.")}</p>
 				</div>
 			`);
@@ -4614,37 +4604,37 @@ foodpos.FoodPOS.Controller = class {
 			}
 
 			const card = $(`
-				<div class="fpos-recent-card" data-held="${o.name}" style="border-left: 4px solid #f59e0b;background:#fff;border-radius:12px;padding:14px;margin-bottom:12px;border:1px solid #eadfd2;border-left-width:4px;">
+				<div class="fpos-recent-card" data-held="${o.name}" style="border-left: 4px solid #f59e0b;background:#fff;border-radius:12px;padding:14px;margin-bottom:12px;border:1px solid #e2e8f0;border-left-width:4px;">
 					<div style="display:flex;justify-content:space-between;align-items:flex-start;">
 						<div>
 							<div style="display:flex;align-items:center;gap:6px;">
-								<span style="font-weight:800;font-size:14px;color:#292524;">${o.name}</span>
+								<span style="font-weight:800;font-size:14px;color:#0f172a;">${o.name}</span>
 								<span style="background:#fef3c7;color:#b45309;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:800;text-transform:uppercase;">
 									HELD
 								</span>
 							</div>
-							<div style="font-size:11px;color:#78716c;margin-top:3px;">
+							<div style="font-size:11px;color:#64748b;margin-top:3px;">
 								<span>${o.order_type}</span>
 								${this.format_table_label(o.table || order_data.table || "") ? `&bull; <b>${this.format_table_label(o.table || order_data.table || "")}</b>` : ""}
 								&bull; <span>Customer: <b>${o.customer_name || o.customer || "Walk-in"}</b></span>
 							</div>
-							${o.phone ? `<div style="font-size:11px;color:#78716c;">${o.phone}</div>` : ""}
+							${o.phone ? `<div style="font-size:11px;color:#64748b;">${o.phone}</div>` : ""}
 						</div>
 
 						<div style="text-align:right;">
-							<div style="font-weight:900;font-size:16px;color:#ea580c;">${format_curr(order_total)}</div>
-							<div style="font-size:11px;color:#a8a29e;margin-top:2px;">${o.creation ? o.creation.substring(11, 16) : ""}</div>
+							<div style="font-weight:900;font-size:16px;color:#15803d;">${format_curr(order_total)}</div>
+							<div style="font-size:11px;color:#94a3b8;margin-top:2px;">${o.creation ? o.creation.substring(11, 16) : ""}</div>
 						</div>
 					</div>
 
-					<div style="font-size:11px;color:#57534e;background:#faf6f0;padding:6px 10px;border-radius:6px;line-height:1.4;margin:8px 0;">
-						<b style="color:#292524;">${items.length} items:</b> ${items_preview || "Items"}
+					<div style="font-size:11px;color:#475569;background:#f8fafc;padding:6px 10px;border-radius:6px;line-height:1.4;margin:8px 0;">
+						<b style="color:#0f172a;">${items.length} items:</b> ${items_preview || "Items"}
 					</div>
 
 					${o.hold_reason ? `<div style="font-size:11px;color:#92400e;background:#fef3c7;padding:3px 8px;border-radius:4px;margin-bottom:8px;">${o.hold_reason}</div>` : ""}
 
-					<div style="display:flex;gap:8px;border-top:1px dashed #eadfd2;padding-top:8px;">
-						<button class="btn btn-default btn-xs fpos-resume-held-btn" style="flex:1;font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:4px;color:#ea580c;background:#ffedd5;border-color:#bbf7d0;border-radius:6px;padding:6px 10px;">
+					<div style="display:flex;gap:8px;border-top:1px dashed #e2e8f0;padding-top:8px;">
+						<button class="btn btn-default btn-xs fpos-resume-held-btn" style="flex:1;font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:4px;color:#15803d;background:#f0fdf4;border-color:#bbf7d0;border-radius:6px;padding:6px 10px;">
 							<span>▶️</span>
 							<span>${__("Resume Order")}</span>
 						</button>
@@ -4949,7 +4939,7 @@ foodpos.FoodPOS.Controller = class {
 
 		if (!this.is_online) {
 			$ind.removeClass("online").addClass("offline").attr("title", __("Offline ({0} queued) - Click to inspect", [queue.length]));
-			$dot.css("background", "#a8a29e");
+			$dot.css("background", "#94a3b8");
 			if ($label.length) $label.text(__("Offline ({0})", [queue.length]));
 		} else if (queue.length > 0) {
 			$ind.removeClass("online offline").addClass("syncing").attr("title", __("Syncing ({0} queued) - Click to inspect", [queue.length]));
@@ -5100,20 +5090,6 @@ foodpos.FoodPOS.Controller = class {
 				this.hide_kitchen_drawer();
 				this.hide_recent_orders_drawer();
 				this.hide_held_orders_drawer();
-				this.hide_pending_drawer();
-			}
-		});
-
-		// v6: "/" (or Ctrl+K) focuses the product search from anywhere
-		// on the keyboard — the cashier never has to reach for the mouse.
-		$(document).off("keydown.fpos_search_shortcut").on("keydown.fpos_search_shortcut", (e) => {
-			const tag = (e.target && e.target.tagName) || "";
-			const typing = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || (e.target && e.target.isContentEditable);
-			if (typing) return;
-			if (e.key === "/" || ((e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K"))) {
-				e.preventDefault();
-				const $input = this.wrapper.find(".fpos-search-input");
-				if ($input.length) { this.show_pos(); $input.focus(); $input.select(); }
 			}
 		});
 
@@ -5172,23 +5148,10 @@ foodpos.FoodPOS.Controller = class {
 			frappe.show_alert({ message: __("Filters reset to default"), indicator: "blue" });
 		});
 
-		// Search input — instant filter (name / code / barcode, v6).
+		// Search input
 		this.wrapper.on("input", ".fpos-search-input", (e) => {
 			this.search_term = $(e.target).val();
 			this.render_items_grid();
-		});
-		// v6: Enter in search adds the single match (barcode-scanner flow:
-		// scan → one result → Enter → item in cart, search clears).
-		this.wrapper.on("keydown", ".fpos-search-input", (e) => {
-			if (e.key !== "Enter" && e.keyCode !== 13) return;
-			const results = this._last_search_results || [];
-			if (results.length === 1) {
-				e.preventDefault();
-				this.add_item_to_cart(results[0]);
-				this.search_term = "";
-				$(e.target).val("");
-				this.render_items_grid();
-			}
 		});
 
 		// Order type toggle with Confirmation & Dynamic State Sync
@@ -5469,9 +5432,9 @@ foodpos.FoodPOS.Controller = class {
 					{
 						fieldname: "info",
 						fieldtype: "HTML",
-						options: `<div style="padding:8px 0;font-size:13px;color:#57534e;">
+						options: `<div style="padding:8px 0;font-size:13px;color:#475569;">
 							<p style="margin-bottom:8px;">${__("There are {0} offline invoice(s) queued in browser storage awaiting server submission.", [queue.length])}</p>
-							<p style="margin-bottom:0;font-size:12px;color:#78716c;">${__("You can retry synchronizing now, or discard stuck local drafts if they were test records.")}</p>
+							<p style="margin-bottom:0;font-size:12px;color:#64748b;">${__("You can retry synchronizing now, or discard stuck local drafts if they were test records.")}</p>
 						</div>`
 					}
 				],
@@ -5518,18 +5481,18 @@ foodpos.FoodPOS.Controller = class {
 					fieldname: "info_html",
 					fieldtype: "HTML",
 					options: `
-						<div style="background:#faf6f0;border:1px solid #eadfd2;border-radius:10px;padding:12px;margin-bottom:14px;">
+						<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px;margin-bottom:14px;">
 							<div style="display:flex;justify-content:space-between;align-items:center;">
-								<span style="font-size:13px;color:#78716c;font-weight:600;">${__("Current Order Subtotal:")}</span>
-								<span style="font-size:16px;color:#292524;font-weight:800;">${format_curr(subtotal)}</span>
+								<span style="font-size:13px;color:#64748b;font-weight:600;">${__("Current Order Subtotal:")}</span>
+								<span style="font-size:16px;color:#0f172a;font-weight:800;">${format_curr(subtotal)}</span>
 							</div>
-							<div style="font-size:11px;color:#a8a29e;margin-top:4px;">
+							<div style="font-size:11px;color:#94a3b8;margin-top:4px;">
 								${__("Cashier cap: Max Rs 100 without Manager PIN. Discount is always in Rs, never %.")}
 							</div>
 						</div>
 
 						<div style="margin-bottom:14px;">
-							<label style="font-size:12px;font-weight:700;color:#44403c;margin-bottom:6px;display:block;">${__("Discount Presets (Rs)")}</label>
+							<label style="font-size:12px;font-weight:700;color:#334155;margin-bottom:6px;display:block;">${__("Discount Presets (Rs)")}</label>
 							<div class="fpos-disc-presets" style="display:flex;gap:6px;flex-wrap:wrap;">
 								<button type="button" class="btn btn-default btn-sm fpos-preset-btn" data-type="amt" data-val="50" style="font-weight:700;">Rs 50</button>
 								<button type="button" class="btn btn-default btn-sm fpos-preset-btn" data-type="amt" data-val="100" style="font-weight:700;">Rs 100</button>
@@ -5677,9 +5640,9 @@ foodpos.FoodPOS.Controller = class {
 		const $closing = this.wrapper.find(".fpos-closing-page");
 		$closing.show().addClass("active").html(`
 			<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:65vh;gap:16px;">
-				<div class="fpos-spinner" style="width:44px;height:44px;border:3px solid #eadfd2;border-top-color:#ea580c;border-radius:50%;animation:fpos-spin .8s linear infinite;"></div>
-				<div style="color:#57534e;font-size:16px;font-weight:700;">${__("Compiling Today's Register Closing & Sales Analytics...")}</div>
-				<div style="color:#a8a29e;font-size:13px;">${__("Reconciling Sales Invoices, Cash Drawer & Payment Modes")}</div>
+				<div class="fpos-spinner" style="width:44px;height:44px;border:3px solid #e2e8f0;border-top-color:#15803d;border-radius:50%;animation:fpos-spin .8s linear infinite;"></div>
+				<div style="color:#475569;font-size:16px;font-weight:700;">${__("Compiling Today's Register Closing & Sales Analytics...")}</div>
+				<div style="color:#94a3b8;font-size:13px;">${__("Reconciling Sales Invoices, Cash Drawer & Payment Modes")}</div>
 			</div>
 		`);
 
@@ -5715,20 +5678,20 @@ foodpos.FoodPOS.Controller = class {
 		let top_items_html = "";
 		if (data.top_items && data.top_items.length) {
 			top_items_html = data.top_items.map((it, idx) => `
-				<tr style="border-bottom: 1px solid #f5efe4;">
-					<td style="padding: 10px 14px; font-weight: 700; color: #ea580c; width: 40px;">#${idx + 1}</td>
+				<tr style="border-bottom: 1px solid #f1f5f9;">
+					<td style="padding: 10px 14px; font-weight: 700; color: #15803d; width: 40px;">#${idx + 1}</td>
 					<td style="padding: 10px 14px;">
-						<div style="font-weight: 600; color: #292524;">${it.item_name}</div>
-						<small style="color: #a8a29e;">${it.item_code}</small>
+						<div style="font-weight: 600; color: #1e293b;">${it.item_name}</div>
+						<small style="color: #94a3b8;">${it.item_code}</small>
 					</td>
-					<td style="padding: 10px 14px; text-align: center; font-weight: 700; color: #44403c;">
-						<span style="background: #f5efe4; padding: 3px 10px; border-radius: 12px;">${it.qty}</span>
+					<td style="padding: 10px 14px; text-align: center; font-weight: 700; color: #334155;">
+						<span style="background: #f1f5f9; padding: 3px 10px; border-radius: 12px;">${it.qty}</span>
 					</td>
-					<td style="padding: 10px 14px; text-align: right; font-weight: 700; color: #292524;">${format_curr(it.amount)}</td>
+					<td style="padding: 10px 14px; text-align: right; font-weight: 700; color: #0f172a;">${format_curr(it.amount)}</td>
 				</tr>
 			`).join("");
 		} else {
-			top_items_html = `<tr><td colspan="4" style="text-align:center;padding:20px;color:#a8a29e;">${__("No items sold today yet")}</td></tr>`;
+			top_items_html = `<tr><td colspan="4" style="text-align:center;padding:20px;color:#94a3b8;">${__("No items sold today yet")}</td></tr>`;
 		}
 
 		// Payment Reconciliation Rows (Requirement 3: grouped by Mode of Payment with counted amounts & live variance)
@@ -5748,42 +5711,42 @@ foodpos.FoodPOS.Controller = class {
 			const icon = "";
 
 			return `
-				<tr class="fpos-recon-row" data-mode="${p.mode_of_payment}" data-opening="${p.opening_amount}" data-sales="${p.invoice_amount}" data-expected="${p.expected_amount}" style="border-bottom: 1px solid #f5efe4;">
-					<td style="padding: 10px 14px; font-weight: 700; color: #292524;">
+				<tr class="fpos-recon-row" data-mode="${p.mode_of_payment}" data-opening="${p.opening_amount}" data-sales="${p.invoice_amount}" data-expected="${p.expected_amount}" style="border-bottom: 1px solid #f1f5f9;">
+					<td style="padding: 10px 14px; font-weight: 700; color: #1e293b;">
 						<span style="margin-right: 6px;">${icon}</span>${p.mode_of_payment}
 					</td>
-					<td style="padding: 10px 14px; text-align: right; color: #78716c; font-weight: 600;">
+					<td style="padding: 10px 14px; text-align: right; color: #64748b; font-weight: 600;">
 						${format_curr(p.opening_amount)}
 					</td>
 					<td style="padding: 10px 14px; text-align: right; color: #16a34a; font-weight: 700;">
 						+${format_curr(p.invoice_amount)}
 					</td>
-					<td style="padding: 10px 14px; text-align: right; font-weight: 800; color: #292524;">
+					<td style="padding: 10px 14px; text-align: right; font-weight: 800; color: #0f172a;">
 						${format_curr(p.expected_amount)}
 					</td>
 					<td style="padding: 8px 14px; text-align: right; width: 150px;">
-						<input type="number" step="any" class="form-control fpos-recon-counted-input" data-mode="${p.mode_of_payment}" value="${flt(p.closing_amount)}" style="height: 36px; text-align: right; font-size: 14px; font-weight: 700; border-radius: 6px; border: 1px solid #d8cbb8;" />
+						<input type="number" step="any" class="form-control fpos-recon-counted-input" data-mode="${p.mode_of_payment}" value="${flt(p.closing_amount)}" style="height: 36px; text-align: right; font-size: 14px; font-weight: 700; border-radius: 6px; border: 1px solid #cbd5e1;" />
 					</td>
 					<td style="padding: 8px 14px; text-align: center; width: 140px;">
-						<span class="fpos-mode-variance-badge" data-mode="${p.mode_of_payment}" style="font-size: 11px; font-weight: 700; padding: 4px 8px; border-radius: 6px; background: #dcfce7; color: #166534; white-space: nowrap;">
+						<span class="fpos-mode-variance-badge" data-mode="${p.mode_of_payment}" style="font-size: 11px; font-weight: 700; padding: 4px 8px; border-radius: 6px; background: #dcfce7; color: #15803d; white-space: nowrap;">
 							● ${__("Exact Match")}
 						</span>
 					</td>
 				</tr>
 			`;
-		}).join("") || `<tr><td colspan="6" style="text-align:center;padding:20px;color:#a8a29e;">${__("No payment modes found for this shift")}</td></tr>`;
+		}).join("") || `<tr><td colspan="6" style="text-align:center;padding:20px;color:#94a3b8;">${__("No payment modes found for this shift")}</td></tr>`;
 
 		// Order Types Rows
 		const ot_rows = (data.order_types || []).map(ot => {
 			const icon = fpos_icon(ot.order_type === "Dine In" ? "table" : ot.order_type === "Takeaway" ? "box" : "truck", "fpos-ic-sm");
 			return `
-				<tr style="border-bottom: 1px solid #f5efe4;">
-					<td style="padding: 10px 14px; font-weight: 600; color: #292524;">${icon} ${ot.order_type}</td>
-					<td style="padding: 10px 14px; text-align: center; color: #78716c; font-weight: 600;">${ot.count}</td>
-					<td style="padding: 10px 14px; text-align: right; font-weight: 700; color: #292524;">${format_curr(ot.amount)}</td>
+				<tr style="border-bottom: 1px solid #f1f5f9;">
+					<td style="padding: 10px 14px; font-weight: 600; color: #1e293b;">${icon} ${ot.order_type}</td>
+					<td style="padding: 10px 14px; text-align: center; color: #64748b; font-weight: 600;">${ot.count}</td>
+					<td style="padding: 10px 14px; text-align: right; font-weight: 700; color: #0f172a;">${format_curr(ot.amount)}</td>
 				</tr>
 			`;
-		}).join("") || `<tr><td colspan="3" style="text-align:center;padding:20px;color:#a8a29e;">${__("No sales recorded today")}</td></tr>`;
+		}).join("") || `<tr><td colspan="3" style="text-align:center;padding:20px;color:#94a3b8;">${__("No sales recorded today")}</td></tr>`;
 
 		// Invoices Table Rows
 		let inv_rows = "";
@@ -5794,41 +5757,41 @@ foodpos.FoodPOS.Controller = class {
 				const doc_route = inv.doctype === "POS Invoice" ? `/app/pos-invoice/${inv.name}` : `/app/sales-invoice/${inv.name}`;
 				const is_paid = flt(inv.outstanding_amount) <= 0.001;
 				const status_badge = is_paid
-					? `<span style="background: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 700;">Paid</span>`
+					? `<span style="background: #dcfce7; color: #15803d; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 700;">Paid</span>`
 					: `<span style="background: #fee2e2; color: #b91c1c; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 700;">Unpaid (${format_curr(inv.outstanding_amount)})</span>`;
 
 				return `
-					<tr style="border-bottom: 1px solid #f5efe4;">
+					<tr style="border-bottom: 1px solid #f1f5f9;">
 						<td style="padding: 10px 14px;">
 							<a href="${doc_route}" target="_blank" style="font-weight: 700; color: #2563eb; text-decoration: none;">${inv.name} ↗</a>
 						</td>
-						<td style="padding: 10px 14px; color: #78716c; font-size: 12px;">${(inv.posting_time || "").substring(0, 5)}</td>
-						<td style="padding: 10px 14px; font-weight: 500; color: #292524;">${inv.customer_name || inv.customer || "Walk-in"}</td>
-						<td style="padding: 10px 14px; font-size: 12px; color: #57534e;">${ot_icon} ${inv.custom_order_type || "Dine In"}</td>
-						<td style="padding: 10px 14px; text-align: right; font-weight: 700; color: #292524;">${format_curr(inv.grand_total)}</td>
+						<td style="padding: 10px 14px; color: #64748b; font-size: 12px;">${(inv.posting_time || "").substring(0, 5)}</td>
+						<td style="padding: 10px 14px; font-weight: 500; color: #1e293b;">${inv.customer_name || inv.customer || "Walk-in"}</td>
+						<td style="padding: 10px 14px; font-size: 12px; color: #475569;">${ot_icon} ${inv.custom_order_type || "Dine In"}</td>
+						<td style="padding: 10px 14px; text-align: right; font-weight: 700; color: #0f172a;">${format_curr(inv.grand_total)}</td>
 						<td style="padding: 10px 14px; text-align: center;">${status_badge}</td>
 					</tr>
 				`;
 			}).join("");
 		} else {
-			inv_rows = `<tr><td colspan="6" style="text-align:center;padding:24px;color:#a8a29e;">${__("No invoices generated in this shift")}</td></tr>`;
+			inv_rows = `<tr><td colspan="6" style="text-align:center;padding:24px;color:#94a3b8;">${__("No invoices generated in this shift")}</td></tr>`;
 		}
 
 		$page.html(`
 			<div style="max-width: 1200px; margin: 0 auto; width: 100%; display: flex; flex-direction: column; gap: 24px;">
 				<!-- Top Header Navigation -->
-				<div style="display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 16px 24px; border-radius: 12px; border: 1px solid #eadfd2; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+				<div style="display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 16px 24px; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
 					<div style="display: flex; align-items: center; gap: 14px;">
 						<button class="btn btn-default fpos-back-to-pos-btn" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700; border-radius: 8px;">
 							<span>←</span>
 							<span>${__("Back to Register")}</span>
 						</button>
 						<div>
-							<h3 style="margin: 0; font-size: 18px; font-weight: 800; color: #292524; display: flex; align-items: center; gap: 8px;">
+							<h3 style="margin: 0; font-size: 18px; font-weight: 800; color: #0f172a; display: flex; align-items: center; gap: 8px;">
 								<span>${fpos_icon("chart", "fpos-ic-sm")}</span> ${__("POS Shift Complete & Shift-Closing")}
 							</h3>
-							<div style="font-size: 12px; color: #78716c; margin-top: 2px;">
-								${__("POS Profile")}: <b style="color: #292524;">${data.pos_profile || this.pos_profile}</b> &bull;
+							<div style="font-size: 12px; color: #64748b; margin-top: 2px;">
+								${__("POS Profile")}: <b style="color: #1e293b;">${data.pos_profile || this.pos_profile}</b> &bull;
 								${__("Date")}: <b>${data.today}</b> &bull;
 								${__("Cashier")}: <b>${data.user_fullname || data.user}</b> &bull;
 								${__("Opening Shift")}: <b style="color: #0369a1;">${data.opening_entry || this.pos_opening || __("Active")}</b>
@@ -5852,8 +5815,8 @@ foodpos.FoodPOS.Controller = class {
 				<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;">
 					<!-- Total Sales -->
 					<div style="background: #fff; border: 1px solid #bbf7d0; border-left: 5px solid #22c55e; border-radius: 12px; padding: 18px 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
-						<div style="font-size: 12px; font-weight: 700; color: #c2410c; text-transform: uppercase; letter-spacing: .5px;">${__("Total Net Sales")}</div>
-						<div style="font-size: 26px; font-weight: 900; color: #ea580c; margin: 6px 0 2px;">${format_curr(data.net_sales)}</div>
+						<div style="font-size: 12px; font-weight: 700; color: #166534; text-transform: uppercase; letter-spacing: .5px;">${__("Total Net Sales")}</div>
+						<div style="font-size: 26px; font-weight: 900; color: #15803d; margin: 6px 0 2px;">${format_curr(data.net_sales)}</div>
 						<div style="font-size: 11px; color: #16a34a;">${__("Gross")}: ${format_curr(data.gross_sales)} &bull; ${__("Discounts")}: -${format_curr(data.total_discounts)}</div>
 					</div>
 
@@ -5865,10 +5828,10 @@ foodpos.FoodPOS.Controller = class {
 					</div>
 
 					<!-- Cash Drawer -->
-					<div style="background: #fff; border: 1px solid #fed7aa; border-left: 5px solid #ea580c; border-radius: 12px; padding: 18px 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+					<div style="background: #fff; border: 1px solid #fed7aa; border-left: 5px solid #15803d; border-radius: 12px; padding: 18px 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
 						<div style="font-size: 12px; font-weight: 700; color: #9a3412; text-transform: uppercase; letter-spacing: .5px;">${__("Expected Cash in Drawer")}</div>
-						<div style="font-size: 26px; font-weight: 900; color: #ea580c; margin: 6px 0 2px;">${format_curr(data.expected_cash)}</div>
-						<div style="font-size: 11px; color: #c2410c;">${__("Opening")}: ${format_curr(data.opening_cash)} &bull; ${__("Cash Sales")}: ${format_curr(data.cash_sales)}</div>
+						<div style="font-size: 26px; font-weight: 900; color: #15803d; margin: 6px 0 2px;">${format_curr(data.expected_cash)}</div>
+						<div style="font-size: 11px; color: #166534;">${__("Opening")}: ${format_curr(data.opening_cash)} &bull; ${__("Cash Sales")}: ${format_curr(data.cash_sales)}</div>
 					</div>
 
 					<!-- Settled Status -->
@@ -5884,13 +5847,13 @@ foodpos.FoodPOS.Controller = class {
 				<!-- Middle Section: Multi-Payment Reconciliation & Channel Breakdowns -->
 				<div style="display: grid; grid-template-columns: 3fr 2fr; gap: 20px;">
 					<!-- Multi-Payment Reconciliation Tool -->
-					<div style="background: #fff; border-radius: 12px; border: 1px solid #eadfd2; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.03); display: flex; flex-direction: column; gap: 14px;">
-						<div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f5efe4; padding-bottom: 12px;">
+					<div style="background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.03); display: flex; flex-direction: column; gap: 14px;">
+						<div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f5f9; padding-bottom: 12px;">
 							<div>
-								<div style="font-size: 15px; font-weight: 800; color: #292524; display: flex; align-items: center; gap: 8px;">
+								<div style="font-size: 15px; font-weight: 800; color: #0f172a; display: flex; align-items: center; gap: 8px;">
 									<span>${fpos_icon("cash", "fpos-ic-sm")}</span> ${__("Payment Reconciliation & Cash Drawer Count")}
 								</div>
-								<div style="font-size: 12px; color: #78716c; margin-top: 2px;">
+								<div style="font-size: 12px; color: #64748b; margin-top: 2px;">
 									${__("Physical count vs. expected totals (Opening Float + Shift Invoices)")}
 								</div>
 							</div>
@@ -5902,7 +5865,7 @@ foodpos.FoodPOS.Controller = class {
 						<div style="overflow-x: auto;">
 							<table style="width: 100%; border-collapse: collapse; font-size: 12px;" class="fpos-recon-table">
 								<thead>
-									<tr style="background: #faf6f0; border-bottom: 2px solid #eadfd2; color: #78716c; text-transform: uppercase; font-size: 10px; font-weight: 700;">
+									<tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0; color: #64748b; text-transform: uppercase; font-size: 10px; font-weight: 700;">
 										<th style="padding: 10px 14px; text-align: left;">${__("Mode of Payment")}</th>
 										<th style="padding: 10px 14px; text-align: right;">${__("Opening Float")}</th>
 										<th style="padding: 10px 14px; text-align: right;">${__("Invoices")}</th>
@@ -5915,14 +5878,14 @@ foodpos.FoodPOS.Controller = class {
 									${recon_rows}
 								</tbody>
 								<tfoot>
-									<tr style="background: #faf6f0; font-weight: 800; border-top: 2px solid #eadfd2;">
-										<td style="padding: 10px 14px; color: #292524;">${__("Total Reconciliation")}</td>
-										<td style="padding: 10px 14px; text-align: right; color: #78716c;">${format_curr(total_opening)}</td>
+									<tr style="background: #f8fafc; font-weight: 800; border-top: 2px solid #e2e8f0;">
+										<td style="padding: 10px 14px; color: #1e293b;">${__("Total Reconciliation")}</td>
+										<td style="padding: 10px 14px; text-align: right; color: #64748b;">${format_curr(total_opening)}</td>
 										<td style="padding: 10px 14px; text-align: right; color: #16a34a;">+${format_curr(total_sales)}</td>
-										<td style="padding: 10px 14px; text-align: right; color: #292524;" class="fpos-recon-total-expected">${format_curr(total_expected)}</td>
-										<td style="padding: 10px 14px; text-align: right; color: #292524;" class="fpos-recon-total-counted">${format_curr(total_counted)}</td>
+										<td style="padding: 10px 14px; text-align: right; color: #0f172a;" class="fpos-recon-total-expected">${format_curr(total_expected)}</td>
+										<td style="padding: 10px 14px; text-align: right; color: #0f172a;" class="fpos-recon-total-counted">${format_curr(total_counted)}</td>
 										<td style="padding: 10px 14px; text-align: center;" class="fpos-recon-total-variance">
-											<span style="font-size: 11px; font-weight: 700; padding: 4px 8px; border-radius: 6px; background: #dcfce7; color: #166534;">● ${__("Balanced")}</span>
+											<span style="font-size: 11px; font-weight: 700; padding: 4px 8px; border-radius: 6px; background: #dcfce7; color: #15803d;">● ${__("Balanced")}</span>
 										</td>
 									</tr>
 								</tfoot>
@@ -5930,7 +5893,7 @@ foodpos.FoodPOS.Controller = class {
 						</div>
 
 						<div style="margin-top: 6px;">
-							<label style="font-size: 12px; font-weight: 700; color: #57534e;">${__("Shift Closing Notes & Remarks:")}</label>
+							<label style="font-size: 12px; font-weight: 700; color: #475569;">${__("Shift Closing Notes & Remarks:")}</label>
 							<textarea class="form-control fpos-closing-notes" rows="2" placeholder="${__("Optional notes regarding cash drawer count, discrepancies, or shift handover...")}" style="font-size: 12px; border-radius: 8px;"></textarea>
 						</div>
 					</div>
@@ -5938,14 +5901,14 @@ foodpos.FoodPOS.Controller = class {
 					<!-- Order Types & Channels Breakdown -->
 					<div style="display: flex; flex-direction: column; gap: 16px;">
 						<!-- Order Channels Breakdown -->
-						<div style="background: #fff; border-radius: 12px; border: 1px solid #eadfd2; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
-							<div style="background: #faf6f0; padding: 12px 16px; font-size: 13px; font-weight: 800; color: #292524; border-bottom: 1px solid #eadfd2; display: flex; justify-content: space-between; align-items: center;">
+						<div style="background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+							<div style="background: #f8fafc; padding: 12px 16px; font-size: 13px; font-weight: 800; color: #1e293b; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
 								<span>${fpos_icon("receipt", "fpos-ic-sm")} ${__("Order Channels (Dine-In, Takeaway, Delivery)")}</span>
-								<span style="font-size: 11px; font-weight: 600; color: #78716c;">${(data.order_types || []).length} ${__("Channels")}</span>
+								<span style="font-size: 11px; font-weight: 600; color: #64748b;">${(data.order_types || []).length} ${__("Channels")}</span>
 							</div>
 							<table style="width: 100%; border-collapse: collapse; font-size: 12px;">
 								<thead>
-									<tr style="background: #fafafa; border-bottom: 1px solid #eadfd2; color: #78716c; text-transform: uppercase; font-size: 10px; font-weight: 700;">
+									<tr style="background: #fafafa; border-bottom: 1px solid #e2e8f0; color: #64748b; text-transform: uppercase; font-size: 10px; font-weight: 700;">
 										<th style="padding: 8px 14px; text-align: left;">${__("Channel")}</th>
 										<th style="padding: 8px 14px; text-align: center;">${__("Orders")}</th>
 										<th style="padding: 8px 14px; text-align: right;">${__("Total Sales")}</th>
@@ -5956,37 +5919,37 @@ foodpos.FoodPOS.Controller = class {
 						</div>
 
 						<!-- Shift Details Quick Info -->
-						<div style="background: #fff; border-radius: 12px; border: 1px solid #eadfd2; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.03); display: flex; flex-direction: column; gap: 8px;">
-							<div style="font-size: 13px; font-weight: 800; color: #292524;">ℹ️ ${__("Shift Information")}</div>
-							<div style="font-size: 12px; color: #78716c; display: flex; justify-content: space-between;">
+						<div style="background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.03); display: flex; flex-direction: column; gap: 8px;">
+							<div style="font-size: 13px; font-weight: 800; color: #1e293b;">ℹ️ ${__("Shift Information")}</div>
+							<div style="font-size: 12px; color: #64748b; display: flex; justify-content: space-between;">
 								<span>${__("Shift Start Time")}:</span>
-								<b style="color: #292524;">${data.shift_start ? frappe.datetime.str_to_user(data.shift_start) : __("Current Session")}</b>
+								<b style="color: #1e293b;">${data.shift_start ? frappe.datetime.str_to_user(data.shift_start) : __("Current Session")}</b>
 							</div>
-							<div style="font-size: 12px; color: #78716c; display: flex; justify-content: space-between;">
+							<div style="font-size: 12px; color: #64748b; display: flex; justify-content: space-between;">
 								<span>${__("Cashier User")}:</span>
-								<b style="color: #292524;">${data.user} (${data.user_fullname || ""})</b>
+								<b style="color: #1e293b;">${data.user} (${data.user_fullname || ""})</b>
 							</div>
-							<div style="font-size: 12px; color: #78716c; display: flex; justify-content: space-between;">
+							<div style="font-size: 12px; color: #64748b; display: flex; justify-content: space-between;">
 								<span>${__("Company")}:</span>
-								<b style="color: #292524;">${data.company || ""}</b>
+								<b style="color: #1e293b;">${data.company || ""}</b>
 							</div>
-							<div style="font-size: 12px; color: #78716c; display: flex; justify-content: space-between;">
+							<div style="font-size: 12px; color: #64748b; display: flex; justify-content: space-between;">
 								<span>${__("Total Invoices Generated")}:</span>
-								<b style="color: #292524;">${(data.invoices || []).length}</b>
+								<b style="color: #1e293b;">${(data.invoices || []).length}</b>
 							</div>
 						</div>
 					</div>
 				</div>
 
 				<!-- Top Selling Fast Food Items Table -->
-				<div style="background: #fff; border-radius: 12px; border: 1px solid #eadfd2; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
-					<div style="background: #faf6f0; padding: 14px 18px; font-size: 14px; font-weight: 800; color: #292524; border-bottom: 1px solid #eadfd2; display: flex; justify-content: space-between; align-items: center;">
+				<div style="background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+					<div style="background: #f8fafc; padding: 14px 18px; font-size: 14px; font-weight: 800; color: #1e293b; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
 						<span>${fpos_icon("chef", "fpos-ic-sm")} ${__("Top Selling Fast Food Items in this Shift")}</span>
-						<span style="font-size: 11px; color: #78716c; font-weight: 600;">${(data.top_items || []).length} ${__("Products Ranked")}</span>
+						<span style="font-size: 11px; color: #64748b; font-weight: 600;">${(data.top_items || []).length} ${__("Products Ranked")}</span>
 					</div>
 					<table style="width: 100%; border-collapse: collapse; font-size: 13px;">
 						<thead>
-							<tr style="background: #fafafa; border-bottom: 1px solid #eadfd2; color: #78716c; text-transform: uppercase; font-size: 10px; font-weight: 700;">
+							<tr style="background: #fafafa; border-bottom: 1px solid #e2e8f0; color: #64748b; text-transform: uppercase; font-size: 10px; font-weight: 700;">
 								<th style="padding: 8px 14px; text-align: left;">${__("Rank")}</th>
 								<th style="padding: 8px 14px; text-align: left;">${__("Item Description")}</th>
 								<th style="padding: 8px 14px; text-align: center;">${__("Quantity Sold")}</th>
@@ -5998,15 +5961,15 @@ foodpos.FoodPOS.Controller = class {
 				</div>
 
 				<!-- Today's Transaction Journal (Sales Invoices) Table -->
-				<div style="background: #fff; border-radius: 12px; border: 1px solid #eadfd2; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
-					<div style="background: #faf6f0; padding: 14px 18px; font-size: 14px; font-weight: 800; color: #292524; border-bottom: 1px solid #eadfd2; display: flex; justify-content: space-between; align-items: center;">
+				<div style="background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+					<div style="background: #f8fafc; padding: 14px 18px; font-size: 14px; font-weight: 800; color: #1e293b; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
 						<span>${fpos_icon("receipt", "fpos-ic-sm")} ${__("Shift Invoice Transactions")}</span>
-						<span style="font-size: 11px; color: #78716c; font-weight: 600;">${invoices.length} ${__("Total Invoices Generated")}</span>
+						<span style="font-size: 11px; color: #64748b; font-weight: 600;">${invoices.length} ${__("Total Invoices Generated")}</span>
 					</div>
 					<div style="max-height: 380px; overflow-y: auto;">
 						<table style="width: 100%; border-collapse: collapse; font-size: 12px;">
 							<thead style="position: sticky; top: 0; background: #fafafa; z-index: 2;">
-								<tr style="border-bottom: 1px solid #eadfd2; color: #78716c; text-transform: uppercase; font-size: 10px; font-weight: 700;">
+								<tr style="border-bottom: 1px solid #e2e8f0; color: #64748b; text-transform: uppercase; font-size: 10px; font-weight: 700;">
 									<th style="padding: 8px 14px; text-align: left;">${__("Invoice Number")}</th>
 									<th style="padding: 8px 14px; text-align: left;">${__("Time")}</th>
 									<th style="padding: 8px 14px; text-align: left;">${__("Customer")}</th>
@@ -6021,13 +5984,13 @@ foodpos.FoodPOS.Controller = class {
 				</div>
 
 				<!-- Bottom Sticky Action Bar -->
-				<div style="display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 16px 24px; border-radius: 12px; border: 1px solid #eadfd2; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 24px;">
+				<div style="display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 16px 24px; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 24px;">
 					<button class="btn btn-default fpos-back-to-pos-btn" style="font-weight: 700; border-radius: 8px; padding: 8px 18px;">
 						<span>← ${__("Return to POS Register")}</span>
 					</button>
 
 					<div style="display: flex; gap: 12px;">
-						<button class="btn btn-default fpos-print-closing-btn" style="font-weight: 700; border-radius: 8px; padding: 8px 18px; border: 1px solid #d8cbb8;">
+						<button class="btn btn-default fpos-print-closing-btn" style="font-weight: 700; border-radius: 8px; padding: 8px 18px; border: 1px solid #cbd5e1;">
 							<span>${fpos_icon("printer", "fpos-ic-sm")} ${__("Print Z-Report")}</span>
 						</button>
 						<button class="btn btn-danger fpos-exit-desk-btn" style="font-weight: 800; border-radius: 8px; padding: 8px 22px;">
@@ -6067,7 +6030,7 @@ foodpos.FoodPOS.Controller = class {
 
 				const $badge = $row.find(".fpos-mode-variance-badge");
 				if (Math.abs(diff) < 0.01) {
-					$badge.css({ background: "#dcfce7", color: "#166534" }).text(`● ${__("Exact Match")}`);
+					$badge.css({ background: "#dcfce7", color: "#15803d" }).text(`● ${__("Exact Match")}`);
 				} else if (diff < 0) {
 					$badge.css({ background: "#fee2e2", color: "#b91c1c" }).text(`● ${__("Short")}: -${format_curr(Math.abs(diff))}`);
 				} else {
@@ -6081,7 +6044,7 @@ foodpos.FoodPOS.Controller = class {
 			const total_diff = total_cnt - total_exp;
 			const $tot_badge = $page.find(".fpos-recon-total-variance");
 			if (Math.abs(total_diff) < 0.01) {
-				$tot_badge.html(`<span style="font-size: 11px; font-weight: 700; padding: 4px 8px; border-radius: 6px; background: #dcfce7; color: #166534;">● ${__("Balanced")}</span>`);
+				$tot_badge.html(`<span style="font-size: 11px; font-weight: 700; padding: 4px 8px; border-radius: 6px; background: #dcfce7; color: #15803d;">● ${__("Balanced")}</span>`);
 			} else if (total_diff < 0) {
 				$tot_badge.html(`<span style="font-size: 11px; font-weight: 700; padding: 4px 8px; border-radius: 6px; background: #fee2e2; color: #b91c1c;">● -${format_curr(Math.abs(total_diff))}</span>`);
 			} else {
@@ -6716,7 +6679,7 @@ foodpos.FoodPOS.Controller = class {
 								<td>${r.check_in || "—"}</td>
 								<td>${r.check_out || "—"}</td>
 								<td>${r.check_in && !r.check_out ? `<button class="fpos-btn fpos-att-row-out" data-name="${r.staff_name}">${__("Check Out")}</button>` : ""}</td>
-							</tr>`).join("") : `<tr><td colspan="5" style="text-align:center;color:#78716c;">${__("No attendance marked yet today.")}</td></tr>`}
+							</tr>`).join("") : `<tr><td colspan="5" style="text-align:center;color:#64748b;">${__("No attendance marked yet today.")}</td></tr>`}
 					</tbody>
 				</table>
 			</div>
