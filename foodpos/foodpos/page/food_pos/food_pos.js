@@ -1586,7 +1586,10 @@ foodpos.FoodPOS.Controller = class {
 					order_note: this.order_note || "",
 				};
 				localStorage.setItem(backup_key, JSON.stringify(backup));
-			} else if (this._cart_ready_for_sync) {
+			} else if (this._cart_ready_for_sync && !this.linked_kot_id) {
+				// v5.9: a confirmed (KOT-linked) order must survive a reload
+				// even if the cart is momentarily empty — never drop its
+				// backup. clear_cart() still removes it (it nulls the link first).
 				localStorage.removeItem(backup_key);
 			}
 		} catch (e) {
@@ -1625,6 +1628,9 @@ foodpos.FoodPOS.Controller = class {
 		this.wrapper.find(".fpos-delivery-label").text(__("Delivery Details *"));
 		this.render_cart_items();
 		this.update_cart_summary();
+		// v5.9: re-render the grid too — otherwise item cards keep a stale
+		// qty stepper ("− 1 +") for an item that is no longer in the cart.
+		if (this.items && this.items.length) this.render_items_grid();
 		if (this.active_tab_id && this.tabs[this.active_tab_id]) {
 			this.sync_current_cart_to_active_tab();
 		}
@@ -1738,7 +1744,28 @@ foodpos.FoodPOS.Controller = class {
 				});
 
 				const first_id = drafts[0].draft_invoice_name || drafts[0].id;
-				this.switch_tab(first_id);
+				// v5.9: a draft with no items must not wipe a restored
+				// confirmed order — keep the local backup when it has items.
+				const first_has_items = (drafts[0].items || []).length > 0;
+				if (!first_has_items) {
+					const kept = this.active_tab_id && this.tabs[this.active_tab_id]
+						&& this.cart_items && this.cart_items.length > 0;
+					if (kept) {
+						this.render_tab_bar();
+						this.update_order_type_ui();
+						this.render_cart_items();
+						this.update_cart_summary();
+					} else if (this.restore_cart_backup()) {
+						this.render_tab_bar();
+						this.update_order_type_ui();
+						this.render_cart_items();
+						this.update_cart_summary();
+					} else {
+						this.switch_tab(first_id);
+					}
+				} else {
+					this.switch_tab(first_id);
+				}
 			} else {
 				let restored = false;
 				if (this.active_tab_id && this.tabs && this.tabs[this.active_tab_id] && this.cart_items && this.cart_items.length > 0) {
@@ -1927,6 +1954,9 @@ foodpos.FoodPOS.Controller = class {
 		this.render_cart_items();
 		this.update_cart_summary();
 		this.render_tab_bar();
+		// v5.9: keep the item-card steppers in sync with the switched tab's
+		// cart — otherwise a card shows a stale qty from the previous tab.
+		if (this.items && this.items.length) this.render_items_grid();
 	}
 
 	async close_tab(tab_id) {
@@ -2385,6 +2415,10 @@ foodpos.FoodPOS.Controller = class {
 			frappe.show_alert({ message: __("Failed to confirm order: {0}", [e.message]), indicator: "red" });
 		} finally {
 			this._confirming_order = false;
+			// v5.9: guarantee the confirmation freeze is torn down even if
+			// the freeze counter is imbalanced — a stuck overlay swallows
+			// every click on the page while looking like nothing is wrong.
+			this._force_unfreeze();
 		}
 	}
 
@@ -3872,11 +3906,12 @@ foodpos.FoodPOS.Controller = class {
 						${items_list}
 					</div>
 
-					<!-- Bottom Controls: Stage transition & Reprint -->
+					<!-- Bottom Controls: Stage transition, Settle & Print Bill -->
 					<div style="display:flex;justify-content:space-between;align-items:center;border-top:1px dashed #e2e8f0;padding-top:8px;">
 						<span style="font-size:11px;color:#94a3b8;">${kot.customer || "Walk-in"}</span>
-						<div style="display:flex;gap:6px;">
+						<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
 							${stage_btn}
+							<button class="btn btn-default btn-xs fpos-kot-settle-btn" data-kot="${kot.name}" style="font-weight:700;background:#15803d;color:#fff;border-color:#15803d;border-radius:6px;padding:5px 12px;">${__("Settle & Print Bill")}</button>
 						</div>
 					</div>
 				</div>
@@ -3930,8 +3965,83 @@ foodpos.FoodPOS.Controller = class {
 				}
 			});
 
+			// v5.9: settle an open KOT — loads its items back into the cart
+			// and opens payment, so a confirmed-but-unpaid ticket can always
+			// be billed (even after a reload wiped the cart).
+			card.find(".fpos-kot-settle-btn").on("click", async (e) => {
+				const kot_id = $(e.currentTarget).data("kot");
+				await this.resume_kot_for_payment(kot_id);
+			});
+
 			$body.append(card);
 		});
+	}
+
+	// v5.9: bill a confirmed KOT — reload its items into the cart and open
+	// the payment screen. Used from the Live Kitchen Orders drawer.
+	async resume_kot_for_payment(kot_name) {
+		if (!kot_name) return;
+		const load = async () => {
+			try {
+				frappe.dom.freeze(__("Loading kitchen ticket..."));
+				const res = await frappe.call({
+					method: "foodpos.foodpos.page.food_pos.food_pos.get_kot_for_payment",
+					args: { kot_name },
+					freeze: false,
+				});
+				frappe.dom.unfreeze();
+				const data = res.message || {};
+				if (!data.items || !data.items.length) {
+					frappe.msgprint(__("Kitchen ticket {0} has no items to bill.", [kot_name]));
+					return;
+				}
+				this.hide_kitchen_drawer();
+				this.cart_items = data.items.map((it) => ({
+					item_code: it.item_code,
+					item_name: it.item_name,
+					qty: flt(it.qty),
+					rate: flt(it.rate),
+					amount: flt(it.amount),
+					uom: it.uom || "Nos",
+					item_note: it.item_note || "",
+				}));
+				this.order_type = data.order_type || "Walk In";
+				this.selected_table = data.table || null;
+				this.selected_table_no = (data.table || "").split("-").pop().trim() || "";
+				this.linked_kot_id = kot_name;
+				this.pos_order_id = data.order_id || null;
+				this.customer = data.customer || this.customer;
+				this.order_note = data.order_note || "";
+				this.order_confirmed = true;
+				this.payment_pending = true;
+				this.show_pending_banner(kot_name);
+				this.update_order_type_ui();
+				this.render_cart_items();
+				this.update_cart_summary();
+				this.render_items_grid();
+				if (this.active_tab_id && this.tabs[this.active_tab_id]) {
+					this.tabs[this.active_tab_id].order_confirmed = true;
+					this.tabs[this.active_tab_id].payment_status = "Pending";
+					this.sync_current_cart_to_active_tab();
+				}
+				this.render_tab_bar();
+				this.save_cart_backup();
+				this.show_payment_page();
+			} catch (e) {
+				frappe.dom.unfreeze();
+				frappe.msgprint(__("Could not load kitchen ticket: {0}", [e.message]));
+			} finally {
+				this._force_unfreeze();
+			}
+		};
+		if (this.cart_items.length > 0 && this.linked_kot_id !== kot_name) {
+			frappe.confirm(
+				__("Your active cart has items. Replace it with kitchen ticket {0} to bill it?", [kot_name]),
+				() => load()
+			);
+		} else {
+			await load();
+		}
 	}
 
 	update_kitchen_badge(kots) {
@@ -4531,9 +4641,12 @@ foodpos.FoodPOS.Controller = class {
 		this.clear_cart();
 	}
 
-	async sync_offline_invoices() {
+	async sync_offline_invoices(manual = false) {
 		const queue = JSON.parse(localStorage.getItem(this.offline_queue_key) || "[]");
-		if (queue.length === 0) return;
+		if (queue.length === 0) {
+			if (manual) frappe.show_alert({ message: __("Nothing to sync"), indicator: "blue" });
+			return;
+		}
 
 		try {
 			const res = await frappe.call({
@@ -4556,9 +4669,22 @@ foodpos.FoodPOS.Controller = class {
 				});
 			}
 
+			// v5.9: a failed sync must say WHY instead of sitting silently
+			// in the queue forever ("2 pending sync" with no error).
+			const failed = results.filter((r) => !r.success);
+			if (failed.length > 0) {
+				frappe.show_alert({
+					message: __("Could not sync {0} invoice(s): {1}", [failed.length, (failed[0].error || __("sync failed"))]),
+					indicator: "red",
+				});
+			}
+
 			this.update_connection_indicator();
+			// v5.9: refresh the home sync pill count after a manual retry.
+			if (manual && this.current_view === "home") this.show_home();
 		} catch (e) {
 			console.warn("Background offline sync completed with notice", e);
+			if (manual) frappe.show_alert({ message: __("Sync failed: {0}", [e.message]), indicator: "red" });
 		}
 	}
 
@@ -5037,8 +5163,8 @@ foodpos.FoodPOS.Controller = class {
 			this.hide_held_orders_drawer();
 		});
 
-		// Manual sync click
-		this.wrapper.on("click", ".fpos-manual-sync-btn", () => this.sync_offline_invoices());
+		// Manual sync click (v5.9: the home sync pill is one of these now)
+		this.wrapper.on("click", ".fpos-manual-sync-btn", () => this.sync_offline_invoices(true));
 
 		// Sync indicator click: view & manage queued invoices
 		this.wrapper.on("click", ".fpos-sync-indicator", () => {
@@ -5831,12 +5957,12 @@ foodpos.FoodPOS.Controller = class {
 		`;
 
 		const win = window.open("", "_blank");
-		win.document.write(print_content);
+		// v5.9: same as the KOT slip — print() must run inside the new tab,
+		// never win.print() from this page (it blocks the POS thread).
+		const content_with_print = print_content.replace("</body>",
+			`<script>window.addEventListener("load", function(){ setTimeout(function(){ window.print(); }, 300); });</script></body>`);
+		win.document.write(content_with_print);
 		win.document.close();
-		setTimeout(() => {
-			win.focus();
-			win.print();
-		}, 300);
 	}
 
 	// ─── v2: Home / Day Open-Close, Tables, Attendance, Daily Report ───
@@ -5980,7 +6106,7 @@ foodpos.FoodPOS.Controller = class {
 						<div class="fpos-hero-greet">${(new Date().getHours() < 12 ? __("Good morning") : new Date().getHours() < 17 ? __("Good afternoon") : __("Good evening"))}, ${__("Chef")}</div>
 						<div class="fpos-hero-sub">${day.day_open ? __("The kitchen is open — orders are flowing in.") : __("The kitchen is closed — open the day to start taking orders.")}</div>
 						<div class="fpos-hero-pills">
-							<span class="fpos-home-sync ${online ? "online" : "offline"}"><span class="fpos-sync-dot"></span> ${sync_label}</span>
+							<button type="button" class="fpos-home-sync fpos-manual-sync-btn ${online ? "online" : "offline"}" title="${__("Tap to retry sync")}"><span class="fpos-sync-dot"></span> ${sync_label}</button>
 							<span class="fpos-hero-day ${day.day_open ? "open" : "closed"}">${day.day_open ? __("● Day Open") : __("○ Day Closed")}</span>
 						</div>
 					</div>
@@ -6467,9 +6593,15 @@ foodpos.FoodPOS.Controller = class {
 			</body></html>`;
 		const win = window.open("", "_blank");
 		if (!win) return;
-		win.document.write(html);
+		// v5.9: window.print() MUST run inside the new tab's own script.
+		// Calling win.print() from this page blocks the POS tab's JS thread
+		// until the print dialog closes — after Confirm, NO click worked at
+		// all (Pay, Filters, sidebar, Home — everything dead until reload),
+		// even though the page looked normal and the button was enabled.
+		const html_with_print = html.replace("</body>",
+			`<script>window.addEventListener("load", function(){ setTimeout(function(){ window.print(); }, 300); });</script></body>`);
+		win.document.write(html_with_print);
 		win.document.close();
-		setTimeout(() => { win.focus(); win.print(); }, 300);
 	}
 
 	refresh() {

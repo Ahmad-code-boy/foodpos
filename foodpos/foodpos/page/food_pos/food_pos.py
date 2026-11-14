@@ -486,12 +486,28 @@ def get_available_tables(section=None, branch=None, pos_profile=None):
 	if section and section != "All":
 		filters["section"] = section
 
-	tables = frappe.get_all(
-		"Restaurant Table",
-		filters=filters,
-		fields=["name", "table_no", "branch", "section", "capacity", "status", "order_id", "waiter", "guests", "occupied_since"],
-		order_by="table_no asc, name asc"
-	)
+	def _fetch():
+		return frappe.get_all(
+			"Restaurant Table",
+			filters=filters,
+			fields=["name", "table_no", "branch", "section", "capacity", "status", "order_id", "waiter", "guests", "occupied_since"],
+			order_by="table_no asc, name asc"
+		)
+
+	tables = _fetch()
+	# v5.9: if the site has NO tables at all, the v0.4.0 seed patch never
+	# ran (migrate skipped, or run on another site) — create the same demo
+	# tables on demand, exactly like the v5.7 station ensure. Idempotent:
+	# only when zero Restaurant Tables exist; never touches real data.
+	if not tables:
+		try:
+			if frappe.db.count("Restaurant Table") == 0:
+				from foodpos.patches.v0_4_0.add_seed_data import _ensure_tables
+				_ensure_tables()
+				frappe.db.commit()
+				tables = _fetch()
+		except Exception:
+			pass
 	return tables
 
 
@@ -2937,6 +2953,66 @@ def get_active_kitchen_kots(pos_profile=None, branch=None, station=None):
 			kot["table_no"] = kot.table.split("-")[-1]
 
 	return kots
+
+
+@frappe.whitelist()
+def get_kot_for_payment(kot_name):
+	"""
+	v5.9: return an unsettled KOT with priced items so the cashier can bill
+	it from the Live Kitchen Orders drawer — even after a reload wiped the
+	cart. Rates come from the profile's selling price list (same source as
+	get_items); Food KOT Item itself stores no rate.
+	"""
+	if not kot_name or not frappe.db.exists("Food KOT", kot_name):
+		frappe.throw(_("Kitchen ticket {0} not found").format(kot_name))
+	kot = frappe.get_doc("Food KOT", kot_name)
+	if kot.is_settled or kot.sales_invoice:
+		frappe.throw(_("Kitchen ticket {0} is already settled").format(kot_name))
+	if kot.is_voided:
+		frappe.throw(_("Kitchen ticket {0} is voided").format(kot_name))
+
+	price_list = "Standard Selling"
+	try:
+		if kot.pos_profile:
+			profile_data = get_pos_profile_data(kot.pos_profile)
+			price_list = profile_data.get("selling_price_list") or price_list
+	except Exception:
+		pass
+
+	items = []
+	for it in kot.items or []:
+		rate = frappe.db.get_value(
+			"Item Price",
+			{"item_code": it.item_code, "price_list": price_list, "selling": 1},
+			"price_list_rate",
+		)
+		if rate is None:
+			rate = frappe.db.get_value(
+				"Item Price",
+				{"item_code": it.item_code, "price_list": "Standard Selling", "selling": 1},
+				"price_list_rate",
+			) or 0
+		items.append({
+			"item_code": it.item_code,
+			"item_name": it.item_name,
+			"qty": flt(it.qty),
+			"rate": flt(rate),
+			"amount": flt(it.qty) * flt(rate),
+			"item_note": it.item_note or "",
+			"uom": "Nos",
+		})
+
+	return {
+		"kot_name": kot.name,
+		"order_id": kot.order_id or "",
+		"order_type": kot.order_type or "Dine In",
+		"table": kot.table or "",
+		"customer": kot.customer or "",
+		"pos_profile": kot.pos_profile or "",
+		"order_note": kot.order_note or "",
+		"status": kot.status,
+		"items": items,
+	}
 
 
 @frappe.whitelist()

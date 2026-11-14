@@ -1,5 +1,26 @@
 # TEST REPORT — Food POS v5 (premium vibe)
 
+## v5.9 — post-confirm click death + KDS settle + tables/sync (2026-11-15)
+
+- Live bench diagnostic (agent, as Administrator): Confirm works (KOT
+  FKOT-2026-00002 created), but afterwards the WHOLE page stops accepting
+  clicks — Pay, Filters, toast ×, Tables, Home all dead; reload restores
+  it. Pay button itself is enabled (not `[disabled]`); the freeze text
+  "Confirming order…" lingered 25s+. Root cause: opener-side
+  `win.print()` in `print_kot_slip` (same in Z-report print). Fixed in-tab.
+- Same runs: KDS drawer showed count only (2 active, no cards listed —
+  drawer body only fills on open); now each card has Settle & Print Bill.
+  Cart was empty after reload with a stale "− 1 +" stepper; backup/draft
+  guards + grid resync added. Home sync pill was plain text, not a button;
+  now a manual retry that toasts the real failure. Tables still 0 after
+  the user's migrate — the seed patch never ran on that site (Patch Log /
+  `is_billing_contact` console checks still awaited from the user); tables
+  are now also created on demand by `get_available_tables`.
+- Sanity **148/148 PASS**, seed stub **9/9 PASS**. NOT verified live: user
+  must pull v5.9 + migrate (for the doctype/column/patch side), then re-test
+  the full flow — confirm → Pay works immediately → bill prints → tables
+  T1–T6 visible → sync pill clears the 2 queued invoices (or shows why not).
+
 ## v5.8 — Walk-In order_type fix (2026-11-15)
 
 - Live bench re-test (agent, as Administrator): the v5.7 station error is

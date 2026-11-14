@@ -1,5 +1,29 @@
 # CHANGELOG — Food POS v5 (premium vibe)
 
+## v5.9 — Fix: page dead after Confirm (print-block), KDS Settle, tables on demand, sync pill (2026-11-15, live bench diagnostic by agent)
+
+- **Root cause of the dead page:** `print_kot_slip` called `win.print()`
+  from the POS page. That blocks the POS tab's JS thread until the print
+  dialog closes — after Confirm, NO click worked (Pay, Filters, sidebar,
+  Home; button enabled, page looked normal) until reload. The same pattern
+  existed in the Z-report print. **Fix:** `window.print()` now runs inside
+  the new tab's own script; the opener never calls `win.print()` /
+  `win.focus()` again. `confirm_order` also force-unfreezes in `finally`
+  so a stuck freeze overlay can never swallow clicks again.
+- **KDS Settle:** every Live Kitchen Orders card now has a "Settle &
+  Print Bill" button (new `get_kot_for_payment` API prices the KOT's items
+  from the profile's price list) — a confirmed-but-unpaid ticket can always
+  be billed, even after a reload wiped the cart.
+- **Cart restore:** a confirmed (KOT-linked) order's backup is never
+  dropped; `init_tabs` prefers the backup over an empty draft; clear/switch
+  re-render the item grid so steppers never go stale ("− 1 +" on an empty cart).
+- **Tables:** `get_available_tables` creates the demo T1–T6 on demand when
+  the site has zero Restaurant Tables (same seed data as the v0.4.0 patch,
+  like the v5.7 station ensure) — the floor works even if migrate never ran.
+- **Sync:** the home sync pill is now a real button (manual retry) and a
+  failed sync toasts the actual server error instead of sitting silently at
+  "2 pending sync". Sanity **148/148 PASS**.
+
 ## v5.8 — Fix: Walk-In Confirm fails 'Order Type cannot be "Walk In"' (2026-11-15, live bench re-test by agent)
 
 - **Root cause:** the POS sends 4 order types (Walk In, Dine In, Takeaway,
