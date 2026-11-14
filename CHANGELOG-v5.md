@@ -1,5 +1,29 @@
 # CHANGELOG — Food POS v5 (premium vibe)
 
+## v6.0 — Warm restaurant redesign (2026-11-15, user brief)
+
+- **New palette, same system:** warm cream page (#faf6f0), warm white
+  cards (#fffdf9), restaurant orange primary (#ea580c, deep #c2410c),
+  elegant dark brown text (#292524), warm beige hairlines, rounder
+  cards (14px). The deep-green brand is gone; green now means only
+  success/ready/paid (Ready, PAID, Balanced, VEG badges). Home hero is a
+  dark-brown → orange gradient. CHILI layout, all flows and all business
+  logic untouched (single branch, auto-KOT, no-tax Rs discount, thermal
+  bills, Pending drawer, seed data).
+- **Search:** instant filter now matches item name, item code, category
+  AND barcode (server `get_items` returns the first Item Barcode and
+  matches it too). Placeholder shows the shortcut hint.
+- **Dialogs, all centered:** Frappe's own dialogs (discount, customer,
+  PIN, confirm, msgprint) get warm rounded centered styling; the receipt
+  modal now opens with a green ✓ **Payment Successful** banner at
+  settle; loading (freeze) overlay is warm-dimmed. The POS's own receipt
+  / print-preview dialogs were already centered.
+- **Touch + keyboard:** Add-to-Dish min 44px, Pay/Confirm min 52px;
+  `/` or Ctrl+K focuses search from anywhere; Enter in search adds the
+  single match (barcode-scanner flow); Esc now also closes the Pending
+  drawer. Rendered from the real CSS and visually checked
+  (`ui-screenshots/v6/1-pos-warm.png`). Sanity **175/175 PASS**.
+
 ## v5.12 — Pending Payments on the sidebar (2026-11-15, user feedback)
 
 - **The flow the user asked about:** order goes to kitchen → customer
