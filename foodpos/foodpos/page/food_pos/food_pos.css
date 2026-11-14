@@ -2708,3 +2708,23 @@ button.fpos-home-sync:hover { filter: brightness(0.97); }
 .fpos-add-btn { min-height: 44px; }
 .fpos-pay-btn, .fpos-confirm-order-btn { min-height: 52px; }
 .fpos-num-key { min-height: 52px; }
+
+/* ══ v6.1: Day Open / Close — clean, VIP, stranger-friendly ══════
+   Plain words, numbered steps, one big action per screen. A new
+   cashier should understand it in seconds. All logic/APIs unchanged. */
+/* Day Open modal: centered warm card (same pattern as print preview). */
+.fpos-day-open-overlay { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center; background: rgba(41, 37, 36, .55); backdrop-filter: blur(4px); padding: 20px; }
+.fpos-day-open-card { width: 520px; max-width: calc(100vw - 32px); max-height: calc(100vh - 40px); overflow-y: auto; background: #fffdf9; border-radius: 20px; box-shadow: 0 24px 60px rgba(41, 37, 36, .35); padding: 28px; }
+.fpos-day-open-steps { display: flex; gap: 8px; margin: 18px 0 20px; }
+.fpos-day-open-step { flex: 1; background: #faf6f0; border: 1px solid #eadfd2; border-radius: 12px; padding: 10px 8px; text-align: center; font-size: 12px; font-weight: 700; color: #57534e; }
+.fpos-day-open-step b { display: block; width: 24px; height: 24px; line-height: 24px; margin: 0 auto 5px; background: #ea580c; color: #fff; border-radius: 50%; font-size: 12px; }
+.fpos-day-open-cash-row { display: flex; align-items: center; gap: 10px; background: #fff; border: 1px solid #eadfd2; border-radius: 12px; padding: 12px 16px; margin-bottom: 10px; }
+.fpos-day-open-cash-row label { font-weight: 800; color: #292524; font-size: 15px; flex: 1; }
+.fpos-day-open-cash-input { width: 160px; font-size: 20px; font-weight: 800; text-align: right; border: 2px solid #eadfd2; border-radius: 10px; padding: 10px 12px; color: #292524; background: #faf6f0; }
+.fpos-day-open-cash-input:focus { outline: none; border-color: #ea580c; box-shadow: 0 0 0 3px rgba(234, 88, 12, .15); background: #fff; }
+/* Home shift card: big plain state + 3-step guide + full-width buttons. */
+.fpos-shift-guide { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0 4px; }
+.fpos-shift-guide span { flex: 1; min-width: 130px; background: #faf6f0; border: 1px solid #eadfd2; border-radius: 10px; padding: 8px 10px; font-size: 12px; font-weight: 600; color: #57534e; }
+.fpos-shift-guide b { display: inline-block; width: 20px; height: 20px; line-height: 20px; text-align: center; background: #ea580c; color: #fff; border-radius: 50%; font-size: 11px; margin-right: 6px; }
+.fpos-shift-action-sub { font-size: 12px; color: #78716c; text-align: center; margin-top: 6px; }
+.fpos-day-open-btn, .fpos-day-close-btn { width: 100%; min-height: 56px; font-size: 16px; padding: 14px 22px; }

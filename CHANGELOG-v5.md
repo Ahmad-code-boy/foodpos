@@ -384,3 +384,77 @@
 - `CHANGELOG-v5.md`, `TEST-REPORT-v5.md`, `BENCH-TEST-v5.md` (this folder).
 - `../foodpos-v5-premium-vibe.zip` — zip of this folder, kept ready, NOT sent,
   NOT pushed to GitHub.
+
+## v6.1 — Day Open / Close, clean VIP + stranger-friendly (2026-11-15 01:45 PKT)
+
+User: "pos open aur closing ka acha sa clean ui kro vip ker taka ksi unjan
+bnda b easyly samj la user friendly ho" — the Day Open / Day Close flow
+must be so plain that even a new person understands it in seconds.
+
+**Day Open — old ERPNext dialog replaced by a guided card:**
+- `show_opening_shift_dialog()` no longer opens a Frappe dialog
+  ("Create POS Opening Entry" + Company link + POS Profile select +
+  "Opening Balance Details (Float Cash)" table). It now shows a
+  centered warm card `.fpos-day-open-overlay` / `.fpos-day-open-card`
+  (same pattern as the v5.11 print preview): big cash icon, title
+  "Open the Day", subtitle "Count the cash in the drawer, then start
+  taking orders.", branch • profile • date as plain text (not editable
+  fields), 3 numbered steps (1 Count the cash / 2 Type it below /
+  3 Tap Open Day), one big Rs input row per payment mode from the
+  profile ("Cash in the drawer" first, autofocus + select-all on
+  focus), one big orange "Open Day" button (56px) + "Not now" below.
+  Enter submits, Esc/backdrop closes back to Home.
+- Same API + same success path: `create_opening_voucher` with
+  `{pos_profile, company, balance_details}` built from the inputs,
+  then the identical post-open sequence (render_layout, load_data,
+  init_tabs, realtime listener, offline sync, kitchen polling,
+  show_home). No server change. Profile switching via the old dialog
+  is gone — profile is fixed to the current one (switch via Settings).
+
+**Home shift card — plain state + guide:**
+- Label "Shift Management" → "Your Day"; state "● Day Open" /
+  "○ Day Closed" → "● Day is Open" / "○ Day is Closed"; when closed
+  a 3-step guide (Count the cash → Tap Open Day → Start taking
+  orders); "Day Start" / "Day End / Close" → "Day starts at" /
+  "Day ends at", Save Times → "Save"; "Close Day — Z Report" →
+  "Close Day" + subtext "See today's sales & print the Z-Report".
+  Open/Close buttons now full-width, 56px (CSS). All bindings
+  (.fpos-day-open-btn / .fpos-day-close-btn / .fpos-day-start /
+  .fpos-day-end / .fpos-day-times-save) unchanged.
+
+**Day Close page — plain language pass (data/logic untouched):**
+- Header "POS Shift Complete & Shift-Closing" → "Close the Day" +
+  "Check the money, then close the day. Nothing is final until you
+  tap “Close Day” below."; amber 3-step strip on top (1 Count the
+  cash / 2 Type it in the “You Counted” column — green means it
+  matches / 3 Tap “Close Day” below).
+- KPIs: "Total Net Sales" → "Today's Sales", "Orders Completed" →
+  "Orders", "Expected Cash in Drawer" → "Cash in Drawer",
+  "Settled Volume" → "Money In".
+- Reconciliation: "Payment Reconciliation & Cash Drawer Count" →
+  "Count the Cash" + "Type what you counted in the drawer. Green
+  means it matches the expected amount."; columns "Opening Float" →
+  "Started With", "Invoices" → "Sold Today", "Expected" → "Should
+  Be", "Physically Counted" → "You Counted", "Variance" → "Match?";
+  footer "Total Reconciliation" → "Total".
+- Sections: "Order Channels (Dine-In, Takeaway, Delivery)" →
+  "Where Orders Came From", "Shift Information" → "About This Day",
+  "Top Selling Fast Food Items in this Shift" → "Best Sellers Today",
+  "Shift Invoice Transactions" → "Today's Bills"; notes label →
+  "Notes (optional):" + "Anything to tell the next shift? (optional)".
+- Buttons: "Submit POS Closing Entry & Exit" → "Close Day" (both
+  places), "Return to POS Register" / "Back to Register" → "Back to
+  POS". Close confirm: "Close the day? Today's sales will be counted
+  and the day will end." PIN details: "Only a manager can close the
+  day. Please enter the manager PIN." Loading text also plain.
+  All closing bindings (.fpos-exit-desk-btn, .fpos-print-closing-btn,
+  .fpos-back-to-pos-btn, .fpos-recon-counted-input, .fpos-closing-notes)
+  unchanged.
+
+**Verify:** sanity 181/181 PASS (6 new v6.1 checks), seed stub 9/9,
+`node --check` + `py_compile` OK. Design rendered from the real CSS
+and visually checked: `../ui-screenshots/v6.1/1-day-open.png`
+(Open the Day card + closed-day shift card + close-steps strip).
+NOT verified live: the user must open/close the day on the bench
+(the day is currently OPEN on pos.local, so the Open card shows
+after the next close).

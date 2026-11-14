@@ -332,3 +332,22 @@ correctly in the screenshots).
 - Item photos on the bench depend on each ERPNext Item having an Image set;
   items without one show the gradient+SVG fallback (verified in the test
   render above).
+
+## v6.1 — Day Open / Close clean VIP UI (2026-11-15 01:45 PKT)
+
+- **What changed:** Day Open dialog → guided centered card (3 steps,
+  big Rs cash inputs, one orange Open Day button); home shift card
+  plain state + 3-step guide + full-width buttons; closing page
+  plain-language pass (steps strip, "Count the Cash", "You Counted",
+  "Close Day" button). No server/API change; `create_opening_voucher`
+  still called with the same args; all closing bindings unchanged.
+- **Static checks:** `node --check` OK, `py_compile` OK,
+  `scratch/v5_sanity.py` **181/181 PASS** (6 new v6.1 checks),
+  `scratch/v5_seed_test.py` **9/9 PASS**.
+- **Visual check:** `../ui-screenshots/v6.1/1-day-open.png` rendered
+  from the real `food_pos.css` — centered Open the Day card (steps,
+  Cash Rs 5000 / Credit Card Rs 0, orange Open Day), closed-day shift
+  card + close-steps strip behind it. Looks clean and premium.
+- **NOT verified live:** Day Open/Close on the bench (day is OPEN on
+  pos.local right now — the new Open card appears after the next
+  Close Day; Close Day still needs Manager PIN, same as before).

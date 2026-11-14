@@ -455,165 +455,109 @@ foodpos.FoodPOS.Controller = class {
 	show_opening_shift_dialog() {
 		const me = this;
 		const company = (this.profile_data && this.profile_data.company) || frappe.defaults.get_default("company");
+		const payments = (this.profile_data && this.profile_data.payments) || [];
+		const modes = payments.length ? payments.map((p) => p.mode_of_payment) : ["Cash"];
+		const today = frappe.datetime.get_today();
 
-		// Show informative placeholder in main view while shift opening dialog is open
+		// v6.1: a plain, guided Day Open card — no ERPNext jargon. A new
+		// cashier understands it in seconds: count the cash, type it, tap
+		// Open Day. Same API + same success path as the old dialog.
 		this.wrapper.html(`
-			<div class="fpos-shift-pending" style="display:flex;align-items:center;justify-content:center;height:65vh;flex-direction:column;gap:14px;color:#57534e;">
+			<div class="fpos-shift-pending" style="display:flex;align-items:center;justify-content:center;min-height:65vh;flex-direction:column;gap:14px;color:#57534e;padding:20px;">
 				<div style="color:#a8a29e;">${fpos_icon("receipt", "fpos-ic-lg")}</div>
-				<div style="font-size:16px;font-weight:700;color:#292524;">${__("Register Shift Not Open")}</div>
-				<p style="font-size:13px;color:#78716c;max-width:380px;text-align:center;margin:0;">${__("Please enter opening float cash in the dialog to start sales operations for {0}.", [this.branch || this.pos_profile])}</p>
-				<button class="btn btn-primary btn-sm fpos-reopen-shift-dialog-btn" style="margin-top:6px;font-weight:600;">${fpos_icon("refresh", "fpos-ic-sm")} ${__("Open Shift Dialog")}</button>
+				<div style="font-size:18px;font-weight:800;color:#292524;">${__("The day hasn't started yet")}</div>
+				<p style="font-size:13px;color:#78716c;max-width:380px;text-align:center;margin:0;">${__("Count the cash in the drawer, then open the day to start taking orders.")}</p>
+				<button class="btn btn-primary btn-sm fpos-reopen-shift-dialog-btn" style="margin-top:6px;font-weight:700;">${fpos_icon("refresh", "fpos-ic-sm")} ${__("Open the Day")}</button>
+			</div>
+			<div class="fpos-day-open-overlay">
+				<div class="fpos-day-open-card">
+					<div style="text-align:center;">
+						<div style="width:56px;height:56px;border-radius:50%;background:#ffedd5;color:#ea580c;display:flex;align-items:center;justify-content:center;font-size:26px;margin:0 auto 10px;">${fpos_icon("cash", "fpos-ic-lg")}</div>
+						<div style="font-size:22px;font-weight:900;color:#292524;">${__("Open the Day")}</div>
+						<div style="font-size:13px;color:#78716c;margin-top:4px;">${__("Count the cash in the drawer, then start taking orders.")}</div>
+						<div style="font-size:12px;color:#a8a29e;margin-top:6px;">${company || ""} &bull; ${this.pos_profile || ""} &bull; ${today}</div>
+					</div>
+					<div class="fpos-day-open-steps">
+						<div class="fpos-day-open-step"><b>1</b>${__("Count the cash")}</div>
+						<div class="fpos-day-open-step"><b>2</b>${__("Type it below")}</div>
+						<div class="fpos-day-open-step"><b>3</b>${__("Tap Open Day")}</div>
+					</div>
+					${modes.map((m, i) => `
+						<div class="fpos-day-open-cash-row">
+							<label>${m === "Cash" ? __("Cash in the drawer") : m}</label>
+							<span style="font-size:18px;font-weight:800;color:#78716c;">Rs</span>
+							<input type="number" min="0" step="any" class="fpos-day-open-cash-input" data-mode="${m}" value="0" ${i === 0 ? "autofocus" : ""}>
+						</div>`).join("")}
+					<div style="font-size:12px;color:#78716c;text-align:center;margin:4px 0 16px;">${__("This is the money you start the day with. It is counted again when the day closes.")}</div>
+					<button class="btn btn-primary fpos-day-open-submit" style="width:100%;font-size:17px;font-weight:800;background:#ea580c;border-color:#ea580c;border-radius:12px;padding:14px;min-height:56px;">${__("Open Day")}</button>
+					<button class="btn btn-default fpos-day-open-cancel" style="width:100%;margin-top:10px;font-weight:700;border-radius:12px;padding:12px;min-height:48px;">${__("Not now")}</button>
+				</div>
 			</div>
 		`);
-		this.wrapper.find(".fpos-reopen-shift-dialog-btn").on("click", () => {
-			this.show_opening_shift_dialog();
+
+		const close_modal = () => { $(document).off("keydown.fpos_day_open"); me.wrapper.find(".fpos-day-open-overlay").remove(); me.show_home(); };
+		this.wrapper.find(".fpos-reopen-shift-dialog-btn").on("click", () => this.show_opening_shift_dialog());
+		this.wrapper.find(".fpos-day-open-cancel").on("click", close_modal);
+		this.wrapper.find(".fpos-day-open-overlay").on("click", (e) => { if (e.target === e.currentTarget) close_modal(); });
+		$(document).off("keydown.fpos_day_open").on("keydown.fpos_day_open", (e) => {
+			if (e.key === "Escape") close_modal();
+			if (e.key === "Enter" && !$(e.target).is("textarea")) { e.preventDefault(); this.wrapper.find(".fpos-day-open-submit").click(); }
 		});
+		// Cash inputs: select-all on focus so typing replaces the 0.
+		this.wrapper.find(".fpos-day-open-cash-input").on("focus", (e) => e.target.select());
 
-		// Build table rows from profile payments
-		let balance_data = [];
-		const payments = (this.profile_data && this.profile_data.payments) || [];
-		if (payments.length) {
-			balance_data = payments.map((p) => ({
-				mode_of_payment: p.mode_of_payment,
-				opening_amount: 0,
-			}));
-		} else {
-			balance_data = [{ mode_of_payment: "Cash", opening_amount: 0 }];
-		}
-
-		const table_fields = [
-			{
-				fieldname: "mode_of_payment",
-				fieldtype: "Link",
-				in_list_view: 1,
-				label: __("Mode of Payment"),
-				options: "Mode of Payment",
-				reqd: 1,
-			},
-			{
-				fieldname: "opening_amount",
-				fieldtype: "Currency",
-				in_list_view: 1,
-				label: __("Opening Amount"),
-				options: "company:company_currency",
-				default: 0,
-			},
-		];
-
-		const profile_options = (this.available_profiles || []).map((p) => ({
-			label: p.name,
-			value: p.name,
-		})); // v2: profile names only — no branch labels.
-
-		const dialog = new frappe.ui.Dialog({
-			title: __("Create POS Opening Entry"),
-			fields: [
-				{
-					fieldtype: "Link",
-					label: __("Company"),
-					default: company,
-					options: "Company",
-					fieldname: "company",
-					reqd: 1,
-				},
-				{
-					fieldtype: "Select",
-					label: __("POS Profile"),
-					options: profile_options,
-					fieldname: "pos_profile",
-					default: me.pos_profile,
-					reqd: 1,
-					change: async () => {
-						const selected_prof = dialog.get_value("pos_profile");
-						if (selected_prof && selected_prof !== me.pos_profile) {
-							dialog.hide();
-							await me.select_pos_profile(selected_prof);
-						}
-					},
-				},
-				{
-					fieldname: "balance_details",
-					fieldtype: "Table",
-					label: __("Opening Balance Details (Float Cash)"),
-					cannot_add_rows: false,
-					in_place_edit: true,
-					reqd: 1,
-					data: balance_data,
-					fields: table_fields,
-				},
-			],
-			primary_action_label: __("Open Shift"),
-			secondary_action_label: __("Cancel"),
-			secondary_action: () => {
-				dialog.hide();
-				me.show_home(); // v2: back to Home, no branch selector.
-			},
-			primary_action: async function ({ company, pos_profile, balance_details }) {
-				if (!balance_details || !balance_details.length) {
-					frappe.show_alert({
-						message: __("Please add Mode of Payment and opening balance details."),
-						indicator: "red",
-					});
-					return;
-				}
-
-				balance_details = balance_details.filter((d) => d.mode_of_payment);
-
-				frappe.dom.freeze(__("Creating POS Opening Entry..."));
-				try {
-					const res = await frappe.call({
-						method: "foodpos.foodpos.page.food_pos.food_pos.create_opening_voucher",
-						args: { pos_profile, company, balance_details: JSON.stringify(balance_details) },
-					});
-					frappe.dom.unfreeze();
-
-					if (res && res.message) {
-						me.pos_opening = res.message.name;
-						me.pos_opening_time = res.message.period_start_date;
-						me.pos_opening_entry = res.message;
-						sessionStorage.setItem("fpos_active_profile", me.pos_profile);
-						frappe.show_alert({
-							message: __("Shift opened successfully: {0}", [me.pos_opening]),
-							indicator: "green",
-						});
-						me.setup_listener_for_pos_closing();
-						dialog.hide();
-						me.day_open = true;
-
-						// Proceed with rendering app
-						const restored_early = me.restore_cart_backup();
-						me.render_layout();
-						if (restored_early) {
-							me.update_order_type_ui();
-							me.render_cart_items();
-							me.update_cart_summary();
-							me.render_tab_bar();
-						}
-						await me.load_data();
-						await me.init_tabs();
-						me.setup_realtime_table_listener();
-						me.sync_offline_invoices();
-						me.start_kitchen_polling();
-						me.show_home(); // v2: back to Home after Day Open.
+		this.wrapper.find(".fpos-day-open-submit").on("click", async () => {
+			const balance_details = modes.map((m) => {
+				const v = flt(this.wrapper.find(`.fpos-day-open-cash-input[data-mode="${m}"]`).val());
+				return { mode_of_payment: m, opening_amount: Math.max(0, v || 0) };
+			}).filter((d) => d.mode_of_payment);
+			if (!balance_details.length) {
+				frappe.show_alert({ message: __("Please enter the opening cash."), indicator: "red" });
+				return;
+			}
+			const $btn = this.wrapper.find(".fpos-day-open-submit");
+			$btn.prop("disabled", true).text(__("Opening the day..."));
+			$(document).off("keydown.fpos_day_open");
+			frappe.dom.freeze(__("Opening the day..."));
+			try {
+				const res = await frappe.call({
+					method: "foodpos.foodpos.page.food_pos.food_pos.create_opening_voucher",
+					args: { pos_profile: me.pos_profile, company, balance_details: JSON.stringify(balance_details) },
+				});
+				frappe.dom.unfreeze();
+				if (res && res.message) {
+					me.pos_opening = res.message.name;
+					me.pos_opening_time = res.message.period_start_date;
+					me.pos_opening_entry = res.message;
+					sessionStorage.setItem("fpos_active_profile", me.pos_profile);
+					frappe.show_alert({ message: __("Day opened — have a great shift!"), indicator: "green" });
+					me.setup_listener_for_pos_closing();
+					me.day_open = true;
+					const restored_early = me.restore_cart_backup();
+					me.render_layout();
+					if (restored_early) {
+						me.update_order_type_ui();
+						me.render_cart_items();
+						me.update_cart_summary();
+						me.render_tab_bar();
 					}
-				} catch (e) {
-					frappe.dom.unfreeze();
-					frappe.msgprint({
-						title: __("Failed to Open Shift"),
-						indicator: "red",
-						message: e.message || __("Error creating POS Opening Entry"),
-					});
+					await me.load_data();
+					await me.init_tabs();
+					me.setup_realtime_table_listener();
+					me.sync_offline_invoices();
+					me.start_kitchen_polling();
+					me.show_home();
 				}
-			},
+			} catch (e) {
+				frappe.dom.unfreeze();
+				$btn.prop("disabled", false).text(__("Open Day"));
+				frappe.msgprint({
+					title: __("Could not open the day"),
+					indicator: "red",
+					message: e.message || __("Something went wrong. Please try again."),
+				});
+			}
 		});
-
-		dialog.get_close_btn().show().on("click", () => {
-			dialog.hide();
-			me.show_home(); // v2: back to Home, no branch selector.
-		});
-
-		this.style_dialog(dialog);
-		dialog.show();
 	}
 
 	check_outdated_pos_opening_entry() {
@@ -5678,8 +5622,8 @@ foodpos.FoodPOS.Controller = class {
 		$closing.show().addClass("active").html(`
 			<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:65vh;gap:16px;">
 				<div class="fpos-spinner" style="width:44px;height:44px;border:3px solid #eadfd2;border-top-color:#ea580c;border-radius:50%;animation:fpos-spin .8s linear infinite;"></div>
-				<div style="color:#57534e;font-size:16px;font-weight:700;">${__("Compiling Today's Register Closing & Sales Analytics...")}</div>
-				<div style="color:#a8a29e;font-size:13px;">${__("Reconciling Sales Invoices, Cash Drawer & Payment Modes")}</div>
+				<div style="color:#57534e;font-size:16px;font-weight:700;">${__("Getting today's sales ready...")}</div>
+				<div style="color:#a8a29e;font-size:13px;">${__("Counting sales, cash and payments")}</div>
 			</div>
 		`);
 
@@ -5821,12 +5765,15 @@ foodpos.FoodPOS.Controller = class {
 					<div style="display: flex; align-items: center; gap: 14px;">
 						<button class="btn btn-default fpos-back-to-pos-btn" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700; border-radius: 8px;">
 							<span>←</span>
-							<span>${__("Back to Register")}</span>
+							<span>${__("Back to POS")}</span>
 						</button>
 						<div>
 							<h3 style="margin: 0; font-size: 18px; font-weight: 800; color: #292524; display: flex; align-items: center; gap: 8px;">
-								<span>${fpos_icon("chart", "fpos-ic-sm")}</span> ${__("POS Shift Complete & Shift-Closing")}
+								<span>${fpos_icon("chart", "fpos-ic-sm")}</span> ${__("Close the Day")}
 							</h3>
+							<div style="font-size: 12px; color: #78716c; margin-top: 2px;">
+								${__("Check the money, then close the day. Nothing is final until you tap “Close Day” below.")}
+							</div>
 							<div style="font-size: 12px; color: #78716c; margin-top: 2px;">
 								${__("POS Profile")}: <b style="color: #292524;">${data.pos_profile || this.pos_profile}</b> &bull;
 								${__("Date")}: <b>${data.today}</b> &bull;
@@ -5843,37 +5790,45 @@ foodpos.FoodPOS.Controller = class {
 						</button>
 						<button class="btn btn-danger fpos-exit-desk-btn" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 800; border-radius: 8px;">
 							<span>${fpos_icon("checkCircle", "fpos-ic-sm")}</span>
-							<span>${__("Submit POS Closing Entry & Exit")}</span>
+							<span>${__("Close Day")}</span>
 						</button>
 					</div>
+				</div>
+
+				<!-- Close-the-day steps: plain words, so anyone can follow. -->
+				<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:14px 20px;display:flex;gap:18px;flex-wrap:wrap;align-items:center;">
+					<span style="font-weight:800;color:#92400e;font-size:14px;">${__("Close the day in 3 steps:")}</span>
+					<span style="font-size:13px;color:#57534e;"><b style="color:#ea580c;">1</b> ${__("Count the cash in the drawer")}</span>
+					<span style="font-size:13px;color:#57534e;"><b style="color:#ea580c;">2</b> ${__("Type it in the “You Counted” column — green means it matches")}</span>
+					<span style="font-size:13px;color:#57534e;"><b style="color:#ea580c;">3</b> ${__("Tap “Close Day” below")}</span>
 				</div>
 
 				<!-- 4 Main KPI Cards -->
 				<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;">
 					<!-- Total Sales -->
 					<div style="background: #fff; border: 1px solid #bbf7d0; border-left: 5px solid #22c55e; border-radius: 12px; padding: 18px 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
-						<div style="font-size: 12px; font-weight: 700; color: #c2410c; text-transform: uppercase; letter-spacing: .5px;">${__("Total Net Sales")}</div>
+						<div style="font-size: 12px; font-weight: 700; color: #c2410c; text-transform: uppercase; letter-spacing: .5px;">${__("Today's Sales")}</div>
 						<div style="font-size: 26px; font-weight: 900; color: #ea580c; margin: 6px 0 2px;">${format_curr(data.net_sales)}</div>
 						<div style="font-size: 11px; color: #16a34a;">${__("Gross")}: ${format_curr(data.gross_sales)} &bull; ${__("Discounts")}: -${format_curr(data.total_discounts)}</div>
 					</div>
 
 					<!-- Total Orders -->
 					<div style="background: #fff; border: 1px solid #bfdbfe; border-left: 5px solid #3b82f6; border-radius: 12px; padding: 18px 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
-						<div style="font-size: 12px; font-weight: 700; color: #1e40af; text-transform: uppercase; letter-spacing: .5px;">${__("Orders Completed")}</div>
+						<div style="font-size: 12px; font-weight: 700; color: #1e40af; text-transform: uppercase; letter-spacing: .5px;">${__("Orders")}</div>
 						<div style="font-size: 26px; font-weight: 900; color: #1d4ed8; margin: 6px 0 2px;">${data.total_orders}</div>
 						<div style="font-size: 11px; color: #3b82f6;">${__("Average Ticket")}: ${format_curr(data.total_orders ? data.net_sales / data.total_orders : 0)}</div>
 					</div>
 
 					<!-- Cash Drawer -->
 					<div style="background: #fff; border: 1px solid #fed7aa; border-left: 5px solid #ea580c; border-radius: 12px; padding: 18px 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
-						<div style="font-size: 12px; font-weight: 700; color: #9a3412; text-transform: uppercase; letter-spacing: .5px;">${__("Expected Cash in Drawer")}</div>
+						<div style="font-size: 12px; font-weight: 700; color: #9a3412; text-transform: uppercase; letter-spacing: .5px;">${__("Cash in Drawer")}</div>
 						<div style="font-size: 26px; font-weight: 900; color: #ea580c; margin: 6px 0 2px;">${format_curr(data.expected_cash)}</div>
 						<div style="font-size: 11px; color: #c2410c;">${__("Opening")}: ${format_curr(data.opening_cash)} &bull; ${__("Cash Sales")}: ${format_curr(data.cash_sales)}</div>
 					</div>
 
 					<!-- Settled Status -->
 					<div style="background: #fff; border: 1px solid #e9d5ff; border-left: 5px solid #a855f7; border-radius: 12px; padding: 18px 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
-						<div style="font-size: 12px; font-weight: 700; color: #6b21a8; text-transform: uppercase; letter-spacing: .5px;">${__("Settled Volume")}</div>
+						<div style="font-size: 12px; font-weight: 700; color: #6b21a8; text-transform: uppercase; letter-spacing: .5px;">${__("Money In")}</div>
 						<div style="font-size: 26px; font-weight: 900; color: #7e22ce; margin: 6px 0 2px;">${format_curr(data.total_paid)}</div>
 						<div style="font-size: 11px; color: ${flt(data.total_outstanding) > 0 ? "#dc2626" : "#7e22ce"};">
 							${__("Outstanding")}: <b>${format_curr(data.total_outstanding)}</b>
@@ -5888,10 +5843,10 @@ foodpos.FoodPOS.Controller = class {
 						<div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f5efe4; padding-bottom: 12px;">
 							<div>
 								<div style="font-size: 15px; font-weight: 800; color: #292524; display: flex; align-items: center; gap: 8px;">
-									<span>${fpos_icon("cash", "fpos-ic-sm")}</span> ${__("Payment Reconciliation & Cash Drawer Count")}
+									<span>${fpos_icon("cash", "fpos-ic-sm")}</span> ${__("Count the Cash")}
 								</div>
 								<div style="font-size: 12px; color: #78716c; margin-top: 2px;">
-									${__("Physical count vs. expected totals (Opening Float + Shift Invoices)")}
+									${__("Type what you counted in the drawer. Green means it matches the expected amount.")}
 								</div>
 							</div>
 							<span style="font-size: 11px; background: #eff6ff; color: #1d4ed8; font-weight: 700; padding: 4px 10px; border-radius: 6px;">
@@ -5903,12 +5858,12 @@ foodpos.FoodPOS.Controller = class {
 							<table style="width: 100%; border-collapse: collapse; font-size: 12px;" class="fpos-recon-table">
 								<thead>
 									<tr style="background: #faf6f0; border-bottom: 2px solid #eadfd2; color: #78716c; text-transform: uppercase; font-size: 10px; font-weight: 700;">
-										<th style="padding: 10px 14px; text-align: left;">${__("Mode of Payment")}</th>
-										<th style="padding: 10px 14px; text-align: right;">${__("Opening Float")}</th>
-										<th style="padding: 10px 14px; text-align: right;">${__("Invoices")}</th>
-										<th style="padding: 10px 14px; text-align: right;">${__("Expected")}</th>
-										<th style="padding: 10px 14px; text-align: right; width: 150px;">${__("Physically Counted")}</th>
-										<th style="padding: 10px 14px; text-align: center; width: 140px;">${__("Variance")}</th>
+										<th style="padding: 10px 14px; text-align: left;">${__("How They Paid")}</th>
+										<th style="padding: 10px 14px; text-align: right;">${__("Started With")}</th>
+										<th style="padding: 10px 14px; text-align: right;">${__("Sold Today")}</th>
+										<th style="padding: 10px 14px; text-align: right;">${__("Should Be")}</th>
+										<th style="padding: 10px 14px; text-align: right; width: 150px;">${__("You Counted")}</th>
+										<th style="padding: 10px 14px; text-align: center; width: 140px;">${__("Match?")}</th>
 									</tr>
 								</thead>
 								<tbody>
@@ -5916,7 +5871,7 @@ foodpos.FoodPOS.Controller = class {
 								</tbody>
 								<tfoot>
 									<tr style="background: #faf6f0; font-weight: 800; border-top: 2px solid #eadfd2;">
-										<td style="padding: 10px 14px; color: #292524;">${__("Total Reconciliation")}</td>
+										<td style="padding: 10px 14px; color: #292524;">${__("Total")}</td>
 										<td style="padding: 10px 14px; text-align: right; color: #78716c;">${format_curr(total_opening)}</td>
 										<td style="padding: 10px 14px; text-align: right; color: #16a34a;">+${format_curr(total_sales)}</td>
 										<td style="padding: 10px 14px; text-align: right; color: #292524;" class="fpos-recon-total-expected">${format_curr(total_expected)}</td>
@@ -5930,8 +5885,8 @@ foodpos.FoodPOS.Controller = class {
 						</div>
 
 						<div style="margin-top: 6px;">
-							<label style="font-size: 12px; font-weight: 700; color: #57534e;">${__("Shift Closing Notes & Remarks:")}</label>
-							<textarea class="form-control fpos-closing-notes" rows="2" placeholder="${__("Optional notes regarding cash drawer count, discrepancies, or shift handover...")}" style="font-size: 12px; border-radius: 8px;"></textarea>
+							<label style="font-size: 12px; font-weight: 700; color: #57534e;">${__("Notes (optional):")}</label>
+							<textarea class="form-control fpos-closing-notes" rows="2" placeholder="${__("Anything to tell the next shift? (optional)")}" style="font-size: 12px; border-radius: 8px;"></textarea>
 						</div>
 					</div>
 
@@ -5940,7 +5895,7 @@ foodpos.FoodPOS.Controller = class {
 						<!-- Order Channels Breakdown -->
 						<div style="background: #fff; border-radius: 12px; border: 1px solid #eadfd2; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
 							<div style="background: #faf6f0; padding: 12px 16px; font-size: 13px; font-weight: 800; color: #292524; border-bottom: 1px solid #eadfd2; display: flex; justify-content: space-between; align-items: center;">
-								<span>${fpos_icon("receipt", "fpos-ic-sm")} ${__("Order Channels (Dine-In, Takeaway, Delivery)")}</span>
+								<span>${fpos_icon("receipt", "fpos-ic-sm")} ${__("Where Orders Came From")}</span>
 								<span style="font-size: 11px; font-weight: 600; color: #78716c;">${(data.order_types || []).length} ${__("Channels")}</span>
 							</div>
 							<table style="width: 100%; border-collapse: collapse; font-size: 12px;">
@@ -5957,13 +5912,13 @@ foodpos.FoodPOS.Controller = class {
 
 						<!-- Shift Details Quick Info -->
 						<div style="background: #fff; border-radius: 12px; border: 1px solid #eadfd2; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.03); display: flex; flex-direction: column; gap: 8px;">
-							<div style="font-size: 13px; font-weight: 800; color: #292524;">ℹ️ ${__("Shift Information")}</div>
+							<div style="font-size: 13px; font-weight: 800; color: #292524;">ℹ️ ${__("About This Day")}</div>
 							<div style="font-size: 12px; color: #78716c; display: flex; justify-content: space-between;">
-								<span>${__("Shift Start Time")}:</span>
+								<span>${__("Day started at")}:</span>
 								<b style="color: #292524;">${data.shift_start ? frappe.datetime.str_to_user(data.shift_start) : __("Current Session")}</b>
 							</div>
 							<div style="font-size: 12px; color: #78716c; display: flex; justify-content: space-between;">
-								<span>${__("Cashier User")}:</span>
+								<span>${__("Cashier")}:</span>
 								<b style="color: #292524;">${data.user} (${data.user_fullname || ""})</b>
 							</div>
 							<div style="font-size: 12px; color: #78716c; display: flex; justify-content: space-between;">
@@ -5971,7 +5926,7 @@ foodpos.FoodPOS.Controller = class {
 								<b style="color: #292524;">${data.company || ""}</b>
 							</div>
 							<div style="font-size: 12px; color: #78716c; display: flex; justify-content: space-between;">
-								<span>${__("Total Invoices Generated")}:</span>
+								<span>${__("Bills today")}:</span>
 								<b style="color: #292524;">${(data.invoices || []).length}</b>
 							</div>
 						</div>
@@ -5981,7 +5936,7 @@ foodpos.FoodPOS.Controller = class {
 				<!-- Top Selling Fast Food Items Table -->
 				<div style="background: #fff; border-radius: 12px; border: 1px solid #eadfd2; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
 					<div style="background: #faf6f0; padding: 14px 18px; font-size: 14px; font-weight: 800; color: #292524; border-bottom: 1px solid #eadfd2; display: flex; justify-content: space-between; align-items: center;">
-						<span>${fpos_icon("chef", "fpos-ic-sm")} ${__("Top Selling Fast Food Items in this Shift")}</span>
+						<span>${fpos_icon("chef", "fpos-ic-sm")} ${__("Best Sellers Today")}</span>
 						<span style="font-size: 11px; color: #78716c; font-weight: 600;">${(data.top_items || []).length} ${__("Products Ranked")}</span>
 					</div>
 					<table style="width: 100%; border-collapse: collapse; font-size: 13px;">
@@ -6000,7 +5955,7 @@ foodpos.FoodPOS.Controller = class {
 				<!-- Today's Transaction Journal (Sales Invoices) Table -->
 				<div style="background: #fff; border-radius: 12px; border: 1px solid #eadfd2; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
 					<div style="background: #faf6f0; padding: 14px 18px; font-size: 14px; font-weight: 800; color: #292524; border-bottom: 1px solid #eadfd2; display: flex; justify-content: space-between; align-items: center;">
-						<span>${fpos_icon("receipt", "fpos-ic-sm")} ${__("Shift Invoice Transactions")}</span>
+						<span>${fpos_icon("receipt", "fpos-ic-sm")} ${__("Today's Bills")}</span>
 						<span style="font-size: 11px; color: #78716c; font-weight: 600;">${invoices.length} ${__("Total Invoices Generated")}</span>
 					</div>
 					<div style="max-height: 380px; overflow-y: auto;">
@@ -6023,7 +5978,7 @@ foodpos.FoodPOS.Controller = class {
 				<!-- Bottom Sticky Action Bar -->
 				<div style="display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 16px 24px; border-radius: 12px; border: 1px solid #eadfd2; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 24px;">
 					<button class="btn btn-default fpos-back-to-pos-btn" style="font-weight: 700; border-radius: 8px; padding: 8px 18px;">
-						<span>← ${__("Return to POS Register")}</span>
+						<span>← ${__("Back to POS")}</span>
 					</button>
 
 					<div style="display: flex; gap: 12px;">
@@ -6031,7 +5986,7 @@ foodpos.FoodPOS.Controller = class {
 							<span>${fpos_icon("printer", "fpos-ic-sm")} ${__("Print Z-Report")}</span>
 						</button>
 						<button class="btn btn-danger fpos-exit-desk-btn" style="font-weight: 800; border-radius: 8px; padding: 8px 22px;">
-							<span>${fpos_icon("checkCircle", "fpos-ic-sm")} ${__("Submit POS Closing Entry & Exit")}</span>
+							<span>${fpos_icon("checkCircle", "fpos-ic-sm")} ${__("Close Day")}</span>
 						</button>
 					</div>
 				</div>
@@ -6101,7 +6056,7 @@ foodpos.FoodPOS.Controller = class {
 			this.print_closing_summary(data);
 		});
 
-		// Finalize Shift & Submit POS Closing Entry
+		// Finalize the day & submit the closing entry
 		$page.on("click", ".fpos-exit-desk-btn", () => {
 			frappe.confirm(
 				__("Are you sure you want to finalize this shift and submit the POS Closing Entry?<br><br>This will consolidate all shift invoices, record counted payments, deduct stock, and post General Ledger entries."),
@@ -6393,27 +6348,33 @@ foodpos.FoodPOS.Controller = class {
 
 				<div class="fpos-home-shift">
 					<div class="fpos-shift-card">
-						<div class="fpos-shift-label">${__("Shift Management")}</div>
+						<div class="fpos-shift-label">${__("Your Day")}</div>
 						<div class="fpos-shift-state ${day.day_open ? "open" : "closed"}">
-							${day.day_open ? __("● Day Open") : __("○ Day Closed")}
+							${day.day_open ? __("● Day is Open") : __("○ Day is Closed")}
 						</div>
 						${day.day_open && this.day_open_time ? `
 							<div class="fpos-shift-opened">
-								${__("Day Open")}: ${this.day_open_time}
+								${__("Opened at")}: ${this.day_open_time}
 								&bull; <span id="fpos-day-elapsed" data-since="${this.day_open_time}">${this.format_elapsed(this.day_open_time)}</span>
-							</div>` : ""}
+							</div>` : `
+							<div class="fpos-shift-guide">
+								<span><b>1</b>${__("Count the cash in the drawer")}</span>
+								<span><b>2</b>${__("Tap Open Day")}</span>
+								<span><b>3</b>${__("Start taking orders")}</span>
+							</div>`}
 						<div class="fpos-shift-times">
-							<label>${__("Day Start")}
+							<label>${__("Day starts at")}
 								<input type="time" class="fpos-day-start" value="${day.day_start_time || ""}">
 							</label>
-							<label>${__("Day End / Close")}
+							<label>${__("Day ends at")}
 								<input type="time" class="fpos-day-end" value="${day.day_end_time || ""}">
 							</label>
-							<button class="fpos-btn fpos-day-times-save">${__("Save Times")}</button>
+							<button class="fpos-btn fpos-day-times-save">${__("Save")}</button>
 						</div>
 						<div class="fpos-shift-actions">
 							${day.day_open
-								? `<button class="fpos-btn fpos-day-close-btn">${__("Close Day — Z Report")}</button>`
+								? `<button class="fpos-btn fpos-day-close-btn">${__("Close Day")}</button>
+								   <div class="fpos-shift-action-sub">${__("See today's sales & print the Z-Report")}</div>`
 								: `<button class="fpos-btn fpos-day-open-btn">${__("Open Day")}</button>`}
 						</div>
 					</div>
@@ -6814,12 +6775,12 @@ foodpos.FoodPOS.Controller = class {
 	// opens the closing page / Z-report. Closing never deletes data.
 	start_day_close() {
 		frappe.confirm(
-			__("Close Day & reconcile daily sales for this shift?"),
+			__("Close the day? Today's sales will be counted and the day will end."),
 			() => {
 				this.prompt_manager_pin({
 					action_type: "Close Register",
 					title: __("Manager PIN — Close Day"),
-					details: __("Closing the day for shift {0} requires manager PIN authorization.", [this.pos_opening || ""]),
+					details: __("Only a manager can close the day. Please enter the manager PIN."),
 					on_success: () => { this.show_closing_page(); },
 				});
 			}
