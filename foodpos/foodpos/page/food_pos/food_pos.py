@@ -16,6 +16,11 @@ from frappe import _
 from frappe.utils import cint, flt, getdate, now_datetime, nowdate
 from frappe.utils.password import get_decrypted_password
 
+# v2 single branch: one branch only. The old branch columns/fields are
+# kept for existing data, but nothing in v2 selects, filters, names or
+# PIN-scopes by branch any more.
+from foodpos.foodpos.single_branch import SINGLE_BRANCH, SINGLE_NAMING_SERIES, normalise_order_type
+
 
 def get_context(context):
 	context.no_cache = 1
@@ -51,8 +56,9 @@ def _format_time_hh_mm(val):
 def get_pos_profiles():
 	"""
 	Retrieve accessible POS Profiles for current user in Frappe/ERPNext v16.
-	Returns custom_branch, warehouse, price list, and currency.
-	Respects Branch User Permissions for multi-branch isolation.
+	Returns warehouse, price list, and currency.
+	v2 single branch: Branch User Permissions are no longer applied —
+	there is only one branch, so every profile the user may use is listed.
 	"""
 	user = frappe.session.user
 	user_profiles = frappe.get_all(
@@ -69,9 +75,7 @@ def get_pos_profiles():
 		if user_profiles:
 			filters["name"] = ["in", user_profiles]
 
-		user_branches = frappe.get_all("User Permission", filters={"user": user, "allow": "Branch"}, pluck="for_value")
-		if user_branches:
-			filters["custom_branch"] = ["in", user_branches]
+		# v2: no Branch User-Permission filtering — single branch only.
 
 	profiles = frappe.get_all(
 		"POS Profile",
@@ -79,7 +83,7 @@ def get_pos_profiles():
 		fields=["name", "company", "warehouse", "selling_price_list", "currency", "custom_branch"]
 	)
 	for p in profiles:
-		p["branch"] = p.get("custom_branch") or ""
+		p["branch"] = SINGLE_BRANCH  # v2: fixed; custom_branch is legacy data only.
 		open_shift = frappe.db.get_value(
 			"POS Opening Entry",
 			{"pos_profile": p["name"], "docstatus": 1, "pos_closing_entry": ["in", ["", None]], "status": "Open"},
@@ -322,8 +326,8 @@ def get_pos_profile_data(pos_profile=None):
 		"name": profile.name,
 		"company": company,
 		"currency": currency,
-		"custom_branch": getattr(profile, "custom_branch", None) or "",
-		"branch": getattr(profile, "custom_branch", None) or "",
+		"custom_branch": SINGLE_BRANCH,  # v2: legacy field, always the single branch.
+		"branch": SINGLE_BRANCH,
 		"warehouse": profile.warehouse or "",
 		"cost_center": getattr(profile, "cost_center", None) or "",
 		"write_off_cost_center": getattr(profile, "write_off_cost_center", None) or "",
@@ -464,17 +468,13 @@ def get_items(pos_profile=None, item_group=None, search_term=None, start=0, page
 def get_available_tables(section=None, branch=None, pos_profile=None):
 	"""
 	Fetch restaurant tables with real-time status and seating capacity.
-	Strictly filters by active branch (or pos_profile).
+	v2 single branch: the `branch` argument is accepted for backward
+	compatibility and ignored — all tables of the one branch are returned.
 	"""
 	if not frappe.db.exists("DocType", "Restaurant Table"):
 		return []
 
-	if not branch and pos_profile:
-		branch = frappe.db.get_value("POS Profile", pos_profile, "custom_branch")
-
-	filters = {}
-	if branch:
-		filters["branch"] = branch
+	filters = {}  # v2: no branch filter — one branch only.
 	if section and section != "All":
 		filters["section"] = section
 
@@ -496,11 +496,9 @@ def force_free_table(table, manager_pin, reason=None):
 	if not table:
 		frappe.throw(_("Table is required."))
 
-	branch = frappe.db.get_value("Restaurant Table", table, "branch")
 	verify_manager_pin(
 		pin=manager_pin,
 		action_type="table_reset",
-		branch=branch,
 		cashier=frappe.session.user,
 		table=table,
 		details=f"Emergency table free for {table}. Reason: {reason or 'Manager override'}"
@@ -555,7 +553,6 @@ def transfer_table(from_table, to_table, manager_pin=None, reason=None):
 		verify_manager_pin(
 			pin=manager_pin,
 			action_type="table_transfer",
-			branch=from_doc.branch,
 			cashier=frappe.session.user,
 			table=f"{from_table} -> {to_table}",
 			details=f"Table transfer from {from_table} to {to_table}. Reason: {reason or 'Customer request'}"
@@ -631,9 +628,9 @@ def verify_manager_pin(pin, action_type, branch=None, cashier=None, order_id=Non
 
 	cashier = cashier or frappe.session.user
 
+	# v2: PINs are no longer branch-scoped. Any enabled PIN of the single
+	# branch may approve; the 5-in-15-minutes lockout below is unchanged.
 	filters = {"enabled": 1}
-	if branch:
-		filters["branch"] = branch
 
 	pin_docs = frappe.get_all(
 		"Food POS Manager PIN",
@@ -646,17 +643,15 @@ def verify_manager_pin(pin, action_type, branch=None, cashier=None, order_id=Non
 		]
 	)
 
-	# Round 23 fix: NO any-branch fallback. A PIN from Branch 2 must never
-	# approve an action in Branch 1. If a branch has no PIN configured, the
-	# manager must set one up for that branch instead of silently borrowing
-	# another branch's PIN.
+	# v2: there is only one branch, so there is no cross-branch PIN to
+	# borrow. If no PIN is configured at all, the manager must set one up.
 	if not pin_docs:
-		frappe.throw(_("No Manager PIN is configured for this branch. Ask an administrator to set one up."))
+		frappe.throw(_("No Manager PIN is configured. Ask an administrator to set one up."))
 
 	# Round 23 fix: PIN brute-force lockout. 5 failed attempts in 15 minutes
 	# from the same session user blocks further attempts. The counter lives
 	# in cache only and is cleared on a successful verification.
-	_fail_key = f"fpos_pin_fail:{frappe.session.user}:{branch or 'any'}"
+	_fail_key = f"fpos_pin_fail:{frappe.session.user}:single-branch"
 	try:
 		_fails = cint(frappe.cache().get_value(_fail_key) or 0)
 	except Exception:
@@ -711,7 +706,7 @@ def verify_manager_pin(pin, action_type, branch=None, cashier=None, order_id=Non
 		audit = frappe.new_doc("Food POS Audit Log")
 		audit.timestamp = now_datetime()
 		audit.action_type = audit_action_map.get(action_type, action_type)
-		audit.branch = branch or matching_mgr.get("branch")
+		audit.branch = SINGLE_BRANCH  # v2: legacy field kept, always the single branch.
 		audit.cashier = cashier
 		audit.approved_by = matching_mgr["user"]
 		audit.order_id = str(order_id or "")
@@ -996,7 +991,6 @@ def _require_fresh_discount_pin(order_data, branch_val, disc_pct, disc_amt):
 	verify_manager_pin(
 		pin=mgr_pin,
 		action_type="discount",
-		branch=branch_val,
 		cashier=frappe.session.user,
 		order_id=order_data.get("order_id") or "",
 		details=f"Discount override: {disc_pct}% or Rs {disc_amt}",
@@ -1104,7 +1098,7 @@ def _link_kots_to_invoice(inv, order_data, branch_val, pos_profile_name, order_t
 			audit = frappe.new_doc("Food POS Audit Log")
 			audit.timestamp = now_datetime()
 			audit.cashier = frappe.session.user or "Administrator"
-			audit.branch = branch_val
+			audit.branch = SINGLE_BRANCH
 			audit.pos_profile = pos_profile_name
 			audit.action_type = "KOT Status Change"
 			audit.details = f"KOT {k_name} settled and linked to Invoice {inv.name} ({order_type}, Total: {inv.grand_total})"
@@ -1131,13 +1125,9 @@ def _get_item_station(item, branch_val):
 	else:
 		base_station = "Main Kitchen"
 
-	station_name = f"{branch_val}-{base_station}" if branch_val else base_station
-	if not frappe.db.exists("Food Kitchen Station", station_name):
-		if frappe.db.exists("Food Kitchen Station", base_station):
-			station_name = base_station
-		elif branch_val and frappe.db.exists("Food Kitchen Station", f"{branch_val}-Main Kitchen"):
-			station_name = f"{branch_val}-Main Kitchen"
-	return station_name
+	# v2: stations are single-branch; the old "{Branch}-{Station}" name is
+	# never built. `branch_val` is kept in the signature for callers.
+	return base_station
 
 
 @frappe.whitelist()
@@ -1162,13 +1152,12 @@ def create_kot(order_data):
 
 	order_type = order_data.get("order_type", "Dine In")
 	table_no = order_data.get("table", "")
-	branch_val = order_data.get("branch") or frappe.db.get_value("POS Profile", order_data.get("pos_profile", ""), "custom_branch") or ""
+	branch_val = SINGLE_BRANCH  # v2: single branch; a client-sent branch is ignored.
 
-	if table_no:
-		if not frappe.db.exists("Restaurant Table", table_no) and branch_val and frappe.db.exists("Restaurant Table", f"{branch_val}-{table_no}"):
-			table_no = f"{branch_val}-{table_no}"
-		elif not frappe.db.exists("Restaurant Table", table_no):
-			table_no = ""
+	if table_no and not frappe.db.exists("Restaurant Table", table_no):
+		# The client may send the printed table number (e.g. "T5") instead
+		# of the document name; resolve it by table_no, never by branch.
+		table_no = frappe.db.get_value("Restaurant Table", {"table_no": str(table_no)}, "name") or ""
 
 	# Multi-station routing: group items by kitchen station
 	station_items = {}
@@ -1241,13 +1230,17 @@ def create_kot(order_data):
 	# If Dine In, update the table state to Occupied
 	if order_type == "Dine In" and table_no and frappe.db.exists("Restaurant Table", table_no):
 		primary_kot = created_kots[0].name if created_kots else ""
+		# v2: never reset the live table timer — a second station KOT for
+		# the same order must not restart occupied_since.
+		existing_since = frappe.db.get_value("Restaurant Table", table_no, "occupied_since")
+		existing_status = frappe.db.get_value("Restaurant Table", table_no, "status")
 		frappe.db.set_value(
 			"Restaurant Table",
 			table_no,
 			{
 				"status": "Occupied",
 				"order_id": primary_kot,
-				"occupied_since": now_datetime(),
+				"occupied_since": existing_since if existing_status == "Occupied" and existing_since else now_datetime(),
 				"guests": cint(order_data.get("guests", 1))
 			}
 		)
@@ -1267,7 +1260,7 @@ def create_kot(order_data):
 			audit = frappe.new_doc("Food POS Audit Log")
 			audit.timestamp = now_datetime()
 			audit.action_type = "KOT Created"
-			audit.branch = branch_val
+			audit.branch = SINGLE_BRANCH
 			audit.cashier = frappe.session.user
 			audit.table = str(table_no or "")
 			audit.details = f"Kitchen ticket {kot_doc.name} created for station {kot_doc.kitchen_station} ({len(kot_doc.items)} items)"
@@ -1430,7 +1423,7 @@ def submit_pos_invoice(order_data, payments):
 
 	pos_profile_name = order_data.get("pos_profile")
 	profile_data = get_pos_profile_data(pos_profile_name)
-	branch_val = profile_data.get("custom_branch") or profile_data.get("branch") or order_data.get("branch")
+	branch_val = SINGLE_BRANCH  # v2: single branch; profile/client branch values are ignored.
 
 	# Determine doctype dynamically from POS Settings
 	inv_doctype = get_pos_invoice_doctype()
@@ -1497,15 +1490,9 @@ def submit_pos_invoice(order_data, payments):
 			if not address:
 				frappe.throw(_("Delivery address is mandatory for Delivery orders."))
 
-		# Multi-branch naming series & Cost Center
-		branch_val = profile_data.get("custom_branch") or profile_data.get("branch")
-		branch_series_map = {
-			"Branch 1 - Gulberg": "BR1-.YYYY.-",
-			"Branch 2 - DHA": "BR2-.YYYY.-",
-			"Branch 3 - Mall Road": "BR3-.YYYY.-",
-		}
-		if branch_val in branch_series_map:
-			doc.naming_series = branch_series_map[branch_val]
+		# v2 single branch: one naming series for every invoice. The BR1
+		# series is kept so numbering continues from the existing sequence.
+		doc.naming_series = SINGLE_NAMING_SERIES
 
 		if profile_data.get("cost_center"):
 			doc.cost_center = profile_data["cost_center"]
@@ -1521,7 +1508,7 @@ def submit_pos_invoice(order_data, payments):
 		if meta.has_field("custom_order_note"):
 			doc.custom_order_note = order_data.get("order_note", "")
 		if meta.has_field("custom_branch"):
-			doc.custom_branch = branch_val
+			doc.custom_branch = SINGLE_BRANCH  # legacy field kept
 		if meta.has_field("custom_contact_phone"):
 			doc.custom_contact_phone = order_data.get("phone") or order_data.get("contact_phone") or ""
 		if meta.has_field("custom_delivery_address"):
@@ -1560,7 +1547,7 @@ def submit_pos_invoice(order_data, payments):
 			# discount_approved_by replay (any old audit row) is removed.
 			_require_fresh_discount_pin(
 				order_data,
-				profile_data.get("custom_branch") or profile_data.get("branch"),
+				SINGLE_BRANCH,  # v2: PIN is no longer branch-scoped.
 				disc_pct, disc_amt,
 			)
 
@@ -1670,13 +1657,9 @@ def submit_pos_invoice(order_data, payments):
 		else:
 			matched = frappe.db.get_value(
 				"Restaurant Table",
-				{"table_no": str(raw_table), "branch": branch_val},
-				"name"
-			) or frappe.db.get_value(
-				"Restaurant Table",
 				{"table_no": str(raw_table)},
 				"name"
-			)
+			)  # v2: table lookup by number only, no branch filter.
 			if matched:
 				resolved_table = matched
 
@@ -1713,7 +1696,7 @@ def submit_pos_invoice(order_data, payments):
 		audit_settle = frappe.new_doc("Food POS Audit Log")
 		audit_settle.timestamp = now_datetime()
 		audit_settle.cashier = frappe.session.user or "Administrator"
-		audit_settle.branch = branch_val
+		audit_settle.branch = SINGLE_BRANCH
 		audit_settle.pos_profile = pos_profile_name
 		audit_settle.action_type = "Order Settled"
 		audit_settle.order_id = inv.name
@@ -1764,7 +1747,7 @@ def submit_pos_invoice(order_data, payments):
 		"currency": inv.currency,
 		"company": inv.company,
 		"pos_profile": pos_profile_name,
-		"branch": profile_data.get("custom_branch") or profile_data.get("branch") or "",
+		"branch": SINGLE_BRANCH,
 		"items": slip_items,
 		"payments": slip_payments,
 		"net_total": flt(getattr(inv, "net_total", inv.grand_total)),
@@ -2660,43 +2643,26 @@ def get_recent_pos_orders(pos_profile=None, branch=None, limit=15):
 	"""
 	Fetch the last N customer orders/invoices today with full items and customer details.
 	Allows restaurant cashiers to review, view slip, or reload/edit in the cart.
-	Resilient to pos_profile name or branch name or active shift opening.
+	Resilient to pos_profile name or active shift opening. (v2: no branch.)
 	"""
 	limit = cint(limit) or 15
 	user = frappe.session.user
 
+	# v2: `branch` is accepted for backward compatibility and ignored.
 	pos_profiles = set()
-	branches = set()
 
 	if pos_profile:
-		pos_profiles.add(pos_profile)
 		if frappe.db.exists("POS Profile", pos_profile):
-			b = frappe.db.get_value("POS Profile", pos_profile, "custom_branch")
-			if b:
-				branches.add(b)
+			pos_profiles.add(pos_profile)
 		else:
-			matched = frappe.db.get_all("POS Profile", filters={"custom_branch": pos_profile}, pluck="name")
+			matched = frappe.db.get_all("POS Profile", filters={"name": ["like", f"%{pos_profile}%"]}, pluck="name")
 			if matched:
 				pos_profiles.update(matched)
-				branches.add(pos_profile)
-			else:
-				matched = frappe.db.get_all("POS Profile", filters={"name": ["like", f"%{pos_profile}%"]}, pluck="name")
-				if matched:
-					pos_profiles.update(matched)
 
-	if branch:
-		branches.add(branch)
-		matched = frappe.db.get_all("POS Profile", filters={"custom_branch": branch}, pluck="name")
-		if matched:
-			pos_profiles.update(matched)
-
-	if not pos_profiles and not branches:
+	if not pos_profiles:
 		open_shift_profile = frappe.db.get_value("POS Opening Entry", {"user": user, "status": "Open", "docstatus": 1}, "pos_profile")
 		if open_shift_profile:
 			pos_profiles.add(open_shift_profile)
-			b = frappe.db.get_value("POS Profile", open_shift_profile, "custom_branch")
-			if b:
-				branches.add(b)
 		else:
 			def_prof = _get_default_pos_profile_for_user(user)
 			if def_prof:
@@ -2706,16 +2672,9 @@ def get_recent_pos_orders(pos_profile=None, branch=None, limit=15):
 	conds = []
 	params = {"limit": limit}
 
-	or_branch_conds = []
 	if pos_profiles:
 		params["profiles"] = tuple(pos_profiles)
-		or_branch_conds.append("pos_profile IN %(profiles)s")
-	if branches:
-		params["branches"] = tuple(branches)
-		or_branch_conds.append("custom_branch IN %(branches)s")
-
-	if or_branch_conds:
-		conds.append(f"({' OR '.join(or_branch_conds)})")
+		conds.append("pos_profile IN %(profiles)s")
 
 	where_str = (" AND " + " AND ".join(conds)) if conds else ""
 
@@ -2842,7 +2801,7 @@ def get_invoice_slip_data(invoice_name, doctype=None):
 		"doctype": doctype,
 		"company": company,
 		"pos_profile": getattr(doc, "pos_profile", ""),
-		"branch": frappe.db.get_value("POS Profile", getattr(doc, "pos_profile", ""), "custom_branch") or "",
+		"branch": SINGLE_BRANCH,
 		"posting_date": str(doc.posting_date),
 		"posting_time": _format_time_hh_mm(doc.posting_time),
 		"customer": doc.customer,
@@ -2866,7 +2825,13 @@ def get_invoice_slip_data(invoice_name, doctype=None):
 		"delivery_address": getattr(doc, "custom_delivery_address", "") or getattr(doc, "shipping_address", ""),
 		"delivery_charges": flt(getattr(doc, "custom_delivery_charges", 0.0)),
 		"items": items,
-		"payments": payments
+		"payments": payments,
+		# v2 thermal bill: KOT numbers + pending amount, so the customer
+		# bill (and the pre-payment dine-in slip) can show them.
+		"kot_numbers": _kot_numbers_for_invoice(doc.name),
+		"order_id": _order_id_for_invoice(doc.name),
+		"pending_amount": max(0.0, flt(doc.grand_total) - flt(doc.paid_amount)),
+		"payment_status": "Pending" if flt(getattr(doc, "outstanding_amount", 0.0)) > 0 else "Paid",
 	}
 
 
@@ -2879,7 +2844,7 @@ def get_active_kitchen_kots(pos_profile=None, branch=None, station=None):
 	"""
 	Fetch all active Kitchen Order Tickets (Pending, In Progress, Ready)
 	with items, remaining cooking items, table number, order type, and elapsed time.
-	Supports filtering by branch and kitchen station.
+	Supports filtering by POS profile and kitchen station. (v2: no branch.)
 	Excludes settled, invoiced, voided, or cancelled tickets.
 	"""
 	filters = {
@@ -2889,14 +2854,8 @@ def get_active_kitchen_kots(pos_profile=None, branch=None, station=None):
 		"is_voided": ["in", [0, None]],
 		"docstatus": ["!=", 2],
 	}
-	if branch:
-		filters["branch"] = branch
-	elif pos_profile:
-		b = frappe.db.get_value("POS Profile", pos_profile, "custom_branch")
-		if b:
-			filters["branch"] = b
-		else:
-			filters["pos_profile"] = pos_profile
+	if pos_profile:
+		filters["pos_profile"] = pos_profile  # v2: no branch filter.
 
 	if station and station != "All":
 		filters["kitchen_station"] = ["like", f"%{station}%"]
@@ -3086,17 +3045,9 @@ def _find_mismatched_linked_kots(branch=None, pos_profile=None):
 	conds = ["k.status = 'Served'", "k.sales_invoice IS NOT NULL", "k.sales_invoice != ''",
 	         "(k.is_voided = 0 OR k.is_voided IS NULL)"]
 	params = {}
-	if branch:
-		conds.append("k.branch = %(branch)s")
-		params["branch"] = branch
-	elif pos_profile:
-		b = frappe.db.get_value("POS Profile", pos_profile, "custom_branch")
-		if b:
-			conds.append("k.branch = %(branch)s")
-			params["branch"] = b
-		else:
-			conds.append("k.pos_profile = %(pos_profile)s")
-			params["pos_profile"] = pos_profile
+	if pos_profile:
+		conds.append("k.pos_profile = %(pos_profile)s")
+		params["pos_profile"] = pos_profile  # v2: no branch filter.
 	rows = frappe.db.sql(f"""
 		SELECT k.name, k.branch, k.pos_profile, k.table, k.order_type, k.customer,
 			k.order_note, k.creation, k.sales_invoice
@@ -3175,17 +3126,9 @@ def get_served_kot_exceptions(branch=None, pos_profile=None):
 	]
 	params = {}
 
-	if branch:
-		conds.append("k.branch = %(branch)s")
-		params["branch"] = branch
-	elif pos_profile:
-		b = frappe.db.get_value("POS Profile", pos_profile, "custom_branch")
-		if b:
-			conds.append("k.branch = %(branch)s")
-			params["branch"] = b
-		else:
-			conds.append("k.pos_profile = %(pos_profile)s")
-			params["pos_profile"] = pos_profile
+	if pos_profile:
+		conds.append("k.pos_profile = %(pos_profile)s")
+		params["pos_profile"] = pos_profile  # v2: no branch filter.
 
 	where_str = " AND ".join(conds)
 	sql = f"""
@@ -3283,15 +3226,13 @@ def void_served_kot(kot_name, manager_pin, reason):
 	if not (reason or "").strip():
 		frappe.throw(_("Mandatory Void Reason is required to void a Served Kitchen Ticket."))
 
-	# Round 23 fix: pass action_type="void" + branch. The old call passed
-	# neither, so the capability check was skipped (any valid PIN could void,
-	# even one without can_approve_void) — and verify_manager_pin requires
-	# action_type, so this call could also crash outright.
+	# Round 23 fix: pass action_type="void". The old call passed neither,
+	# so the capability check was skipped (any valid PIN could void, even
+	# one without can_approve_void). v2: no branch is passed (single branch).
 	kot = frappe.get_doc("Food KOT", kot_name)
 	v = verify_manager_pin(
 		(manager_pin or "").strip(),
 		action_type="void",
-		branch=kot.branch,
 		cashier=frappe.session.user,
 		order_id=kot.name,
 		table=kot.table,
@@ -3329,7 +3270,7 @@ def void_served_kot(kot_name, manager_pin, reason):
 	audit = frappe.new_doc("Food POS Audit Log")
 	audit.timestamp = now_datetime()
 	audit.cashier = manager_user
-	audit.branch = kot.branch
+	audit.branch = SINGLE_BRANCH  # v2: legacy field kept.
 	audit.pos_profile = kot.pos_profile
 	audit.action_type = "KOT Voided"
 	audit.details = f"Served KOT {kot_name} ({kot.order_type}, Table: {kot.table or 'N/A'}, Est: Rs {est_total}) VOIDED by Manager {manager_name}. Reason: {reason}"
@@ -3367,7 +3308,7 @@ def close_pos_opening_entry(pos_profile, pos_opening_entry=None, payments=None, 
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# 10. Held Orders Management (Per-Branch & Shift)
+# 10. Held Orders Management (Single Branch & Shift)
 # ──────────────────────────────────────────────────────────────────────────────
 
 @frappe.whitelist()
@@ -3385,7 +3326,7 @@ def hold_order(order_data, reason=None):
 
 	pos_profile = order_data.get("pos_profile")
 	company = (frappe.db.get_value("POS Profile", pos_profile, "company") if pos_profile else None) or frappe.defaults.get_global_default("company") or "Nextash"
-	branch = order_data.get("branch") or (frappe.db.get_value("POS Profile", pos_profile, "custom_branch") if pos_profile else None)
+	branch = SINGLE_BRANCH  # v2: single branch; client-sent branch is ignored.
 	table_no = order_data.get("table")
 
 	held = frappe.new_doc("Food POS Held Order")
@@ -3459,7 +3400,7 @@ def hold_order(order_data, reason=None):
 		audit_hold = frappe.new_doc("Food POS Audit Log")
 		audit_hold.timestamp = now_datetime()
 		audit_hold.cashier = frappe.session.user or "Administrator"
-		audit_hold.branch = branch
+		audit_hold.branch = SINGLE_BRANCH
 		audit_hold.pos_profile = pos_profile
 		audit_hold.action_type = "Order Held"
 		audit_hold.order_id = held.name
@@ -3471,22 +3412,19 @@ def hold_order(order_data, reason=None):
 		frappe.log_error(f"Audit log failed for order hold: {e}", "Food POS Audit Log")
 
 	frappe.db.commit()
-	held_count = frappe.db.count("Food POS Held Order", filters={"status": "Held", "branch": branch}) if branch else frappe.db.count("Food POS Held Order", filters={"status": "Held"})
+	held_count = frappe.db.count("Food POS Held Order", filters={"status": "Held"})  # v2: no branch filter.
 	return {"success": True, "held_order_id": held.name, "held_count": held_count}
 
 
 @frappe.whitelist()
 def get_held_orders(branch=None, pos_profile=None):
 	"""
-	Fetch all active held orders for the active branch or shift.
+	Fetch all active held orders for the active shift.
+	v2: `branch` is accepted for backward compatibility and ignored.
 	"""
 	filters = {"status": "Held"}
-	if branch:
-		filters["branch"] = branch
-	elif pos_profile:
-		b = frappe.db.get_value("POS Profile", pos_profile, "custom_branch")
-		if b:
-			filters["branch"] = b
+	if pos_profile:
+		filters["pos_profile"] = pos_profile
 
 	orders = frappe.get_all(
 		"Food POS Held Order",
@@ -3525,7 +3463,7 @@ def resume_held_order(held_order_id):
 		audit_res = frappe.new_doc("Food POS Audit Log")
 		audit_res.timestamp = now_datetime()
 		audit_res.cashier = frappe.session.user or "Administrator"
-		audit_res.branch = doc.branch
+		audit_res.branch = SINGLE_BRANCH
 		audit_res.pos_profile = doc.pos_profile
 		audit_res.action_type = "Order Resumed"
 		audit_res.order_id = doc.name
@@ -3537,7 +3475,7 @@ def resume_held_order(held_order_id):
 		frappe.log_error(f"Audit log failed for order resume: {e}", "Food POS Audit Log")
 
 	frappe.db.commit()
-	held_count = frappe.db.count("Food POS Held Order", filters={"status": "Held", "branch": doc.branch}) if doc.branch else frappe.db.count("Food POS Held Order", filters={"status": "Held"})
+	held_count = frappe.db.count("Food POS Held Order", filters={"status": "Held"})  # v2: no branch filter.
 
 	order_data = json.loads(doc.order_data) if isinstance(doc.order_data, str) else doc.order_data
 	return {
@@ -3581,7 +3519,7 @@ def discard_held_order(held_order_id, reason=None):
 		audit_disc = frappe.new_doc("Food POS Audit Log")
 		audit_disc.timestamp = now_datetime()
 		audit_disc.cashier = frappe.session.user or "Administrator"
-		audit_disc.branch = doc.branch
+		audit_disc.branch = SINGLE_BRANCH
 		audit_disc.pos_profile = doc.pos_profile
 		audit_disc.action_type = "Order Discarded"
 		audit_disc.order_id = doc.name
@@ -3593,7 +3531,7 @@ def discard_held_order(held_order_id, reason=None):
 		frappe.log_error(f"Audit log failed for order discard: {e}", "Food POS Audit Log")
 
 	frappe.db.commit()
-	held_count = frappe.db.count("Food POS Held Order", filters={"status": "Held", "branch": doc.branch}) if doc.branch else frappe.db.count("Food POS Held Order", filters={"status": "Held"})
+	held_count = frappe.db.count("Food POS Held Order", filters={"status": "Held"})  # v2: no branch filter.
 	return {"success": True, "held_count": held_count}
 
 
@@ -3643,4 +3581,434 @@ def release_table_if_no_order(table):
 	return {"success": True, "table": table, "status": "Available"}
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+# v2 — Single-Branch Home / Day, Auto-KOT Confirm, Attendance, Daily Report
+# ──────────────────────────────────────────────────────────────────────────────
+# These APIs are new in v2. They reuse the existing Round-23 KOT logic,
+# shift-closing flow and PIN guards; nothing here weakens them.
 
+import re as _re
+
+
+def _kot_numbers_for_invoice(invoice_name):
+	"""KOT names linked to one settled invoice (for the thermal bill)."""
+	try:
+		return [
+			r.name
+			for r in frappe.get_all(
+				"Food KOT",
+				filters={"sales_invoice": invoice_name},
+				fields=["name"],
+				order_by="creation asc",
+			)
+		]
+	except Exception:
+		return []
+
+
+def _order_id_for_invoice(invoice_name):
+	"""The POS order token of the KOTs linked to one settled invoice."""
+	try:
+		rows = frappe.get_all(
+			"Food KOT", filters={"sales_invoice": invoice_name}, fields=["order_id"], limit=1
+		)
+		return rows[0].order_id if rows and rows[0].get("order_id") else ""
+	except Exception:
+		return ""
+
+
+@frappe.whitelist()
+def confirm_order(order_data):
+	"""v2: confirm an order WITHOUT settling it (payment stays Pending).
+
+	Dine-in lifecycle step 2: confirming an order auto-creates the KOT
+	(s) via :func:`create_kot` — there is no "Send to Kitchen" button any
+	more. ``create_kot`` is idempotent per order_id + station (Round 23),
+	so a double-click / double-confirm returns the SAME KOT(s) instead
+	of a duplicate. For Dine In it also marks the table Occupied and
+	starts the table timer (``occupied_since``). The invoice is NOT
+	created here; the customer pays later via ``submit_pos_invoice``,
+	which frees the table.
+
+	BILL RULE v3 (hard rule): this function must never create an invoice
+	or a customer bill. When an order goes to the kitchen the customer
+	gets NO bill — only the KOT slip goes to the kitchen. The customer
+	bill is generated/printed ONLY after payment, in
+	``submit_pos_invoice`` (via ``get_invoice_slip_data``), or on an
+	explicit reprint of an already-paid invoice. See TEST-REPORT-v3.md
+	for the grep proof (no show_pos_slip / print_pos_slip /
+	get_invoice_slip_data call on the confirm path, client or server).
+	"""
+	if isinstance(order_data, str):
+		order_data = json.loads(order_data)
+
+	items = order_data.get("items") or order_data.get("cart_items") or []
+	if not items:
+		frappe.throw(_("Cannot confirm an empty order. Add items first."))
+
+	order_data["order_type"] = normalise_order_type(
+		order_data.get("order_type") or ("Dine In" if order_data.get("table") else "Takeaway")
+	)
+	order_data["branch"] = SINGLE_BRANCH  # v2: single branch; client value ignored.
+
+	kot_res = create_kot(order_data)
+	table = kot_res.get("table") or order_data.get("table") or ""
+	occupied_since = ""
+	if table and frappe.db.exists("Restaurant Table", table):
+		occupied_since = str(frappe.db.get_value("Restaurant Table", table, "occupied_since") or "")
+
+	return {
+		"success": True,
+		"order_id": kot_res.get("order_id"),
+		"kot_names": kot_res.get("kot_names") or ([kot_res.get("kot_name")] if kot_res.get("kot_name") else []),
+		"kot_name": kot_res.get("kot_name", ""),
+		"table": table,
+		"occupied_since": occupied_since,
+		"payment_status": "Pending",
+		"order_type": order_data["order_type"],
+	}
+
+
+def _day_times_from_opening(opening_name):
+	"""Read user-set Day Start/End times for one POS Opening Entry.
+
+	The times live in Custom Fields on POS Opening Entry
+	(``custom_fpos_day_start_time`` / ``custom_fpos_day_end_time``, added
+	by patch v0.3.0). Before that patch has run (``bench migrate``), the
+	cache fallback below is used so the home screen still works.
+	"""
+	day_start = day_end = None
+	try:
+		meta = frappe.get_meta("POS Opening Entry")
+		fields = []
+		if meta.has_field("custom_fpos_day_start_time"):
+			fields.append("custom_fpos_day_start_time")
+		if meta.has_field("custom_fpos_day_end_time"):
+			fields.append("custom_fpos_day_end_time")
+		if fields:
+			vals = frappe.db.get_value("POS Opening Entry", opening_name, fields)
+			if vals:
+				day_start = str(vals[0]) if len(vals) > 0 and vals[0] else None
+				day_end = str(vals[1]) if len(vals) > 1 and vals[1] else None
+	except Exception:
+		pass
+	if not day_start and not day_end:
+		try:
+			cached = frappe.cache().get_value(f"fpos_day_times:{opening_name}") or {}
+			day_start = cached.get("day_start_time")
+			day_end = cached.get("day_end_time")
+		except Exception:
+			pass
+	return day_start, day_end
+
+
+@frappe.whitelist()
+def get_day_status(pos_profile=None):
+	"""v2 home screen: is the day open, when did it start, what times did
+	the user set? Day Open == an open POS Opening Entry for the profile.
+	"""
+	openings = []
+	try:
+		openings = check_opening_entry(user=frappe.session.user, pos_profile=pos_profile) or []
+	except Exception:
+		openings = []
+	entry = openings[0] if openings else None
+	day_start = day_end = None
+	period_start = None
+	if entry:
+		period_start = str(entry.get("period_start_date") or "")
+		day_start, day_end = _day_times_from_opening(entry.get("name"))
+	return {
+		"day_open": bool(entry),
+		"pos_profile": pos_profile,
+		"pos_opening_entry": entry.get("name") if entry else "",
+		"period_start_date": period_start,
+		"day_start_time": day_start,
+		"day_end_time": day_end,
+		"server_now": str(now_datetime()),
+		"branch": SINGLE_BRANCH,
+	}
+
+
+@frappe.whitelist()
+def set_day_times(pos_profile=None, day_start_time=None, day_end_time=None):
+	"""v2 home screen: the user sets the Day Start and Day End times.
+
+	Times are ``HH:MM`` (24-hour). They are stored on the open POS
+	Opening Entry (custom fields, patch v0.3.0) or, until migrate has
+	run, in cache for that opening entry. They do NOT close the day by
+	themselves — Day Close still runs the shift-closing / Z-report flow.
+	"""
+	for label, value in (("Day Start", day_start_time), ("Day End", day_end_time)):
+		if value and not _re.match(r"^([01]\d|2[0-3]):[0-5]\d$", str(value).strip()):
+			frappe.throw(_("{0} time must be HH:MM, e.g. 09:00.").format(label))
+	openings = check_opening_entry(user=frappe.session.user, pos_profile=pos_profile) or []
+	if not openings:
+		frappe.throw(_("Open the day first — there is no open shift to attach times to."))
+	entry_name = openings[0].get("name")
+	stored_in = "cache"
+	try:
+		meta = frappe.get_meta("POS Opening Entry")
+		updates = {}
+		if meta.has_field("custom_fpos_day_start_time") and day_start_time:
+			updates["custom_fpos_day_start_time"] = day_start_time
+		if meta.has_field("custom_fpos_day_end_time") and day_end_time:
+			updates["custom_fpos_day_end_time"] = day_end_time
+		if updates:
+			frappe.db.set_value("POS Opening Entry", entry_name, updates)
+			frappe.db.commit()
+			stored_in = "POS Opening Entry"
+	except Exception:
+		pass
+	try:
+		frappe.cache().set_value(
+			f"fpos_day_times:{entry_name}",
+			{"day_start_time": day_start_time, "day_end_time": day_end_time},
+			expires_in_sec=86400,
+		)
+	except Exception:
+		pass
+	return {
+		"success": True,
+		"pos_opening_entry": entry_name,
+		"day_start_time": day_start_time,
+		"day_end_time": day_end_time,
+		"stored_in": stored_in,
+	}
+
+
+@frappe.whitelist()
+def get_staff_attendance(attendance_date=None, pos_profile=None):
+	"""v2: staff attendance rows for one day (default today)."""
+	date = attendance_date or str(getdate())
+	if not frappe.db.exists("DocType", "Food POS Attendance"):
+		return {"date": date, "rows": [], "note": "Food POS Attendance will appear after bench migrate."}
+	filters = {"attendance_date": date}
+	if pos_profile:
+		filters["pos_profile"] = pos_profile
+	rows = frappe.get_all(
+		"Food POS Attendance",
+		filters=filters,
+		fields=["name", "staff_name", "user", "attendance_date", "check_in", "check_out", "status", "notes"],
+		order_by="staff_name asc",
+	)
+	return {"date": date, "rows": rows}
+
+
+@frappe.whitelist()
+def mark_staff_attendance(staff_name, action, attendance_date=None, user=None):
+	"""v2: mark attendance inline (no dialog). ``action`` is one of
+	``check_in`` / ``check_out`` / ``absent``. One row per staff per day.
+	"""
+	staff_name = (staff_name or "").strip()
+	if not staff_name:
+		frappe.throw(_("Staff name is required."))
+	if action not in ("check_in", "check_out", "absent"):
+		frappe.throw(_("Unknown attendance action."))
+	date = attendance_date or str(getdate())
+	if not frappe.db.exists("DocType", "Food POS Attendance"):
+		frappe.throw(_("Food POS Attendance is not installed yet. Run bench migrate first."))
+	existing = frappe.get_all(
+		"Food POS Attendance",
+		filters={"staff_name": staff_name, "attendance_date": date},
+		fields=["name", "check_in", "check_out", "status"],
+	)
+	if action == "absent":
+		if existing:
+			doc = frappe.get_doc("Food POS Attendance", existing[0].name)
+			doc.status = "Absent"
+			doc.save()
+		else:
+			doc = frappe.new_doc("Food POS Attendance")
+			doc.staff_name = staff_name
+			doc.user = user or ""
+			doc.attendance_date = date
+			doc.status = "Absent"
+			doc.flags.ignore_permissions = True
+			doc.insert()
+		frappe.db.commit()
+		return {"success": True, "action": "absent", "staff_name": staff_name, "date": date}
+
+	if existing:
+		doc = frappe.get_doc("Food POS Attendance", existing[0].name)
+	else:
+		doc = frappe.new_doc("Food POS Attendance")
+		doc.staff_name = staff_name
+		doc.user = user or ""
+		doc.attendance_date = date
+		doc.status = "Present"
+		doc.flags.ignore_permissions = True
+		doc.insert()
+	if action == "check_in":
+		if doc.check_in:
+			return {"success": True, "action": "check_in", "already": True, "staff_name": staff_name, "date": date, "check_in": str(doc.check_in)}
+		doc.check_in = now_datetime()
+		doc.status = "Present"
+	elif action == "check_out":
+		if not doc.check_in:
+			frappe.throw(_("Check-in first — {0} has not checked in today.").format(staff_name))
+		doc.check_out = now_datetime()
+	doc.save()
+	frappe.db.commit()
+	return {
+		"success": True,
+		"action": action,
+		"staff_name": staff_name,
+		"date": date,
+		"check_in": str(doc.check_in or ""),
+		"check_out": str(doc.check_out or ""),
+		"status": doc.status,
+	}
+
+
+@frappe.whitelist()
+def get_daily_report(report_date=None, pos_profile=None):
+	"""v2: one daily report for the home bottom nav (Reports).
+
+	Aggregates today's submitted POS/Sales Invoices by order type, item
+	sales, payment modes, plus pending dine-in (occupied tables + open
+	KOTs) and today's attendance. Reuses the shift-closing totals where
+	they exist, but is date-scoped, not shift-scoped, so it still works
+	after Day Close. All queries are defensive: a missing table returns
+	zeros instead of failing the page.
+	"""
+	date = report_date or str(getdate())
+	profile_cond = ""
+	params = {"date": date}
+	if pos_profile:
+		profile_cond = " AND pos_profile = %(pos_profile)s"
+		params["pos_profile"] = pos_profile
+
+	def _invoice_totals(doctype):
+		table = f"tab{doctype}"
+		if not _table_exists(table):
+			return {"orders": 0, "sales": 0.0}
+		try:
+			rows = frappe.db.sql(
+				f"""SELECT COUNT(name) AS orders, COALESCE(SUM(grand_total), 0) AS sales
+				FROM `{table}`
+				WHERE posting_date = %(date)s AND docstatus = 1 AND is_pos = 1{profile_cond}""",
+				params,
+				as_dict=True,
+			)
+			row = rows[0] if rows else {}
+			return {"orders": cint(row.get("orders", 0)), "sales": flt(row.get("sales", 0))}
+		except Exception:
+			return {"orders": 0, "sales": 0.0}
+
+	def _by_order_type(doctype):
+		table = f"tab{doctype}"
+		if not _table_exists(table):
+			return {}
+		cols = frappe.db.get_table_columns(doctype) or []
+		type_col = "custom_order_type" if "custom_order_type" in cols else "'Takeaway'"
+		try:
+			rows = frappe.db.sql(
+				f"""SELECT {type_col} AS order_type, COUNT(name) AS orders,
+					COALESCE(SUM(grand_total), 0) AS sales
+				FROM `{table}`
+				WHERE posting_date = %(date)s AND docstatus = 1 AND is_pos = 1{profile_cond}
+				GROUP BY {type_col}""",
+				params,
+				as_dict=True,
+			)
+			return {str(r.get("order_type") or "Takeaway"): {"orders": cint(r.get("orders", 0)), "sales": flt(r.get("sales", 0))} for r in rows}
+		except Exception:
+			return {}
+
+	def _payment_modes(doctype):
+		# Payments live in the child table "<Doctype> Payment".
+		child = f"tab{doctype} Payment"
+		parent = f"tab{doctype}"
+		if not _table_exists(child) or not _table_exists(parent):
+			return {}
+		try:
+			rows = frappe.db.sql(
+				f"""SELECT p.mode_of_payment AS mode, COALESCE(SUM(p.amount), 0) AS amount,
+					COUNT(DISTINCT p.parent) AS invoices
+				FROM `{child}` p JOIN `{parent}` i ON i.name = p.parent
+				WHERE i.posting_date = %(date)s AND i.docstatus = 1 AND i.is_pos = 1{profile_cond}
+				GROUP BY p.mode_of_payment""",
+				params,
+				as_dict=True,
+			)
+			return {str(r.get("mode") or "Cash"): {"amount": flt(r.get("amount", 0)), "invoices": cint(r.get("invoices", 0))} for r in rows}
+		except Exception:
+			return {}
+
+	def _top_items(doctype, limit=5):
+		child = f"tab{doctype} Item"
+		parent = f"tab{doctype}"
+		if not _table_exists(child) or not _table_exists(parent):
+			return []
+		try:
+			rows = frappe.db.sql(
+				f"""SELECT i.item_name AS item_name, COALESCE(SUM(i.qty), 0) AS qty,
+					COALESCE(SUM(i.amount), 0) AS amount
+				FROM `{child}` i JOIN `{parent}` p ON p.name = i.parent
+				WHERE p.posting_date = %(date)s AND p.docstatus = 1 AND p.is_pos = 1{profile_cond}
+				GROUP BY i.item_code, i.item_name ORDER BY qty DESC LIMIT %(limit)s""",
+				dict(params, limit=limit),
+				as_dict=True,
+			)
+			return [{"item_name": r.get("item_name"), "qty": flt(r.get("qty", 0)), "amount": flt(r.get("amount", 0))} for r in rows]
+		except Exception:
+			return []
+
+	pos_totals = _invoice_totals("POS Invoice")
+	sales_totals = _invoice_totals("Sales Invoice")
+	by_type = _by_order_type("POS Invoice")
+	for key, val in _by_order_type("Sales Invoice").items():
+		merged = by_type.setdefault(key, {"orders": 0, "sales": 0.0})
+		merged["orders"] += val["orders"]
+		merged["sales"] += val["sales"]
+	payments = _payment_modes("POS Invoice")
+	for mode, val in _payment_modes("Sales Invoice").items():
+		merged = payments.setdefault(mode, {"amount": 0.0, "invoices": 0})
+		merged["amount"] += val["amount"]
+		merged["invoices"] += val["invoices"]
+	top_items = _top_items("POS Invoice") or _top_items("Sales Invoice")
+
+	# Pending dine-in right now: occupied tables + open (unsettled) KOTs.
+	pending_tables = []
+	pending_kots = 0
+	try:
+		tables = get_available_tables(pos_profile=pos_profile) or []
+		pending_tables = [
+			{"table": t.get("table_no") or t.get("name"), "status": t.get("status"), "occupied_since": str(t.get("occupied_since") or ""), "guests": cint(t.get("guests", 0))}
+			for t in tables
+			if t.get("status") in ("Occupied", "Reserved")
+		]
+	except Exception:
+		pass
+	try:
+		pending_kots = len(get_active_kitchen_kots(pos_profile=pos_profile) or [])
+	except Exception:
+		pending_kots = 0
+
+	attendance = {"present": 0, "absent": 0, "total": 0}
+	try:
+		att = get_staff_attendance(attendance_date=date, pos_profile=pos_profile)
+		rows = att.get("rows") or []
+		attendance = {
+			"present": sum(1 for r in rows if r.get("status") == "Present"),
+			"absent": sum(1 for r in rows if r.get("status") == "Absent"),
+			"total": len(rows),
+		}
+	except Exception:
+		pass
+
+	return {
+		"date": date,
+		"branch": SINGLE_BRANCH,
+		"pos_profile": pos_profile,
+		"total_orders": pos_totals["orders"] + sales_totals["orders"],
+		"total_sales": pos_totals["sales"] + sales_totals["sales"],
+		"by_order_type": by_type,
+		"payment_modes": payments,
+		"top_items": top_items,
+		"pending_tables": pending_tables,
+		"pending_kot_count": pending_kots,
+		"tables_served": pos_totals["orders"] + sales_totals["orders"],
+		"attendance": attendance,
+	}

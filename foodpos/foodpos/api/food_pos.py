@@ -10,6 +10,9 @@ import json
 
 import frappe
 from frappe import _
+
+# v2 single branch: see foodpos.foodpos.single_branch.
+from foodpos.foodpos.single_branch import SINGLE_BRANCH, SINGLE_NAMING_SERIES, normalise_order_type
 from frappe.utils import cint, flt, get_datetime, getdate, now_datetime, nowdate
 
 
@@ -424,14 +427,8 @@ def create_pos_invoice(order, payments):
             if not address:
                 frappe.throw(_("Delivery address is mandatory for Delivery orders."))
 
-        branch_val = getattr(profile, "custom_branch", None) or getattr(profile, "branch", None)
-        branch_series_map = {
-            "Branch 1 - Gulberg": "BR1-.YYYY.-",
-            "Branch 2 - DHA": "BR2-.YYYY.-",
-            "Branch 3 - Mall Road": "BR3-.YYYY.-",
-        }
-        if branch_val in branch_series_map:
-            doc.naming_series = branch_series_map[branch_val]
+        # v2 single branch: one naming series for every invoice.
+        doc.naming_series = SINGLE_NAMING_SERIES
 
         if getattr(profile, "cost_center", None):
             doc.cost_center = profile.cost_center
@@ -445,7 +442,7 @@ def create_pos_invoice(order, payments):
         if meta.has_field("custom_order_note"):
             doc.custom_order_note = order.get("order_note", "")
         if meta.has_field("custom_branch"):
-            doc.custom_branch = branch_val
+            doc.custom_branch = SINGLE_BRANCH  # legacy field kept
         if meta.has_field("custom_contact_phone"):
             doc.custom_contact_phone = order.get("phone") or order.get("contact_phone") or ""
         if meta.has_field("custom_delivery_address"):
@@ -473,33 +470,34 @@ def create_pos_invoice(order, payments):
             doc.append("items", row)
 
         # ── Discount with Cashier Cap & Manager PIN Guard ────────────────────
-        disc_pct = flt(order.get("discount_percentage", 0))
+        # v5.2: discount is a flat Rs amount only (no % anymore). Cashier cap
+        # is Rs 100 — anything above needs a fresh Manager PIN on every settle.
         disc_amt = flt(order.get("discount_amount", 0))
-        if disc_pct > 10.0 or disc_amt > 100.0:
+        if disc_amt > 100.0:
             # Round 23 fix: fresh PIN on every over-cap settle; the old
             # discount_approved_by replay is removed (see page helper).
             mgr_pin = order.get("manager_pin") or order.get("discount_manager_pin")
             if not mgr_pin:
-                frappe.throw(_("Discounts exceeding 10% or Rs 100 require a fresh Manager PIN on every settle. A previous approval cannot be reused."))
-            branch_val = getattr(profile, "custom_branch", None) or getattr(profile, "branch", None)
+                frappe.throw(_("Discounts exceeding Rs 100 require a fresh Manager PIN on every settle. A previous approval cannot be reused."))
             from foodpos.foodpos.page.food_pos.food_pos import verify_manager_pin
             verify_manager_pin(
                 pin=mgr_pin,
                 action_type="discount",
-                branch=branch_val,
                 cashier=frappe.session.user,
                 order_id=order.get("order_id") or "",
-                details=f"Discount override: {disc_pct}% or Rs {disc_amt}"
+                details=f"Discount override: Rs {disc_amt}"
             )
 
-        if disc_pct:
-            doc.additional_discount_percentage = disc_pct
-        elif disc_amt:
+        if disc_amt:
             doc.discount_amount = disc_amt
 
         # ── Set missing values & calculate totals ────────────────────────────
         doc.flags.ignore_permissions = True
         doc.set_missing_values(for_validate=True)
+        # v5.2: NO TAX — never apply the POS Profile's Sales Taxes and Charges
+        # template to the invoice, even if one is configured on the profile.
+        doc.taxes_and_charges = ""
+        doc.set("taxes", [])
         doc.calculate_taxes_and_totals()
 
         total_amount = flt(doc.rounded_total) or flt(doc.grand_total)
@@ -584,7 +582,7 @@ def create_pos_invoice(order, payments):
         from foodpos.foodpos.page.food_pos.food_pos import _link_kots_to_invoice
         _link_kots_to_invoice(
             inv, order,
-            getattr(profile, "custom_branch", None) or getattr(profile, "branch", None),
+            SINGLE_BRANCH,
             pos_profile_name,
             order.get("order_type", "Dine In"),
         )
@@ -601,9 +599,9 @@ def create_pos_invoice(order, payments):
 
 @frappe.whitelist()
 def verify_manager_pin(pin, action_type, branch=None, cashier=None, order_id=None, table=None, details=None):
-	"""Proxy to food_pos page verify_manager_pin."""
+	"""Proxy to food_pos page verify_manager_pin. v2: `branch` is ignored (single branch)."""
 	from foodpos.foodpos.page.food_pos.food_pos import verify_manager_pin as _verify_pin
-	return _verify_pin(pin, action_type, branch=branch, cashier=cashier, order_id=order_id, table=table, details=details)
+	return _verify_pin(pin, action_type, cashier=cashier, order_id=order_id, table=table, details=details)
 
 
 def _get_default_pos_profile():
@@ -727,6 +725,7 @@ def create_kot(order):
 		kot.table      = order.get("table", "") or ""
 		kot.order_note = order.get("order_note", "") or ""
 		kot.pos_profile = order.get("pos_profile", "") or ""
+		kot.branch = SINGLE_BRANCH  # v2: legacy field kept, always the single branch.
 
 		# customer is a Link field — only set if it's a valid non-empty value
 		customer = order.get("customer", "")
@@ -813,9 +812,9 @@ def toggle_kot_item_done(kot_name, item_name=None, is_done=0, row_id=None):
 
 @frappe.whitelist()
 def get_active_kitchen_kots(pos_profile=None, branch=None, station=None):
-	"""Alias for page food_pos get_active_kitchen_kots."""
+	"""Alias for page food_pos get_active_kitchen_kots. v2: branch is ignored (single branch)."""
 	from foodpos.foodpos.page.food_pos.food_pos import get_active_kitchen_kots as _get_kots
-	return _get_kots(pos_profile=pos_profile, branch=branch, station=station)
+	return _get_kots(pos_profile=pos_profile, station=station)
 
 
 @frappe.whitelist()
@@ -839,13 +838,9 @@ def update_kot_item_done_status(kot_name, item_name=None, is_done=0, row_id=None
 
 @frappe.whitelist()
 def get_tables(pos_profile=None, branch=None):
-	"""Return restaurant tables with live status filtered by branch."""
+	"""Return restaurant tables with live status. v2: `branch` is ignored (single branch)."""
 	try:
 		filters = {"disabled": 0}
-		if not branch and pos_profile:
-			branch = frappe.db.get_value("POS Profile", pos_profile, "custom_branch")
-		if branch:
-			filters["branch"] = branch
 
 		tables = frappe.get_all(
 			"Restaurant Table",

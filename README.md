@@ -6,15 +6,37 @@
 
 **Food POS** (`foodpos`) is a touch-friendly Restaurant and Fast-Food Point of Sale app built natively for **Frappe & ERPNext v16**. It delivers high-speed ordering, table floor management, live kitchen ticket tracking (KOT), slide-in checkout, and offline sync.
 
+> **v2 — Single Branch (local working copy, NOT pushed to GitHub).**
+> This copy removes all multi-branch code: one fixed branch, **Main Branch**,
+> one naming series, no branch selector. It adds a Home / Day Open–Close
+> screen, automatic KOT on order confirm, a redesigned floor plan, staff
+> attendance and a daily orders report. Full details: [`CHANGELOG-v2.md`](CHANGELOG-v2.md).
+> Install it from the GitHub repo only after the v2 code is pushed there
+> (see [Install](#-quick-installation)); until then, install from this folder.
+
 ---
 
 ## ⚡ Key Features
 
+- **🏠 Home / Day Open–Close screen (v2, the first screen of `/food-pos`)**:
+  - Sync/Connected status, Shift Management with Day Open state, Day Open time + running elapsed timer.
+  - User-settable **Day Start** and **Day End / Close** times (saved on the open POS Opening Entry).
+  - Four big order-type tiles: **Walk In, Take Away, Delivery, Dine In**.
+  - Bottom nav: Orders, Dispatch, Cashier, KDS, Shifts, Staff, Attendance, Reports, Printer, Settings.
+  - **Day Close** runs the existing PIN-gated shift-closing / Z-report flow — it never deletes data.
+
 - **🍔 Fast-Food & Restaurant UI (`/food-pos`)**:
+  - Left **category sidebar** (v2): clean vertical list with active-category highlight, item counts and search.
+  - Item cards (v2): consistent size, name, price in Rs, short description, Veg / Non-Veg / Spicy badges, clear **+** add button.
   - Auto-categorization for Burgers, Pizzas, Sandwiches, Sides, Drinks, Deals, and Desserts.
   - Dietary filters (🌱 Veg, 🍗 Non-Veg, 🌶️ Spicy) with live item counts and omni-search.
   - Line-item cooking notes (e.g., *"Extra Spicy"*, *"No Onions"*) and inline price edits.
-  - Order type selector: **Dine-In**, **Takeaway**, and **Delivery**.
+  - Order type selector: **Walk In**, **Dine-In**, **Takeaway**, and **Delivery**.
+
+- **✅ Confirm Order — KOT auto-sent (v2)**:
+  - Confirming an order **automatically** creates the KOT server-side and prints the kitchen slip (KOT parchi) — there is no manual "Send to Kitchen" button any more.
+  - Idempotent per order: a double-click / double-confirm creates exactly **one** KOT per order.
+  - Dine-in: the table becomes Occupied immediately, a live timer starts, and payment stays **Pending** until the customer pays; settling the invoice frees the table automatically.
 
 - **💳 Full-Page Slide-In Payment Screen**:
   - Transitions smoothly from left to right on **Pay & Settle** click.
@@ -24,7 +46,8 @@
 
 - **🧾 Monospace Customer POS Slip & Thermal Print**:
   - 80mm / 58mm ESC/POS thermal receipt formatting with item notes, tax, discount, and change details.
-  - Auto-print on checkout or on-demand reprint.
+  - Shows shop name, order type, table (dine-in), items with qty/rate/amount + notes, subtotal, discount, tax, delivery fee, total, payment mode + paid/change, **pending amount (clearly, for dine-in before payment)**, date/time, order & KOT numbers, and a thank-you line.
+  - Auto-print on checkout or on-demand reprint. Dine-in prints the **KOT slip to the kitchen on confirm** and the **customer bill on the thermal printer at settle time**; reprint works from Recent Orders.
 
 - **📋 Recent Orders & Cart Recall (Last 10 Customers)**:
   - Slide-out order history drawer showing today's recent orders.
@@ -40,7 +63,12 @@
 
 - **🪑 Interactive Table Management**:
   - Floor visualizer with seating capacity and live occupancy (`Available`, `Occupied`, `Reserved`, `Cleaning`).
+  - v2 redesign: table shapes with chairs, capacity, section, live status colours, **live timer on occupied tables** (ticking without reload), guest count, order number — tap a table to open its order. Edit Layout opens the Restaurant Table list.
   - Backend support for Table Merging, Unmerging, and Order Transfers.
+
+- **👥 Staff Attendance & 📊 Daily Orders Report (v2)**:
+  - Attendance: check-in / check-out / absent per staff per day, tied to the Day Open/Close day, marked with inline controls inside the POS page (no dialog). New DocType `Food POS Attendance`.
+  - Daily report: today's orders by type, items sold, sales, payment modes, pending dine-in payments, tables served, attendance summary — reachable from the home bottom nav (Reports). Data from new API `get_daily_report` (reuses the closing-details queries where possible).
 
 - **📶 Offline Mode & Sync**:
   - LocalStorage caching for POS profile, item catalog, and tables.
@@ -56,13 +84,23 @@
 
 ## 🚀 Quick Installation
 
+> **v2 is a local working copy and has NOT been pushed to GitHub yet.**
+> To install v2 on a bench, copy this folder into the bench's `apps/` directory
+> (or push it to GitHub first and use the `bench get-app` URL below), then:
+
 ```bash
 cd $PATH_TO_YOUR_BENCH
-bench get-app foodpos
+bench get-app https://github.com/Ahmad-code-boy/foodpos.git
 bench --site <your-site> install-app foodpos
 bench --site <your-site> migrate
 bench --site <your-site> clear-cache
 ```
+
+> `bench migrate` also runs the v2 patch `foodpos.patches.v0_3_0.add_day_time_fields`
+> (adds Day Start / Day End time fields on POS Opening Entry) and creates the
+> new `Food POS Attendance` DocType. Until migrate runs, the home screen still
+> works — day times fall back to a 24h cache entry, and attendance shows a
+> "run bench migrate first" note.
 
 Access the POS directly at: `https://<your-site>/food-pos`
 
@@ -81,12 +119,14 @@ Access the POS directly at: `https://<your-site>/food-pos`
 ### Custom DocTypes
 - **`Restaurant Table`**: Table number, capacity, section, and live occupancy status.
 - **`Food KOT` & `Food KOT Item`**: Kitchen order tickets and line items with `is_done` preparation flag.
+- **`Food POS Attendance`** (v2): Staff name, date, check-in / check-out, status (Present / Absent / On Leave), POS Profile. One row per staff per day.
 - **`Food Item Modifier Group` & `Food Item Modifier`**: Add-on modifiers and extra toppings.
 - **`Food Table Merge`**: Primary and secondary table combinations.
 
 ### Custom Fields Added
 - **`Sales Invoice` & `POS Invoice`**: `custom_order_type`, `custom_table`, `custom_order_note`
 - **`Item`**: `custom_is_vegetarian`, `custom_is_vegan`, `custom_modifier_group`
+- **`POS Opening Entry`** (v2, patch v0.3.0): `custom_fpos_day_start_time`, `custom_fpos_day_end_time` — user-set Day Start / Day End times shown on the home screen.
 
 ---
 
@@ -108,6 +148,12 @@ All endpoints live in `foodpos.foodpos.page.food_pos.food_pos`:
 | `update_kot_stage` | `kot_name`, `status` | Advance ticket stage (`Pending` &rarr; `Ready` &rarr; `Served`) |
 | `get_today_closing_details` | `pos_profile` | Shift sales totals, cash balancing & analytics |
 | `sync_offline_invoices`| `invoices` | Batch sync offline queued invoices |
+| `confirm_order` | `order_data` | **v2:** Confirm an order without settling it — auto-creates the KOT (idempotent), reserves the table, starts the timer, payment stays Pending |
+| `get_day_status` | `pos_profile` | **v2:** Is the day open, open shift, saved Day Start/End times |
+| `set_day_times` | `pos_profile`, `day_start_time`, `day_end_time` | **v2:** Save user-set Day Start / Day End times (HH:MM) |
+| `get_staff_attendance` | `attendance_date`, `pos_profile` | **v2:** Attendance rows for one day |
+| `mark_staff_attendance` | `staff_name`, `action` (`check_in` / `check_out` / `absent`) | **v2:** Mark attendance inline |
+| `get_daily_report` | `report_date`, `pos_profile` | **v2:** Today's orders by type, sales, payment modes, top items, pending dine-in tables, attendance |
 
 ---
 

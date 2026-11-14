@@ -4,9 +4,9 @@
 
 /* ── CSS variables ─────────────────────────────────────────── */
 :root {
-	--fpos-primary:       #f97316;
-	--fpos-primary-dark:  #ea6c0a;
-	--fpos-primary-light: #fff7ed;
+	--fpos-primary:       #15803d; /* v3: premium deep green (was orange #f97316) */
+	--fpos-primary-dark:  #166534; /* v3: darker green */
+	--fpos-primary-light: #f0fdf4; /* v3: soft green tint */
 	--fpos-success:       #22c55e;
 	--fpos-danger:        #ef4444;
 	--fpos-warning:       #f59e0b;
@@ -118,27 +118,6 @@
 	transition: all var(--fpos-transition);
 }
 .fpos-close-btn:hover { background: var(--fpos-bg); }
-
-/* Full-Page Multi-Order Tabs Bar */
-.fpos-page-tabs-bar {
-	display: flex;
-	align-items: center;
-	gap: 12px;
-	background: #f8fafc;
-	border-bottom: 1px solid var(--fpos-border);
-	padding: 8px 16px;
-	overflow-x: auto;
-	flex-shrink: 0;
-	z-index: 10;
-}
-
-.fpos-page-tabs-bar::-webkit-scrollbar {
-	height: 4px;
-}
-.fpos-page-tabs-bar::-webkit-scrollbar-thumb {
-	background: #cbd5e1;
-	border-radius: 4px;
-}
 
 .fpos-tab-pill {
 	transition: all 0.15s ease;
@@ -300,7 +279,6 @@
 .fpos-ot-tab:hover  { border-color:var(--fpos-primary); color:var(--fpos-primary); }
 .fpos-ot-tab.active { background:var(--fpos-primary); border-color:var(--fpos-primary); color:#fff; }
 
-.fpos-cart-meta { display:flex; gap:8px; padding:8px 16px; border-bottom:1px solid var(--fpos-border); flex-shrink:0; }
 .fpos-meta-field {
 	flex:1; display:flex; align-items:center; gap:6px; padding:7px 10px;
 	background:var(--fpos-bg); border:1px dashed var(--fpos-border);
@@ -864,8 +842,8 @@
 	transform: translateY(-1px);
 }
 .fpos-keypad-btn:active {
-	background: #ffedd5;
-	border-color: #ea580c;
+	background: #dcfce7;
+	border-color: #15803d;
 	transform: translateY(1px);
 }
 
@@ -883,7 +861,7 @@
 }
 .modal.fpos-custom-dialog .modal-header,
 .fpos-custom-dialog .modal-header {
-	background: linear-gradient(135deg, #fff7ed 0%, #fff 100%);
+	background: linear-gradient(135deg, #f0fdf4 0%, #fff 100%);
 	border-bottom: 1px solid #fed7aa;
 	padding: 16px 20px;
 }
@@ -895,8 +873,8 @@
 }
 .modal.fpos-custom-dialog .btn-primary,
 .fpos-custom-dialog .btn-primary {
-	background: #ea580c !important;
-	border-color: #ea580c !important;
+	background: #15803d !important;
+	border-color: #15803d !important;
 	color: #fff !important;
 	font-weight: 700 !important;
 	border-radius: 8px !important;
@@ -1056,9 +1034,9 @@
    ============================================================ */
 
 :root {
-	--fpos-primary:       #ea580c;
-	--fpos-primary-hover: #c2410c;
-	--fpos-primary-light: #fff7ed;
+	--fpos-primary:       #15803d;
+	--fpos-primary-hover: #166534;
+	--fpos-primary-light: #f0fdf4;
 	--fpos-success:       #16a34a;
 	--fpos-success-hover: #15803d;
 	--fpos-danger:        #dc2626;
@@ -1156,36 +1134,8 @@
 	display: flex;
 	align-items: center;
 	justify-content: center;
+	gap: 8px;
 	flex: 1;
-}
-
-.fpos-segmented-control {
-	display: inline-flex;
-	background: var(--fpos-bg);
-	border: 1px solid var(--fpos-border);
-	border-radius: var(--fpos-radius-full);
-	padding: 3px;
-	gap: 2px;
-}
-
-.fpos-segmented-control .fpos-ot-tab {
-	border: none !important;
-	background: transparent !important;
-	padding: 6px 14px !important;
-	border-radius: var(--fpos-radius-full) !important;
-	font-size: 13px !important;
-	font-weight: 600 !important;
-	color: var(--fpos-text-muted) !important;
-	cursor: pointer !important;
-	transition: all 0.15s ease !important;
-	white-space: nowrap !important;
-	line-height: 1 !important;
-}
-
-.fpos-segmented-control .fpos-ot-tab.active {
-	background: var(--fpos-primary) !important;
-	color: #ffffff !important;
-	box-shadow: 0 1px 2px rgba(0,0,0,0.1) !important;
 }
 
 .fpos-header-right {
@@ -1275,9 +1225,9 @@
 }
 
 .fpos-filters-dropdown-btn.has-active-filters {
-	background: #fff7ed !important;
+	background: #f0fdf4 !important;
 	border-color: #f97316 !important;
-	color: #c2410c !important;
+	color: #166534 !important;
 }
 
 .fpos-filter-active-badge {
@@ -1346,7 +1296,7 @@
 	text-decoration: underline !important;
 }
 .fpos-link-btn:hover {
-	color: #ea580c !important;
+	color: #15803d !important;
 }
 
 .fpos-icon-close-btn {
@@ -1453,13 +1403,6 @@
 	background: var(--fpos-bg);
 	border-bottom: 1px solid var(--fpos-border);
 	gap: 8px;
-}
-
-.fpos-cart-header-strip .fpos-cart-meta {
-	padding: 0 !important;
-	background: transparent !important;
-	border-bottom: none !important;
-	flex: 1;
 }
 
 .fpos-cart-overflow-wrapper {
@@ -1604,18 +1547,6 @@
 	margin: 5px 0;
 }
 
-/* Zone 2 — Orders Strip */
-.fpos-page-tabs-bar {
-	display: flex !important;
-	align-items: center !important;
-	gap: 8px !important;
-	background: #f8fafc !important;
-	border-bottom: 1px solid var(--fpos-border) !important;
-	padding: 6px 16px !important;
-	flex-shrink: 0 !important;
-	overflow-x: auto !important;
-}
-
 .fpos-tabs-list {
 	display: flex;
 	align-items: center;
@@ -1663,37 +1594,6 @@
 .fpos-new-tab-btn:hover {
 	border-color: var(--fpos-primary) !important;
 	color: var(--fpos-primary) !important;
-}
-
-/* Zone 3 — Menu Area (Single Unified Filter Bar) */
-.fpos-filter-bar {
-	display: flex !important;
-	align-items: center !important;
-	gap: 10px !important;
-	padding: 10px 16px !important;
-	background: var(--fpos-surface) !important;
-	border-bottom: 1px solid var(--fpos-border) !important;
-	flex-wrap: nowrap !important;
-	overflow: visible !important;
-	position: relative !important;
-	z-index: 30 !important;
-	flex-shrink: 0 !important;
-}
-
-.fpos-search-box {
-	position: relative;
-	width: 260px;
-	max-width: 100%;
-	flex-shrink: 0;
-}
-
-.fpos-popover-categories {
-	display: flex !important;
-	flex-wrap: wrap !important;
-	gap: 6px !important;
-	overflow-x: visible !important;
-	max-height: 180px !important;
-	overflow-y: auto !important;
 }
 
 .fpos-search-icon {
@@ -1902,15 +1802,6 @@
 	flex-direction: column !important;
 	height: 100% !important;
 	position: relative !important;
-}
-
-.fpos-cart-meta {
-	padding: 10px 14px !important;
-	border-bottom: 1px solid var(--fpos-border) !important;
-	display: flex !important;
-	flex-direction: column !important;
-	gap: 6px !important;
-	background: var(--fpos-bg) !important;
 }
 
 .fpos-meta-field {
@@ -2164,3 +2055,469 @@
 .fpos-quiet-link.fpos-danger-text:hover {
 	color: var(--fpos-danger) !important;
 }
+
+/* ── v2: Home / Day Open-Close screen ─────────────────────────────── */
+.fpos-home-btn { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px 12px; font-size: 13px; font-weight: 600; color: #0f172a; cursor: pointer; }
+.fpos-home-btn:hover { background: #f0fdf4; border-color: var(--fpos-primary); }
+.fpos-home { max-width: 1100px; margin: 0 auto; padding: 20px 24px 90px; }
+.fpos-home-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+.fpos-home-title { font-size: 26px; font-weight: 800; color: #0f172a; }
+.fpos-home-sub { font-size: 13px; color: #64748b; margin-top: 2px; }
+.fpos-home-sync { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; padding: 8px 14px; border-radius: 999px; background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+.fpos-home-sync.offline { background: #fef3c7; color: #92400e; border-color: #fde68a; }
+.fpos-sync-dot { width: 9px; height: 9px; border-radius: 50%; background: #22c55e; }
+.fpos-home-sync.offline .fpos-sync-dot { background: #f59e0b; }
+.fpos-home-shift { margin-bottom: 20px; }
+.fpos-shift-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px 20px; box-shadow: 0 1px 3px rgba(15,23,42,.06); }
+.fpos-shift-label { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #64748b; }
+.fpos-shift-state { font-size: 20px; font-weight: 800; margin: 6px 0 2px; }
+.fpos-shift-state.open { color: #15803d; }
+.fpos-shift-state.closed { color: #64748b; }
+.fpos-shift-opened { font-size: 13px; color: #475569; margin-bottom: 12px; }
+.fpos-shift-opened #fpos-day-elapsed { font-weight: 800; color: #b45309; font-variant-numeric: tabular-nums; }
+.fpos-shift-times { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; margin: 10px 0 14px; }
+.fpos-shift-times label { font-size: 12px; font-weight: 600; color: #475569; display: flex; flex-direction: column; gap: 4px; }
+.fpos-shift-times input[type="time"] { border: 1px solid #cbd5e1; border-radius: 8px; padding: 7px 10px; font-size: 14px; }
+.fpos-day-times-save { background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px 14px; font-weight: 600; cursor: pointer; }
+.fpos-day-open-btn, .fpos-day-close-btn { border: none; border-radius: 10px; padding: 12px 22px; font-size: 15px; font-weight: 700; cursor: pointer; color: #fff; }
+.fpos-day-open-btn { background: var(--fpos-primary); }
+.fpos-day-close-btn { background: #0f172a; }
+.fpos-home-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 22px; }
+.fpos-home-tile { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 22px 12px 18px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 6px; box-shadow: 0 1px 3px rgba(15,23,42,.06); }
+.fpos-home-tile:hover { border-color: var(--fpos-primary); box-shadow: 0 4px 14px rgba(249,115,22,.18); }
+.fpos-tile-icon { font-size: 34px; }
+.fpos-tile-label { font-size: 16px; font-weight: 800; color: #0f172a; }
+.fpos-tile-desc { font-size: 12px; color: #64748b; }
+.fpos-home-nav { position: fixed; left: 0; right: 0; bottom: 0; background: #fff; border-top: 1px solid #e2e8f0; display: flex; justify-content: center; gap: 4px; padding: 8px 10px; z-index: 50; }
+.fpos-home-nav-item { background: none; border: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 11px; font-weight: 600; color: #475569; padding: 6px 12px; border-radius: 8px; }
+.fpos-home-nav-item:hover { background: #f0fdf4; color: var(--fpos-primary); }
+.fpos-nav-icon { font-size: 20px; }
+
+/* ── v2: left category sidebar + menu layout ─────────────────────── */
+.fpos-menu-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+/* ── v2: item cards — consistent size, description, diet badges ───── */
+.fpos-item-desc { font-size: 11px; color: #64748b; line-height: 1.35; margin-top: 2px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 30px; }
+.fpos-card-diet-badge.fpos-diet-nonveg { background: #fee2e2; color: #b91c1c; }
+.fpos-items-grid .fpos-item-card { min-height: 150px; }
+
+/* ── v2: tables floor plan ───────────────────────────────────────── */
+.fpos-tables-view, .fpos-attendance-view, .fpos-daily-report-view { max-width: 1100px; margin: 0 auto; padding: 20px 24px 90px; }
+.fpos-floor-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
+.fpos-floor-title { font-size: 22px; font-weight: 800; color: #0f172a; }
+.fpos-floor-sub { font-size: 13px; color: #64748b; margin-top: 2px; }
+.fpos-floor-actions { display: flex; gap: 8px; }
+.fpos-floor-section-title { font-size: 14px; font-weight: 800; color: #475569; margin: 18px 0 10px; }
+.fpos-floor-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
+.fpos-table-card { position: relative; background: #fff; border: 2px solid #e2e8f0; border-radius: 16px; padding: 14px 10px 12px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px; min-height: 132px; }
+.fpos-table-card:hover { box-shadow: 0 4px 14px rgba(15,23,42,.12); }
+.fpos-table-available { border-color: #22c55e; background: #f0fdf4; }
+.fpos-table-occupied { border-color: #ef4444; background: #fef2f2; }
+.fpos-table-reserved { border-color: #f59e0b; background: #fffbeb; }
+.fpos-table-cleaning { border-color: #3b82f6; background: #eff6ff; }
+.fpos-table-chairs { display: flex; gap: 4px; }
+.fpos-chair { width: 12px; height: 12px; border-radius: 50%; background: #cbd5e1; border: 2px solid #94a3b8; }
+.fpos-table-available .fpos-chair { background: #bbf7d0; border-color: #22c55e; }
+.fpos-table-occupied .fpos-chair { background: #fecaca; border-color: #ef4444; }
+.fpos-table-top { width: 64px; height: 64px; border-radius: 50%; background: #fff; border: 3px solid #cbd5e1; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 800; color: #0f172a; }
+.fpos-table-available .fpos-table-top { border-color: #22c55e; }
+.fpos-table-occupied .fpos-table-top { border-color: #ef4444; }
+.fpos-table-reserved .fpos-table-top { border-color: #f59e0b; }
+.fpos-table-cleaning .fpos-table-top { border-color: #3b82f6; }
+.fpos-table-meta { font-size: 12px; font-weight: 700; color: #475569; }
+.fpos-table-time { font-size: 12px; font-weight: 800; color: #b45309; font-variant-numeric: tabular-nums; }
+.fpos-table-guests, .fpos-table-order { font-size: 11px; color: #64748b; }
+.fpos-floor-legend { display: flex; gap: 18px; margin-top: 22px; font-size: 12px; color: #475569; }
+.fpos-floor-legend .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; }
+.fpos-floor-legend .dot.available { background: #22c55e; }
+.fpos-floor-legend .dot.occupied { background: #ef4444; }
+.fpos-floor-legend .dot.reserved { background: #f59e0b; }
+.fpos-floor-legend .dot.cleaning { background: #3b82f6; }
+.fpos-tables-loading { text-align: center; padding: 60px 20px; color: #64748b; font-size: 14px; }
+
+/* ── v2: attendance + daily report ───────────────────────────────── */
+.fpos-att-mark { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; margin-bottom: 16px; }
+.fpos-att-name { flex: 1; min-width: 180px; border: 1px solid #cbd5e1; border-radius: 8px; padding: 9px 12px; font-size: 14px; }
+.fpos-att-table { width: 100%; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; border-collapse: collapse; overflow: hidden; }
+.fpos-att-table th, .fpos-att-table td { text-align: left; padding: 10px 12px; font-size: 13px; border-bottom: 1px solid #f1f5f9; }
+.fpos-att-table th { background: #f8fafc; font-weight: 700; color: #475569; }
+.fpos-att-note { background: #fef3c7; border: 1px solid #fde68a; color: #92400e; border-radius: 10px; padding: 10px 14px; font-size: 13px; margin-bottom: 14px; }
+.fpos-report-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 18px; }
+.fpos-report-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; }
+.fpos-rc-label { font-size: 12px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: .05em; }
+.fpos-rc-value { font-size: 24px; font-weight: 800; color: #0f172a; margin-top: 4px; }
+.fpos-report-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.fpos-report-col { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; }
+.fpos-report-h { font-size: 14px; font-weight: 800; color: #0f172a; margin-bottom: 8px; }
+.fpos-report-row { display: flex; justify-content: space-between; font-size: 13px; color: #475569; padding: 7px 0; border-bottom: 1px solid #f1f5f9; }
+.fpos-report-row:last-child { border-bottom: none; }
+@media (max-width: 720px) {
+	.fpos-home-tiles { grid-template-columns: repeat(2, 1fr); }
+	.fpos-report-cards { grid-template-columns: repeat(2, 1fr); }
+	.fpos-report-cols { grid-template-columns: 1fr; }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   v3 PREMIUM DESIGN SYSTEM — one source of truth for the whole POS.
+   Palette: deep green #15803d / dark #166534 / tint #f0fdf4, ink
+   #0f172a, secondary #475569, muted #64748b, border #e2e8f0.
+   Type scale: 22-26px titles, 15-16px labels, 12-13px meta (min 12px).
+   Touch targets >= 44px. Radii 14-16px, soft shadows, 8px spacing.
+   Icons are inline SVG (.fpos-ic) — emoji is never a UI icon in v3.
+   ══════════════════════════════════════════════════════════════════ */
+.fpos-ic { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; vertical-align: -4px; }
+.fpos-ic-sm { width: 16px; height: 16px; }
+.fpos-ic-lg { width: 28px; height: 28px; }
+.fpos-brand-icon .fpos-ic { width: 26px; height: 26px; color: #15803d; }
+.fpos-btn, .fpos-action-btn-outline { min-height: 44px; border-radius: 12px; font-size: 15px; font-weight: 700; }
+.fpos-day-open-btn, .fpos-day-close-btn { background: #15803d; }
+.fpos-home-tile { border-radius: 16px; padding: 24px 12px 20px; box-shadow: 0 1px 3px rgba(15,23,42,.06), 0 8px 24px rgba(15,23,42,.04); }
+.fpos-home-tile:hover { border-color: #15803d; box-shadow: 0 6px 20px rgba(21,128,61,.16); }
+.fpos-home-tile .fpos-tile-icon { color: #15803d; display: flex; align-items: center; justify-content: center; height: 44px; }
+.fpos-home-tile .fpos-tile-icon .fpos-ic { width: 36px; height: 36px; }
+.fpos-home-nav-item .fpos-ic { width: 22px; height: 22px; }
+.fpos-home-nav-item:hover { background: #f0fdf4; color: #15803d; }
+.fpos-shift-card { border-radius: 16px; box-shadow: 0 1px 3px rgba(15,23,42,.06), 0 8px 24px rgba(15,23,42,.04); }
+.fpos-day-times-save { min-height: 44px; border-radius: 10px; }
+
+/* ── v3: POS left icon sidebar (image 4 concept) ── */
+.fpos-body { display: flex; }
+.fpos-pos-sidebar { width: 84px; flex-shrink: 0; background: #fff; border-right: 1px solid #e2e8f0; display: flex; flex-direction: column; align-items: stretch; padding: 12px 8px; gap: 4px; }
+.fpos-pos-nav-item { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 11px 4px; border: none; background: none; border-radius: 12px; cursor: pointer; font-size: 11px; font-weight: 700; color: #475569; min-height: 56px; }
+.fpos-pos-nav-item .fpos-ic { width: 22px; height: 22px; }
+.fpos-pos-nav-item:hover { background: #f0fdf4; color: #15803d; }
+.fpos-pos-nav-item.active { background: #15803d; color: #fff; }
+.fpos-pos-nav-spacer { flex: 1; }
+.fpos-pos-nav-item.fpos-pos-logout:hover { background: #fef2f2; color: #dc2626; }
+
+/* ── v3: top category tiles (image 4 concept) ── */
+.fpos-cat-tiles { display: flex; gap: 10px; overflow-x: auto; padding: 12px 16px 4px; scrollbar-width: none; }
+.fpos-cat-tiles { flex: 0 0 auto !important; /* v3 fix: .fpos-categories has flex:1 1 auto !important (v2 row rule); inside the column .fpos-menu-main that stretched the tile strip vertically and pushed the item grid down. */ }
+.fpos-cat-tiles::-webkit-scrollbar { display: none; }
+.fpos-cat-tile { flex-shrink: 0; min-width: 108px; background: #fff; border: 1.5px solid #e2e8f0; border-radius: 14px; padding: 12px 14px; cursor: pointer; text-align: left; display: flex; flex-direction: column; gap: 2px; }
+.fpos-cat-tile:hover { border-color: #15803d; }
+.fpos-cat-tile.active { background: #f0fdf4; border-color: #15803d; }
+.fpos-cat-tile-name { font-size: 14px; font-weight: 800; color: #0f172a; display: flex; align-items: center; gap: 6px; }
+.fpos-cat-tile-count { font-size: 12px; color: #64748b; }
+
+/* ── v3: premium item cards + Add to Dish / stepper ── */
+.fpos-items-grid { gap: 14px; }
+.fpos-item-card { border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(15,23,42,.05); overflow: hidden; }
+.fpos-item-card:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(15,23,42,.10); border-color: #bbf7d0; }
+.fpos-item-media { position: relative; }
+.fpos-card-diet-badge { font-size: 10px; font-weight: 800; letter-spacing: .04em; padding: 3px 7px; border-radius: 999px; }
+.fpos-diet-veg { background: #dcfce7; color: #166534; }
+.fpos-diet-spicy { background: #fef3c7; color: #92400e; }
+.fpos-item-title { font-size: 14px; }
+.fpos-item-rate { font-size: 15px; color: #15803d; }
+.fpos-quick-add-btn { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; border-radius: 10px; min-width: 44px; min-height: 36px; font-size: 15px; font-weight: 800; }
+.fpos-add-dish-btn { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; border-radius: 10px; min-height: 36px; padding: 0 12px; font-size: 13px; font-weight: 800; cursor: pointer; }
+.fpos-add-dish-btn:hover { background: #15803d; color: #fff; }
+.fpos-stepper { display: inline-flex; align-items: center; gap: 2px; background: #15803d; border-radius: 10px; padding: 2px; }
+.fpos-stepper button { width: 34px; height: 32px; border: none; background: transparent; color: #fff; font-size: 18px; font-weight: 800; cursor: pointer; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+.fpos-stepper button:hover { background: rgba(255,255,255,.18); }
+.fpos-stepper-qty { min-width: 26px; text-align: center; color: #fff; font-size: 14px; font-weight: 800; }
+
+/* ── v3: order panel — two distinct actions ── */
+.fpos-right-panel { background: #fff; border-left: 1px solid #e2e8f0; }
+.fpos-cart-header-strip { border-bottom: 1px solid #e2e8f0; }
+.fpos-total-due-row { font-size: 17px; }
+.fpos-confirm-order-btn { background: #f0fdf4 !important; color: #15803d !important; border: 2px solid #15803d !important; width: 100%; }
+.fpos-confirm-order-btn:hover:not(:disabled) { background: #dcfce7 !important; }
+.fpos-pay-btn { background: #15803d !important; border-color: #15803d !important; color: #fff !important; width: 100%; }
+.fpos-pay-btn:hover:not(:disabled) { background: #166534 !important; }
+.fpos-sticky-actions { display: flex; flex-direction: column; gap: 10px; }
+.fpos-pay-methods { display: flex; gap: 8px; margin: 0 0 4px; }
+.fpos-pay-method { flex: 1; border: 1.5px solid #e2e8f0; background: #fff; border-radius: 12px; padding: 10px 6px; font-size: 12px; font-weight: 700; color: #475569; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px; min-height: 52px; }
+.fpos-pay-method:hover { border-color: #15803d; color: #15803d; }
+.fpos-pay-method.active { background: #f0fdf4; border-color: #15803d; color: #15803d; }
+/* BILL RULE v3: pending-payment banner — shown after confirm, hidden at settle. */
+.fpos-pending-banner { display: none; background: #fffbeb; border: 1.5px solid #f59e0b; border-radius: 12px; padding: 12px 14px; font-size: 13px; line-height: 1.5; color: #92400e; }
+.fpos-pending-banner.show { display: block; }
+.fpos-pending-banner b { color: #78350f; }
+/* ── v3: bottom occupied-table chips ── */
+.fpos-table-chips-bar { display: flex; gap: 10px; overflow-x: auto; padding: 10px 16px; background: #fff; border-top: 1px solid #e2e8f0; scrollbar-width: none; }
+.fpos-table-chips-bar::-webkit-scrollbar { display: none; }
+.fpos-table-chip { flex-shrink: 0; display: flex; align-items: center; gap: 8px; border: 1.5px solid #e2e8f0; background: #f8fafc; border-radius: 999px; padding: 7px 14px 7px 8px; cursor: pointer; font-size: 13px; font-weight: 700; color: #0f172a; }
+.fpos-table-chip:hover { border-color: #15803d; }
+.fpos-table-chip-no { width: 30px; height: 30px; border-radius: 50%; background: #15803d; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; }
+.fpos-table-chip-meta { font-size: 11px; font-weight: 600; color: #64748b; }
+
+/* ── v3: REALISTIC tables (image 5 concept) ──
+   Round wooden top (radial wood gradient + rim), pedestal stem + base,
+   wooden chairs left/right, big number, status pill + dot top-left. */
+.fpos-table-card { min-height: 210px; padding: 16px 12px 14px; border-radius: 18px; }
+.fpos-table-dot { position: absolute; top: 12px; left: 12px; width: 12px; height: 12px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(15,23,42,.08); }
+.fpos-table-dot.available { background: #22c55e; }
+.fpos-table-dot.occupied { background: #ef4444; }
+.fpos-table-dot.reserved { background: #f59e0b; }
+.fpos-table-dot.cleaning { background: #3b82f6; }
+.fpos-table-scene { position: relative; width: 100%; display: flex; align-items: center; justify-content: center; padding: 6px 0 2px; }
+.fpos-table-top { width: 92px; height: 92px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #e8b877 0%, #d9a05b 38%, #b57e3a 68%, #8a5a22 100%); border: 3px solid #7c4f1d; box-shadow: inset 0 0 0 3px rgba(255,255,255,.22), inset 0 -6px 12px rgba(0,0,0,.25), 0 6px 14px rgba(15,23,42,.18); display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 900; color: #3f2708; text-shadow: 0 1px 0 rgba(255,255,255,.35); position: relative; z-index: 2; }
+.fpos-table-pedestal { position: absolute; left: 50%; bottom: -4px; transform: translateX(-50%); width: 12px; height: 22px; background: linear-gradient(90deg, #6b4423, #8a5a22 50%, #6b4423); border-radius: 3px; z-index: 1; }
+.fpos-table-pedestal::after { content: ""; position: absolute; left: 50%; bottom: -7px; transform: translateX(-50%); width: 46px; height: 9px; border-radius: 50%; background: #5d3a1a; }
+.fpos-chair { position: absolute; top: 50%; width: 20px; height: 30px; border-radius: 6px 6px 4px 4px; background: linear-gradient(180deg, #c98f4a, #a06a2c); border: 2px solid #7c4f1d; box-shadow: 0 3px 6px rgba(15,23,42,.18); z-index: 1; }
+.fpos-chair::before { content: ""; position: absolute; top: -11px; left: -2px; right: -2px; height: 12px; border-radius: 6px 6px 0 0; background: linear-gradient(180deg, #d9a05b, #a06a2c); border: 2px solid #7c4f1d; border-bottom: none; }
+.fpos-chair::after { content: ""; position: absolute; bottom: -9px; left: 2px; width: 3px; height: 9px; background: #7c4f1d; box-shadow: 13px 0 0 #7c4f1d; }
+.fpos-chair-left { left: 2px; transform: translateY(-50%) rotate(-6deg); }
+.fpos-chair-right { right: 2px; transform: translateY(-50%) rotate(6deg); }
+.fpos-chair-top { left: 50%; top: -4px; transform: translateX(-50%); }
+.fpos-chair-bottom { left: 50%; top: auto; bottom: -4px; transform: translateX(-50%) rotate(180deg); }
+.fpos-table-num { font-size: 15px; font-weight: 900; color: #0f172a; margin-top: 10px; }
+.fpos-table-status-pill { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 800; padding: 5px 11px; border-radius: 999px; margin-top: 4px; }
+.fpos-table-status-pill .fpos-ic { width: 14px; height: 14px; }
+.fpos-table-status-pill.available { background: #dcfce7; color: #166534; }
+.fpos-table-status-pill.occupied { background: #fee2e2; color: #991b1b; }
+.fpos-table-status-pill.reserved { background: #fef3c7; color: #92400e; }
+.fpos-table-status-pill.cleaning { background: #dbeafe; color: #1d4ed8; }
+.fpos-table-time { font-size: 13px; font-weight: 800; color: #b45309; font-variant-numeric: tabular-nums; margin-top: 2px; }
+.fpos-table-meta2 { font-size: 12px; color: #64748b; margin-top: 2px; }
+@media (max-width: 720px) {
+  .fpos-pos-sidebar { width: 64px; }
+  .fpos-pos-nav-item span.fpos-pos-nav-label { display: none; }
+  .fpos-cat-tile { min-width: 92px; }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   v4 CHILI layout — exact 3-column structure (see CHANGELOG-v4.md).
+   Why: v3 stacked icon sidebar + category sidebar + tile row + top
+   order-type tabs + bottom chips (triple navigation = clutter). v4
+   has ONE navigation per axis: left icon sidebar, centre tile row,
+   right order panel, bottom chips strip. No server/API changes. */
+
+/* App shell: one rounded white window on a pale green-grey frame. The
+   file is app-scoped so it cannot paint the Desk page itself — the
+   12px ring + margin give the same framed-window look inside the page. */
+.fpos-wrapper { width: calc(100vw - 24px); height: calc(100vh - 24px); margin: 12px; border-radius: 20px; box-shadow: 0 0 0 12px #e9f1ea, 0 24px 60px rgba(15,23,42,.14); overflow: hidden; position: relative; }
+/* v4: the home bottom nav was position:fixed to the viewport — with the framed
+   shell it would sit 12px below the shell's bottom edge, over the green frame.
+   Anchor it to the shell instead, with matching bottom corners. */
+.fpos-wrapper .fpos-home-nav { position: absolute; left: 0; right: 0; bottom: 0; border-radius: 0 0 20px 20px; }
+/* One header per view: off the POS screen the POS topbar hides — Home,
+   Tables, Attendance and Report each have their own header + Home button. */
+.fpos-wrapper:not(.fpos-view-pos) .fpos-topbar { display: none; }
+
+/* --- CHILI top bar --- */
+.fpos-topbar { height: 64px; padding: 0 16px; gap: 14px; }
+.fpos-topbar-menu-btn { width: 44px; height: 44px; border: none; background: #fff; border-radius: 12px; cursor: pointer; color: #0f172a; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.fpos-topbar-menu-btn:hover { background: #f0fdf4; color: #15803d; }
+.fpos-topbar-menu-btn .fpos-ic { width: 22px; height: 22px; }
+.fpos-header-center { flex: 1; display: flex; justify-content: center; }
+.fpos-topbar-search { flex: 1; max-width: 560px; height: 44px; display: flex; align-items: center; gap: 8px; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 12px; padding: 0 14px; }
+.fpos-topbar-search:focus-within { border-color: #15803d; background: #fff; box-shadow: 0 0 0 3px rgba(21,128,61,.12); }
+.fpos-topbar-search .fpos-search-icon { position: static; transform: none; flex-shrink: 0; }
+.fpos-topbar-search .fpos-search-input { flex: 1; min-width: 0; border: none !important; background: transparent !important; box-shadow: none !important; padding-left: 0 !important; }
+.fpos-topbar-order-chip { display: inline-flex; align-items: center; gap: 7px; height: 44px; padding: 0 14px; border: 1.5px solid #e2e8f0; background: #fff; border-radius: 12px; font-size: 13px; font-weight: 800; color: #0f172a; cursor: pointer; white-space: nowrap; }
+.fpos-topbar-order-chip:hover { border-color: #15803d; color: #15803d; }
+.fpos-topbar-order-chip .fpos-ic-sm { width: 15px; height: 15px; }
+.fpos-topbar-icon-btn { width: 44px; height: 44px; padding: 0; border: 1px solid #e2e8f0; background: #fff; border-radius: 12px; cursor: pointer; color: #475569; display: inline-flex; align-items: center; justify-content: center; position: relative; flex-shrink: 0; }
+.fpos-topbar-icon-btn:hover { border-color: #15803d; color: #15803d; background: #f0fdf4; }
+.fpos-topbar-icon-btn .fpos-ic { width: 20px; height: 20px; }
+.fpos-topbar-icon-btn .fpos-held-badge { position: absolute; top: -6px; right: -6px; background: #15803d; color: #fff; font-size: 10px; font-weight: 800; min-width: 18px; height: 18px; border-radius: 9px; display: flex; align-items: center; justify-content: center; padding: 0 4px; }
+/* hamburger collapses the left nav to icons only */
+.fpos-wrapper.fpos-sidebar-collapsed .fpos-pos-sidebar { width: 64px; }
+.fpos-wrapper.fpos-sidebar-collapsed .fpos-pos-nav-label { display: none; }
+
+/* --- v5.3: Filters live in the TOP BAR, same single row as the search bar.
+   Button matches the 44px search field; popover opens below it (base right:0). --- */
+.fpos-header-center .fpos-filters-dropdown-wrapper { display: flex; align-items: center; flex-shrink: 0; }
+.fpos-header-center .fpos-filters-dropdown-btn { height: 44px !important; border-radius: 12px !important; padding: 0 14px !important; }
+
+/* --- Centre column: ONE category row --- */
+.fpos-cat-row { display: flex; align-items: stretch; gap: 8px; padding: 14px 16px 4px; flex-shrink: 0; }
+/* v4: the v3 `.fpos-cat-tiles { flex: 0 0 auto !important; }` rule would stop the
+   row shrinking, so on a 1280px screen the centre column overflowed into the
+   right panel and clipped the "Table 4" title. The !important here wins it back. */
+.fpos-cat-row .fpos-cat-tiles { flex: 1 1 auto !important; min-width: 0; padding: 0; gap: 8px; }
+.fpos-cat-tile { flex: 1 1 0; min-width: 0; padding: 10px 8px !important; }
+.fpos-cat-tile-name { white-space: nowrap; font-size: 13px !important; overflow: hidden; text-overflow: ellipsis; }
+/* v4: an item without a photo renders a placeholder <div> inside the flex
+   .fpos-item-media — without flex:1 it shrink-to-fit into a narrow band. */
+.fpos-item-media > div { flex: 1; }
+.fpos-items-grid-wrapper { padding: 12px 20px 20px; }
+.fpos-items-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 1150px) { .fpos-items-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* --- Right order panel: CHILI header --- */
+/* v4: the Zone-3 rule sets the panel to 360px !important — the !important here
+   wins it back to the CHILI ~300px, which also frees 60px for the centre column. */
+.fpos-right-panel { width: 300px !important; }
+.fpos-cart-header-strip { display: flex; align-items: flex-start; gap: 8px; padding: 16px 16px 12px; }
+.fpos-order-head { flex: 1; min-width: 0; }
+.fpos-order-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+/* v4: the ⋮ overflow menu sits in the title row so the order-type tabs below
+   get the panel's full width (all four labels fit without truncating). */
+.fpos-order-title-row .fpos-cart-overflow-wrapper { flex-shrink: 0; }
+.fpos-order-title { font-size: 18px; font-weight: 900; color: #0f172a; line-height: 1.25; }
+.fpos-order-sub { font-size: 12px; color: #64748b; margin-top: 2px; }
+.fpos-order-edit-btn { width: 36px; height: 36px; border: 1px solid #e2e8f0; background: #fff; border-radius: 10px; cursor: pointer; color: #64748b; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.fpos-order-edit-btn:hover { border-color: #15803d; color: #15803d; }
+.fpos-order-type-tabs { display: flex; gap: 4px; background: #f1f5f9; border-radius: 12px; padding: 4px; margin-top: 12px; }
+.fpos-order-type-tabs .fpos-ot-tab { flex: 1; min-width: 0; border: none; background: transparent; border-radius: 9px; padding: 8px 2px; font-size: 12px; font-weight: 700; color: #475569; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fpos-order-type-tabs .fpos-ot-tab:hover { color: #15803d; }
+.fpos-order-type-tabs .fpos-ot-tab.active { background: #15803d; color: #fff; box-shadow: 0 2px 6px rgba(21,128,61,.3); }
+.fpos-delivery-field { margin-top: 10px; font-size: 13px; font-weight: 600; color: #0284c7; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+
+/* --- Bottom chips strip: staff avatars + order chips --- */
+.fpos-chips-staff { display: inline-flex; align-items: center; flex-shrink: 0; margin-right: 4px; }
+.fpos-chip-avatar { width: 32px; height: 32px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(15,23,42,.18); display: inline-flex; align-items: center; justify-content: center; color: #fff; margin-left: -8px; }
+.fpos-chip-avatar:first-child { margin-left: 0; }
+.fpos-chip-avatar .fpos-ic { width: 16px; height: 16px; }
+.fpos-chip-avatar-a { background: #15803d; }
+.fpos-chip-avatar-b { background: #0d9488; }
+.fpos-table-chip-available .fpos-table-chip-meta { color: #15803d; font-weight: 700; }
+
+/* --- Tables floor: clean 3-column grid (image 5) --- */
+.fpos-floor-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; max-width: 980px; }
+@media (max-width: 900px) { .fpos-floor-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .fpos-floor-grid { grid-template-columns: 1fr; } }
+
+/* ══════════════════════════════════════════════════════════════════
+   v5 PREMIUM VIBE — visual system only. The v4 CHILI layout is
+   FROZEN: no panel, sidebar, tile row, button or screen position
+   moves, nothing is added or removed structurally. Only colour,
+   depth, type, photos, chairs and polish change.
+   Palette: deep green #14532d/#15803d; warm gold #b45309/#d97706
+   used SPARINGLY (discount badge, Total Due figure, active-tile
+   glow, primary-button sheen) — never orange backgrounds. Page
+   soft warm off-white #f7f5f0; cards/panels white, 18px radius,
+   soft layered shadows, 1px hairline borders #e8e4da.
+   Type: "Plus Jakarta Sans", Inter, system-ui, sans-serif.
+   ══════════════════════════════════════════════════════════════════ */
+:root {
+	--fpos-bg: #f7f5f0;
+	--fpos-border: #e8e4da;
+	--fpos-gold: #b45309;
+	--fpos-gold-bright: #d97706;
+	--fpos-gold-tint: #fef3c7;
+	--fpos-warm-grey: #78716c;
+	--fpos-shadow: 0 1px 2px rgba(20,60,30,.06), 0 8px 24px rgba(20,60,30,.08);
+	--fpos-shadow-lg: 0 2px 4px rgba(20,60,30,.07), 0 16px 40px rgba(20,60,30,.12);
+}
+
+/* ── v5: type + page ── */
+.fpos-wrapper { font-family: "Plus Jakarta Sans", Inter, system-ui, -apple-system, "Segoe UI", sans-serif; box-shadow: 0 0 0 12px #ede9df, 0 24px 60px rgba(15,23,42,.14); }
+.fpos-home-title, .fpos-floor-title, .fpos-order-title { letter-spacing: -.02em; }
+.fpos-shift-label, .fpos-floor-section-title, .fpos-rc-label, .fpos-home-stat-label, .fpos-home-recent-title { letter-spacing: .08em; text-transform: uppercase; }
+.fpos-grand-total-val, .fpos-item-rate, .fpos-cart-row-amount, .fpos-table-time, .fpos-stepper-qty, .fpos-home-stat-value, .fpos-home-recent-amt, .fpos-subtotal-val, .fpos-tax-val, .fpos-discount-val { font-variant-numeric: tabular-nums; }
+.fpos-topbar { box-shadow: 0 1px 0 rgba(20,60,30,.05); }
+.fpos-pos-sidebar { border-right-color: #e8e4da; }
+.fpos-home-nav { border-top-color: #e8e4da; }
+/* v5: home/tables views scroll inside the shell — the new home stats +
+   recent strip add height, and short screens must not clip them. */
+.fpos-home-view, .fpos-tables-view { overflow-y: auto; }
+
+/* ── v5: buttons — visible hover/active states ── */
+.fpos-btn { transition: background .18s ease, box-shadow .18s ease, transform .12s ease; }
+.fpos-btn:active:not(:disabled) { transform: scale(.98); }
+.fpos-topbar-icon-btn, .fpos-topbar-order-chip, .fpos-order-edit-btn { transition: all .18s ease; }
+.fpos-pos-nav-item.active { box-shadow: 0 4px 12px rgba(21,128,61,.28); }
+.fpos-day-open-btn:hover, .fpos-day-close-btn:hover { box-shadow: 0 6px 16px rgba(21,128,61,.30); }
+
+/* ── v5: item cards — photos + type ── */
+.fpos-item-card { border-radius: 18px; border-color: #e8e4da; box-shadow: 0 1px 2px rgba(20,60,30,.06), 0 8px 24px rgba(20,60,30,.08); }
+.fpos-item-card:hover { transform: translateY(-2px); box-shadow: 0 2px 4px rgba(20,60,30,.07), 0 16px 40px rgba(20,60,30,.12); border-color: #d6d0bf; }
+.fpos-item-media { height: 110px; }
+.fpos-item-photo { width: 100%; height: 110px; background-color: #f3ede2; background-size: cover; background-position: center; background-repeat: no-repeat; }
+.fpos-item-photo-fallback { display: flex; align-items: center; justify-content: center; }
+.fpos-item-photo-fallback .fpos-ic { width: 46px; height: 46px; padding: 9px; background: rgba(255,255,255,.78); border-radius: 50%; box-shadow: 0 2px 8px rgba(20,60,30,.12); }
+/* warm gradient tiles per food icon (never a bare letter) */
+.fpos-food-pizza { background: linear-gradient(135deg, #fef3c7, #fde68a 55%, #fcd34d); color: #b45309; }
+.fpos-food-burger { background: linear-gradient(135deg, #ffedd5, #fdba74 60%, #fb923c); color: #9a3412; }
+.fpos-food-noodle { background: linear-gradient(135deg, #fef9c3, #fde047 60%, #facc15); color: #854d0e; }
+.fpos-food-soup { background: linear-gradient(135deg, #fee2e2, #fca5a5 60%, #f87171); color: #991b1b; }
+.fpos-food-fries { background: linear-gradient(135deg, #fef3c7, #fde68a 55%, #fbbf24); color: #92400e; }
+.fpos-food-sandwich { background: linear-gradient(135deg, #d1fae5, #86efac 60%, #4ade80); color: #166534; }
+.fpos-food-drink { background: linear-gradient(135deg, #e0f2fe, #7dd3fc 60%, #38bdf8); color: #075985; }
+.fpos-food-dessert { background: linear-gradient(135deg, #fce7f3, #f9a8d4 60%, #f472b6); color: #9d174d; }
+.fpos-food-combo { background: linear-gradient(135deg, #ede9fe, #c4b5fd 60%, #a78bfa); color: #5b21b6; }
+.fpos-food-plate { background: linear-gradient(135deg, #dcfce7, #86efac 60%, #4ade80); color: #166534; }
+.fpos-item-title { font-size: 15px; font-weight: 600; }
+.fpos-item-desc { font-size: 12.5px; color: #78716c; }
+.fpos-item-rate { font-size: 15px; font-weight: 700; color: #15803d; }
+
+/* ── v5: category tiles — tinted icon circle, active glow ── */
+.fpos-cat-tile { border-radius: 16px; border-color: #e8e4da; box-shadow: 0 1px 2px rgba(20,60,30,.05); transition: border-color .18s ease, box-shadow .18s ease, transform .12s ease; padding: 10px 6px !important; }
+.fpos-cat-tile:hover { border-color: #15803d; box-shadow: 0 4px 14px rgba(21,128,61,.14); }
+.fpos-cat-tile:active { transform: scale(.98); }
+.fpos-cat-tile.active { background: #f0fdf4; border-color: #15803d; box-shadow: inset 0 0 0 1px #15803d, 0 0 0 3px rgba(217,119,6,.18), 0 8px 20px rgba(21,128,61,.16); }
+.fpos-cat-tile-icon { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: #dcfce7; color: #15803d; flex-shrink: 0; }
+.fpos-cat-tile-icon .fpos-ic { width: 13px; height: 13px; }
+.fpos-cat-tile.active .fpos-cat-tile-icon { background: #15803d; color: #fff; }
+.fpos-cat-tile-name { gap: 6px; }
+
+/* ── v5: home — shift card, tiles, stats, recent orders ──
+   Spacing is tightened (not re-laid-out) so the new stats + recent
+   strip fit above the fixed bottom nav at 1280×860; the views still
+   scroll on shorter screens. */
+.fpos-home { padding: 16px 24px 90px; }
+.fpos-home-top { margin-bottom: 14px; }
+.fpos-home-shift { margin-bottom: 16px; }
+.fpos-shift-card { border-radius: 18px; border-color: #e8e4da; box-shadow: 0 1px 2px rgba(20,60,30,.06), 0 8px 24px rgba(20,60,30,.08); padding: 14px 20px; }
+.fpos-home-tiles { margin-bottom: 16px; }
+.fpos-home-tile { border-radius: 18px; border-color: #e8e4da; box-shadow: 0 1px 2px rgba(20,60,30,.06), 0 8px 24px rgba(20,60,30,.08); transition: border-color .18s ease, box-shadow .18s ease, transform .12s ease; padding: 18px 12px 14px; }
+.fpos-home-tile:hover { transform: translateY(-2px); border-color: #15803d; box-shadow: 0 2px 4px rgba(20,60,30,.07), 0 16px 36px rgba(21,128,61,.18); }
+.fpos-home-tile:active { transform: scale(.98); }
+.fpos-home-tile .fpos-tile-icon { width: 48px; height: 48px; border-radius: 50%; background: #f0fdf4; }
+.fpos-home-tile .fpos-tile-icon .fpos-ic { width: 28px; height: 28px; }
+.fpos-home-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 16px; }
+.fpos-home-stat { background: #fff; border: 1px solid #e8e4da; border-radius: 18px; padding: 14px 18px; box-shadow: 0 1px 2px rgba(20,60,30,.06), 0 8px 24px rgba(20,60,30,.08); }
+.fpos-home-stat-label { font-size: 11px; font-weight: 700; color: #78716c; }
+.fpos-home-stat-value { font-size: 22px; font-weight: 800; color: #0f172a; margin-top: 6px; letter-spacing: -.02em; }
+.fpos-home-stat-gold { color: #b45309; }
+.fpos-home-stat-item { font-size: 17px; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fpos-home-stat-sub { font-size: 12px; color: #78716c; margin-top: 3px; }
+.fpos-home-recent { background: #fff; border: 1px solid #e8e4da; border-radius: 18px; padding: 2px 18px 8px; box-shadow: 0 1px 2px rgba(20,60,30,.06), 0 8px 24px rgba(20,60,30,.08); margin-bottom: 16px; }
+.fpos-home-recent-head { display: flex; justify-content: space-between; align-items: center; padding: 10px 0 4px; }
+.fpos-home-recent-title { font-size: 13px; font-weight: 800; color: #0f172a; }
+.fpos-home-recent-all { background: none; border: none; color: #15803d; font-size: 13px; font-weight: 700; cursor: pointer; padding: 4px 6px; border-radius: 8px; }
+.fpos-home-recent-all:hover { background: #f0fdf4; }
+.fpos-home-recent-row { display: flex; align-items: center; gap: 12px; width: 100%; background: none; border: none; border-top: 1px solid #f1ede3; padding: 9px 2px; cursor: pointer; text-align: left; font-size: 13px; border-radius: 0; }
+.fpos-home-recent-row:hover { background: #faf9f6; }
+.fpos-home-recent-id { font-weight: 800; color: #0f172a; min-width: 108px; }
+.fpos-home-recent-cust { font-weight: 600; color: #334155; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fpos-home-recent-meta { color: #78716c; font-size: 12px; white-space: nowrap; }
+.fpos-home-recent-amt { font-weight: 800; color: #15803d; white-space: nowrap; }
+.fpos-home-recent-pill { font-size: 10px; font-weight: 800; padding: 3px 8px; border-radius: 999px; letter-spacing: .04em; }
+.fpos-home-recent-pill.paid { background: #dcfce7; color: #166534; }
+.fpos-home-recent-pill.unpaid { background: #fee2e2; color: #991b1b; }
+.fpos-home-recent-empty { padding: 14px 2px; font-size: 13px; color: #78716c; }
+
+/* ── v5: order panel — Total Due in gold, gradient Pay button ── */
+.fpos-grand-total-val { color: #b45309; font-size: 20px; font-weight: 800; }
+.fpos-order-type-tabs .fpos-ot-tab { transition: all .2s ease; }
+.fpos-order-type-tabs .fpos-ot-tab.active { box-shadow: 0 3px 8px rgba(21,128,61,.35), 0 0 0 1px rgba(21,128,61,.20); }
+.fpos-pay-method.active { background: #f0fdf4; border-color: #15803d; color: #15803d; box-shadow: 0 2px 8px rgba(21,128,61,.14); }
+.fpos-pay-method .fpos-ic { width: 20px; height: 20px; }
+.fpos-pay-btn { background: linear-gradient(180deg, #16a34a 0%, #15803d 55%, #166534 100%) !important; box-shadow: 0 6px 16px rgba(21,128,61,.35), inset 0 1px 0 rgba(255,255,255,.25) !important; }
+.fpos-pay-btn:hover:not(:disabled) { background: linear-gradient(180deg, #15803d 0%, #166534 100%) !important; box-shadow: 0 8px 20px rgba(21,128,61,.40), inset 0 1px 0 rgba(255,255,255,.25) !important; }
+.fpos-confirm-order-btn:hover:not(:disabled) { background: #dcfce7 !important; box-shadow: 0 2px 8px rgba(21,128,61,.14); }
+.fpos-discount-badge { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; border-radius: 999px; padding: 2px 9px; font-weight: 800; font-size: 12px; }
+.fpos-stepper { border-radius: 999px; box-shadow: 0 2px 6px rgba(21,128,61,.25); }
+
+/* ── v5: bottom chips — soft shadow + status dot ── */
+.fpos-table-chip { background: #fff; border-color: #e8e4da; box-shadow: 0 1px 2px rgba(20,60,30,.06), 0 4px 12px rgba(20,60,30,.08); transition: border-color .18s ease, box-shadow .18s ease, transform .12s ease; }
+.fpos-table-chip:hover { box-shadow: 0 2px 4px rgba(20,60,30,.07), 0 8px 20px rgba(20,60,30,.12); }
+.fpos-table-chip:active { transform: scale(.97); }
+.fpos-table-chip-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.fpos-table-chip-dot.ordering, .fpos-table-chip-dot.free { background: #22c55e; box-shadow: 0 0 0 3px rgba(34,197,94,.18); }
+.fpos-table-chip-dot.kitchen { background: #d97706; box-shadow: 0 0 0 3px rgba(217,119,6,.18); }
+
+/* ── v5: REALISTIC tables — real wooden chairs, wood grain, floor shadow.
+   Chairs keep their v3 positions (left/right of the top); only the
+   rendering changes. The v2 status tints are removed — mint/pink chairs
+   read as popsicles; status still lives in the dot, pill and border. ── */
+.fpos-table-card { border-radius: 18px; box-shadow: 0 1px 2px rgba(20,60,30,.06), 0 8px 24px rgba(20,60,30,.08); transition: box-shadow .18s ease, transform .12s ease; }
+.fpos-table-card:hover { transform: translateY(-2px); box-shadow: 0 2px 4px rgba(20,60,30,.07), 0 16px 36px rgba(20,60,30,.12); }
+.fpos-table-top { background:
+	repeating-linear-gradient(115deg, rgba(124,79,29,.12) 0 2px, rgba(124,79,29,0) 2px 10px),
+	repeating-linear-gradient(25deg, rgba(255,255,255,.05) 0 3px, rgba(255,255,255,0) 3px 14px),
+	radial-gradient(circle at 35% 30%, #e8b877 0%, #d9a05b 38%, #b57e3a 68%, #8a5a22 100%); }
+.fpos-table-scene::after { content: ""; position: absolute; left: 50%; bottom: -6px; transform: translateX(-50%); width: 120px; height: 10px; border-radius: 50%; background: radial-gradient(ellipse at center, rgba(60,40,15,.22) 0%, rgba(60,40,15,0) 70%); z-index: 0; pointer-events: none; }
+.fpos-table-available .fpos-chair, .fpos-table-occupied .fpos-chair, .fpos-table-reserved .fpos-chair, .fpos-table-cleaning .fpos-chair { background: linear-gradient(180deg, #d9a05b, #a06a2c); border-color: #7c4f1d; }
+.fpos-chair { width: 24px; height: 34px; border-radius: 7px 7px 5px 5px; background: linear-gradient(180deg, #c98f4a, #a06a2c); border: 2px solid #7c4f1d; box-shadow: 0 4px 8px rgba(15,23,42,.20); }
+.fpos-chair::before { content: ""; position: absolute; top: -15px; left: -3px; right: -3px; height: 17px; border-radius: 8px 8px 3px 3px; background: repeating-linear-gradient(90deg, #d9a05b 0 4px, #b57e3a 4px 5px), linear-gradient(180deg, #d9a05b, #a06a2c); border: 2px solid #7c4f1d; border-bottom: none; }
+.fpos-chair::after { content: ""; position: absolute; bottom: -10px; left: 3px; width: 3px; height: 10px; background: #6b4423; box-shadow: 14px 0 0 #6b4423; }
+
+/* ── v5: report + attendance cards share the same surface ── */
+.fpos-report-card, .fpos-report-col, .fpos-att-mark { border-color: #e8e4da; border-radius: 18px; box-shadow: 0 1px 2px rgba(20,60,30,.06), 0 8px 24px rgba(20,60,30,.08); }

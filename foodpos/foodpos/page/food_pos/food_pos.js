@@ -5,6 +5,73 @@
 
 frappe.provide("foodpos.FoodPOS");
 
+// v2 single branch: one branch only ("Main Branch"). The old branch
+// columns are kept in the database for existing data, but the client
+// never selects, filters or switches by branch any more.
+const FPOS_SINGLE_BRANCH = "Main Branch";
+const FPOS_ORDER_TYPES = ["Walk In", "Dine In", "Takeaway", "Delivery"];
+
+// ── v3: SVG icon library — premium line icons (stroke 1.8, 24px grid).
+// Emoji is never a UI icon in v3; v5 adds proper SVG food icons
+// (pizza / burger / noodle / soup / fries / sandwich / drink / dessert /
+// combo / plate) so item cards never fall back to a bare letter or emoji.
+// Usage: fpos_icon("home").
+const FPOS_ICONS = {
+	grid: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+	menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
+	bell: '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>',
+	home: '<path d="M3 9.5 12 3l9 6.5V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22v-8h6v8"/>',
+	chef: '<path d="M4 17h16"/><path d="M12 9a8 8 0 0 1 8 8H4a8 8 0 0 1 8-8z"/><path d="M12 9V6"/><circle cx="12" cy="4.5" r="1.4"/>',
+	table: '<ellipse cx="12" cy="8.5" rx="7.5" ry="3"/><path d="M12 11.5V20"/><path d="M7 20h10"/>',
+	calendar: '<rect x="3" y="4.5" width="18" height="17" rx="2.5"/><path d="M16 2.5v4M8 2.5v4M3 10h18"/>',
+	truck: '<rect x="1.5" y="4" width="14" height="12" rx="1"/><path d="M15.5 9h4l3.5 3.5V16h-7.5z"/><circle cx="6" cy="18.5" r="1.8"/><circle cx="18.5" cy="18.5" r="1.8"/>',
+	chart: '<path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/>',
+	settings: '<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/>',
+	filter: '<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"/><path d="M1 14h6M9 8h6M17 16h6"/>',
+	logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/>',
+	receipt: '<path d="M5 2h14v20l-2.3-1.4L14.4 22l-2.4-1.4L9.6 22 7.3 20.6 5 22z"/><path d="M9 7.5h6M9 11.5h6M9 15.5h4"/>',
+	clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>',
+	users: '<path d="M17 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9.5" cy="7.5" r="3.8"/><path d="M22 21v-2a4 4 0 0 0-3-3.8M15.5 4a3.8 3.8 0 0 1 0 7.5"/>',
+	user: '<circle cx="12" cy="8" r="4"/><path d="M4.5 21v-1a7.5 7.5 0 0 1 15 0v1"/>',
+	check: '<path d="M20 6 9 17l-5-5"/>',
+	checkCircle: '<circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.5 2.5 4.5-5.5"/>',
+	star: '<path d="M12 2.5 14.9 8.6l6.6.9-4.8 4.6 1.2 6.6L12 17.6 6.1 20.7l1.2-6.6L2.5 9.5l6.6-.9z"/>',
+	people: '<path d="M17 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9.5" cy="7.5" r="3.8"/><path d="M22 21v-2a4 4 0 0 0-3-3.8M15.5 4a3.8 3.8 0 0 1 0 7.5"/>',
+	timer: '<circle cx="12" cy="13" r="8"/><path d="M12 9.5V13l2.5 1.5M10 2.5h4"/>',
+	pause: '<path d="M9 5v14M15 5v14"/>',
+	search: '<circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.5 16.5"/>',
+	plus: '<path d="M12 5v14M5 12h14"/>',
+	minus: '<path d="M5 12h14"/>',
+	card: '<rect x="2" y="5" width="20" height="14" rx="2.5"/><path d="M2 10h20"/>',
+	cash: '<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.8"/><path d="M5.5 9.5h.01M18.5 14.5h.01"/>',
+	qr: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM21 14v.01M14 21v.01M21 18v3"/>',
+	cart: '<circle cx="9" cy="20.5" r="1.4"/><circle cx="18" cy="20.5" r="1.4"/><path d="M2 3h3l2.6 12.4a2 2 0 0 0 2 1.6h8.7a2 2 0 0 0 2-1.6L22 7H6"/>',
+	tag: '<path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L2 12V2h10l8.6 8.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.3"/>',
+	trash: '<path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>',
+	refresh: '<path d="M23 4v6h-6"/><path d="M20.5 15a9 9 0 1 1-1.6-9.4L23 10"/>',
+	alert: '<circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16.5h.01"/>',
+	pin: '<path d="M21 10c0 7-9 12.5-9 12.5S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>',
+	box: '<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/>',
+	x: '<path d="M18 6 6 18M6 6l12 12"/>',
+	printer: '<path d="M6 9V3h12v6"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="7" rx="1"/>',
+	edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+	// ── v5: food icons — used as the no-photo fallback inside item cards
+	// (rich gradient tile + large SVG) and on category tiles. Never emoji.
+	pizza: '<path d="M4.5 4.8 12 20.5 19.5 4.8A9 9 0 0 0 4.5 4.8z"/><path d="M12 20.5V9.5"/><circle cx="9" cy="8" r="1.1"/><circle cx="14.8" cy="7.2" r="1.1"/><circle cx="12" cy="13" r="1.1"/>',
+	burger: '<path d="M5 10.5a7 5.5 0 0 1 14 0z"/><path d="M4 14.5h16"/><path d="M5.5 18h13a2.5 2.5 0 0 1-2.5 2.5H8A2.5 2.5 0 0 1 5.5 18z"/><path d="M9.5 7.8h.01M13.5 6.8h.01"/>',
+	noodle: '<path d="M3.5 12.5h17c0 4.4-3.8 8-8.5 8s-8.5-3.6-8.5-8z"/><path d="M7.5 12.5c.5-2.5 1.5-3.5 2-5M11.5 12.5c.3-2.5 1-3.5 1.5-5M15.5 12.5c.3-2 1-3 1.5-4"/><path d="M15 2.5 20 6M17.5 2.5 21 5"/>',
+	soup: '<path d="M4 13.5h16a8 8 0 0 1-16 0z"/><path d="M9 9.5c0-1.5 1-1.5 1-3M13 9.5c0-1.5 1-1.5 1-3"/><path d="M6 21h12"/>',
+	fries: '<path d="M7 9h10l-1.2 10.5a2 2 0 0 1-2 1.8H10.2a2 2 0 0 1-2-1.8z"/><path d="M8.5 9V5M12 9V3.5M15.5 9V5"/>',
+	sandwich: '<path d="M4 15.5 12 5.5l8 10z"/><path d="M4 15.5h16"/><path d="M6.5 19h11"/>',
+	drink: '<path d="M7.5 4.5h9l-1.4 15a2 2 0 0 1-2 1.7h-2.2a2 2 0 0 1-2-1.7z"/><path d="M13.5 4.5 16.5 2"/><path d="M9 10h6"/>',
+	dessert: '<path d="M6 21h12"/><path d="M7 21v-6a5 5 0 0 1 10 0v6"/><path d="M12 10V7"/><circle cx="12" cy="5.2" r="1.2"/>',
+	combo: '<path d="M4 17.5h16"/><path d="M5.5 17.5a6.5 6.5 0 0 1 13 0"/><path d="M12 11V9"/><circle cx="12" cy="7.2" r="1.1"/>',
+	plate: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/>',
+};
+function fpos_icon(name, cls) {
+	return `<svg class="fpos-ic ${cls || ""}" viewBox="0 0 24 24" aria-hidden="true">${FPOS_ICONS[name] || ""}</svg>`;
+}
+
 frappe.pages["food-pos"].on_page_load = function (wrapper) {
 	frappe.ui.make_app_page({
 		parent: wrapper,
@@ -38,6 +105,7 @@ foodpos.FoodPOS.Controller = class {
 		if (!this.wrapper.length) this.wrapper = this.page_wrapper;
 		this.pos_profile = null;
 		this.profile_data = null;
+		this.branch = FPOS_SINGLE_BRANCH; // v2: fixed, never switched.
 		this.pos_opening = null;
 		this.pos_opening_time = null;
 		this.pos_opening_entry = null;
@@ -49,12 +117,20 @@ foodpos.FoodPOS.Controller = class {
 		this.fast_food_category = "All";
 		this.diet_filter = "all"; // all | veg | non-veg | spicy
 		this.sort_by = "default"; // default | price-asc | price-desc | name-asc
-		this.current_view = "pos"; // "pos" | "closing" | "payment"
+		this.current_view = "home"; // v2: "home" | "pos" | "tables" | "attendance" | "report" | "closing" | "payment"
+		this.day_open = false;
+		this.day_start_time = "";
+		this.day_end_time = "";
+		this.home_timer_interval = null;
+		this.table_timer_interval = null;
+		this.attendance_rows = [];
+		this.daily_report = null;
+		this._confirming_order = false;
 		this.search_term = "";
 		this.tables = [];
 
 		// Cart state
-		this.order_type = "Dine In"; // Dine In | Takeaway | Delivery
+		this.order_type = "Dine In"; // v2: "Walk In" | "Dine In" | "Takeaway" | "Delivery"
 		this.selected_table = null;
 		this.selected_table_no = "";
 		this.customer = "";
@@ -159,7 +235,7 @@ foodpos.FoodPOS.Controller = class {
 	async check_pos_profile() {
 		this.wrapper.html(`
 			<div class="fpos-loading-screen" style="display:flex;align-items:center;justify-content:center;height:70vh;flex-direction:column;gap:12px;">
-				<div class="fpos-spinner" style="width:36px;height:36px;border:3px solid #e2e8f0;border-top-color:#f97316;border-radius:50%;animation:fpos-spin .8s linear infinite;"></div>
+				<div class="fpos-spinner" style="width:36px;height:36px;border:3px solid #e2e8f0;border-top-color:#15803d;border-radius:50%;animation:fpos-spin .8s linear infinite;"></div>
 				<span style="color:#64748b;font-size:14px;">${__("Loading Food POS environment...")}</span>
 			</div>
 		`);
@@ -174,7 +250,7 @@ foodpos.FoodPOS.Controller = class {
 			if (profiles.length === 0) {
 				this.wrapper.html(`
 					<div class="fpos-empty-profile" style="max-width:480px;margin:80px auto;text-align:center;background:#fff;padding:40px;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.08);">
-						<div style="font-size:48px;margin-bottom:12px;">⚠️</div>
+						<div style="margin-bottom:12px;color:#f59e0b;">${fpos_icon("alert", "fpos-ic-lg")}</div>
 						<h3>${__("No POS Profile Found")}</h3>
 						<p style="color:#64748b;margin:12px 0 20px;">${__("Please create or assign a POS Profile for your user in ERPNext to begin sales operations.")}</p>
 						<button class="btn btn-primary" onclick="frappe.set_route('List', 'POS Profile')">${__("Open POS Profiles")}</button>
@@ -221,161 +297,19 @@ foodpos.FoodPOS.Controller = class {
 				}
 			}
 
-			// 4. On every fresh load (or when no active shift is in session), show the branch selector
-			this.render_profile_selection_dialog(profiles, false);
+			// 4. v2 single branch: no branch/register selector dialog any
+			// more. Auto-select the (single) profile — prefer one with an
+			// open shift — and land on the Home / Day screen.
+			const auto_profile = profiles.find((p) => p.has_open_shift) || profiles[0];
+			await this.select_pos_profile(auto_profile.name);
 		} catch (err) {
 			console.error(err);
 			frappe.show_alert({ message: __("Failed to initialize POS profile"), indicator: "red" });
 		}
 	}
 
-	render_profile_selection_dialog(profiles, can_close = false) {
-		// Ensure only one instance of the register dialog ever exists
-		if (this.branch_select_dialog) {
-			try {
-				this.branch_select_dialog.hide();
-				this.branch_select_dialog.$wrapper.remove();
-				this.branch_select_dialog.destroy();
-			} catch (e) {}
-			this.branch_select_dialog = null;
-		}
-		$(".modal:contains('Select POS Register & Branch')").closest(".modal").remove();
-		$(".modal-backdrop").remove();
-		$("body").removeClass("modal-open");
-
-		const options = (profiles || []).map((p) => ({
-			label: p.custom_branch
-				? `📍 ${p.custom_branch} — ${p.name}${p.has_open_shift ? ` (${__("🟢 Shift Active")})` : ` (${__("⚪ Closed")})`}`
-				: `${p.name}${p.has_open_shift ? ` (${__("🟢 Shift Active")})` : ` (${__("⚪ Closed")})`}`,
-			value: p.name,
-		}));
-		const last_profile = sessionStorage.getItem("fpos_active_profile") || localStorage.getItem("fpos_last_profile");
-		const active_profile = (last_profile && profiles.some((p) => p.name === last_profile && p.has_open_shift))
-			? last_profile
-			: (profiles.find((p) => p.has_open_shift) ? profiles.find((p) => p.has_open_shift).name : (options[0] ? options[0].value : ""));
-		let selected_profile = active_profile;
-
-		// Build interactive branch cards for effortless mouse clicking
-		const cards_html = `
-			<div class="fpos-branch-cards-grid" style="display:flex;flex-direction:column;gap:8px;margin-top:8px;">
-				${(profiles || []).map((p) => {
-					const is_sel = p.name === selected_profile;
-					const b_name = p.custom_branch || p.name;
-					const badge = p.has_open_shift
-						? `<span style="background:#ecfdf5;color:#059669;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;">🟢 Active Shift</span>`
-						: `<span style="background:#f1f5f9;color:#64748b;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;">⚪ Closed</span>`;
-					return `
-						<div class="fpos-branch-card-row ${is_sel ? "selected" : ""}" data-profile="${p.name}" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border:2px solid ${is_sel ? "#ea580c" : "#e2e8f0"};border-radius:10px;cursor:pointer;background:${is_sel ? "#fff7ed" : "#ffffff"};transition:all .15s ease;">
-							<div style="display:flex;align-items:center;gap:10px;">
-								<span style="font-size:20px;">📍</span>
-								<div>
-									<div style="font-weight:700;font-size:13.5px;color:#1e293b;">${b_name}</div>
-									<div style="font-size:11.5px;color:#64748b;">${p.name}</div>
-								</div>
-							</div>
-							<div>${badge}</div>
-						</div>
-					`;
-				}).join("")}
-			</div>
-		`;
-
-		const me = this;
-		const d = new frappe.ui.Dialog({
-			title: __("Select POS Register & Branch"),
-			fields: [
-				{
-					fieldname: "pos_profile",
-					fieldtype: "Select",
-					label: __("Select Branch POS Profile"),
-					options: options,
-					default: selected_profile,
-					description: __("Select your branch and register profile to begin"),
-				},
-				{
-					fieldname: "branch_cards_html",
-					fieldtype: "HTML",
-					options: cards_html,
-				},
-			],
-			primary_action_label: __("Select Branch / Open Register"),
-			primary_action: async (values) => {
-				const prof = (values && values.pos_profile) || selected_profile || d.get_value("pos_profile");
-				if (!prof) {
-					frappe.msgprint(__("Please select a POS Profile."));
-					return;
-				}
-				d.hide();
-				await this.select_pos_profile(prof);
-			},
-		});
-
-		this.style_dialog(d);
-		this.branch_select_dialog = d;
-
-		// Attach mouse handlers to branch cards
-		d.$wrapper.on("click", ".fpos-branch-card-row", function () {
-			const prof = $(this).data("profile");
-			selected_profile = prof;
-			d.set_value("pos_profile", prof);
-			try {
-				d.get_field("pos_profile").$input.val(prof);
-			} catch (e) {}
-			d.$wrapper.find(".fpos-branch-card-row").each(function () {
-				const cur_prof = $(this).data("profile");
-				const match = cur_prof === prof;
-				$(this).toggleClass("selected", match);
-				$(this).css({
-					"border-color": match ? "#ea580c" : "#e2e8f0",
-					"background-color": match ? "#fff7ed" : "#ffffff",
-				});
-			});
-		});
-
-		// Double click triggers selection immediately
-		d.$wrapper.on("dblclick", ".fpos-branch-card-row", function () {
-			const prof = $(this).data("profile");
-			selected_profile = prof;
-			d.hide();
-			me.select_pos_profile(prof);
-		});
-
-		// Sync select field changes back to card highlights (supports change, input, click, mousedown, and option selection)
-		const apply_profile_selection = (prof) => {
-			if (!prof) return;
-			selected_profile = prof;
-			d.set_value("pos_profile", prof);
-			try {
-				d.get_field("pos_profile").$input.val(prof);
-			} catch (e) {}
-			d.$wrapper.find(".fpos-branch-card-row").each(function () {
-				const cur_prof = $(this).data("profile");
-				const match = cur_prof === prof;
-				$(this).toggleClass("selected", match);
-				$(this).css({
-					"border-color": match ? "#ea580c" : "#e2e8f0",
-					"background-color": match ? "#fff7ed" : "#ffffff",
-				});
-			});
-		};
-
-		d.$wrapper.on("change input click", "select[data-fieldname='pos_profile']", function () {
-			apply_profile_selection($(this).val());
-		});
-
-		d.$wrapper.on("click mousedown", "select[data-fieldname='pos_profile'] option", function () {
-			const prof = $(this).val() || $(this).attr("value");
-			apply_profile_selection(prof);
-		});
-
-		if (!can_close) {
-			d.get_close_btn().hide();
-		} else {
-			d.get_close_btn().show();
-		}
-		d.show();
-	}
-
+	// v2: render_profile_selection_dialog was deleted — single branch,
+	// the profile is auto-selected in check_pos_profile().
 	async select_pos_profile(profile_name) {
 		if (!profile_name) return;
 
@@ -411,7 +345,7 @@ foodpos.FoodPOS.Controller = class {
 			});
 			this.profile_data = res.message || {};
 			this.customer = this.profile_data.customer || "";
-			this.branch = this.profile_data.custom_branch || this.profile_data.branch || "";
+			this.branch = FPOS_SINGLE_BRANCH; // v2: fixed.
 
 			// Cache profile config locally
 			localStorage.setItem(`fpos_profile_${this.pos_profile}`, JSON.stringify(this.profile_data));
@@ -420,9 +354,15 @@ foodpos.FoodPOS.Controller = class {
 			clearTimeout(safety_timer);
 			this._force_unfreeze();
 
-			// Standard v16 POS Shift Check / Creation Workflow
+			// Standard v16 POS Shift Check / Creation Workflow.
+			// v2: a closed day still renders the app — Home shows Day Closed
+			// and the Open Day button starts the shift from there.
 			const shift_active = await this.init_pos_shift();
 			if (!shift_active) {
+				this.render_layout();
+				await this.load_data();
+				await this.init_tabs();
+				this.show_home();
 				return;
 			}
 
@@ -442,6 +382,7 @@ foodpos.FoodPOS.Controller = class {
 			}
 
 			await this.load_data();
+			this.show_home(); // v2: Home / Day screen is the first screen.
 			await this.init_tabs();
 			this.setup_realtime_table_listener();
 			this.sync_offline_invoices();
@@ -455,13 +396,13 @@ foodpos.FoodPOS.Controller = class {
 				freeze: false,
 			});
 		} catch (err) {
-			console.error("Error switching branch profile:", err);
+			console.error("Error loading POS profile:", err);
 			// Offline fallback
 			const cached = localStorage.getItem(`fpos_profile_${this.pos_profile}`);
 			if (cached) {
 				this.profile_data = JSON.parse(cached);
 				this.customer = this.profile_data.customer || "";
-				this.branch = this.profile_data.custom_branch || this.profile_data.branch || "";
+				this.branch = FPOS_SINGLE_BRANCH;
 				this.render_layout();
 				this.load_data_offline();
 			} else {
@@ -500,8 +441,8 @@ foodpos.FoodPOS.Controller = class {
 				this.setup_listener_for_pos_closing();
 				return true;
 			} else {
-				// No active shift: show standard Create POS Opening Entry dialog
-				this.show_opening_shift_dialog();
+				// v2: no active shift — do NOT pop the opening dialog here.
+				// The Home screen shows "Day Closed" with an Open Day button.
 				return false;
 			}
 		} catch (err) {
@@ -517,10 +458,10 @@ foodpos.FoodPOS.Controller = class {
 		// Show informative placeholder in main view while shift opening dialog is open
 		this.wrapper.html(`
 			<div class="fpos-shift-pending" style="display:flex;align-items:center;justify-content:center;height:65vh;flex-direction:column;gap:14px;color:#475569;">
-				<div style="font-size:42px;">📋</div>
+				<div style="color:#94a3b8;">${fpos_icon("receipt", "fpos-ic-lg")}</div>
 				<div style="font-size:16px;font-weight:700;color:#1e293b;">${__("Register Shift Not Open")}</div>
 				<p style="font-size:13px;color:#64748b;max-width:380px;text-align:center;margin:0;">${__("Please enter opening float cash in the dialog to start sales operations for {0}.", [this.branch || this.pos_profile])}</p>
-				<button class="btn btn-primary btn-sm fpos-reopen-shift-dialog-btn" style="margin-top:6px;font-weight:600;">🔄 ${__("Open Shift Dialog")}</button>
+				<button class="btn btn-primary btn-sm fpos-reopen-shift-dialog-btn" style="margin-top:6px;font-weight:600;">${fpos_icon("refresh", "fpos-ic-sm")} ${__("Open Shift Dialog")}</button>
 			</div>
 		`);
 		this.wrapper.find(".fpos-reopen-shift-dialog-btn").on("click", () => {
@@ -559,9 +500,9 @@ foodpos.FoodPOS.Controller = class {
 		];
 
 		const profile_options = (this.available_profiles || []).map((p) => ({
-			label: p.custom_branch ? `📍 ${p.custom_branch} — ${p.name}` : p.name,
+			label: p.name,
 			value: p.name,
-		}));
+		})); // v2: profile names only — no branch labels.
 
 		const dialog = new frappe.ui.Dialog({
 			title: __("Create POS Opening Entry"),
@@ -601,11 +542,10 @@ foodpos.FoodPOS.Controller = class {
 				},
 			],
 			primary_action_label: __("Open Shift"),
-			secondary_action_label: __("Switch Branch / Cancel"),
+			secondary_action_label: __("Cancel"),
 			secondary_action: () => {
 				dialog.hide();
-				sessionStorage.removeItem("fpos_active_profile");
-				me.render_profile_selection_dialog(me.available_profiles, false);
+				me.show_home(); // v2: back to Home, no branch selector.
 			},
 			primary_action: async function ({ company, pos_profile, balance_details }) {
 				if (!balance_details || !balance_details.length) {
@@ -637,6 +577,7 @@ foodpos.FoodPOS.Controller = class {
 						});
 						me.setup_listener_for_pos_closing();
 						dialog.hide();
+						me.day_open = true;
 
 						// Proceed with rendering app
 						const restored_early = me.restore_cart_backup();
@@ -652,6 +593,7 @@ foodpos.FoodPOS.Controller = class {
 						me.setup_realtime_table_listener();
 						me.sync_offline_invoices();
 						me.start_kitchen_polling();
+						me.show_home(); // v2: back to Home after Day Open.
 					}
 				} catch (e) {
 					frappe.dom.unfreeze();
@@ -666,8 +608,7 @@ foodpos.FoodPOS.Controller = class {
 
 		dialog.get_close_btn().show().on("click", () => {
 			dialog.hide();
-			sessionStorage.removeItem("fpos_active_profile");
-			me.render_profile_selection_dialog(me.available_profiles, false);
+			me.show_home(); // v2: back to Home, no branch selector.
 		});
 
 		this.style_dialog(dialog);
@@ -708,48 +649,49 @@ foodpos.FoodPOS.Controller = class {
 		const text = `${name} ${group} ${desc}`;
 
 		let category = "Other Fast Food";
-		let icon = "🍴";
+		// v5: `icon` is an FPOS_ICONS key (SVG food icon), never an emoji.
+		let icon = "plate";
 		let badge_color = "#475569";
 		let badge_bg = "#f1f5f9";
 
 		if (/burger|cheeseburger|whopper|patty|zinger|beef burger|chicken burger|smashburger|slider|bun/.test(text)) {
 			category = "Burgers";
-			icon = "🍔";
-			badge_color = "#c2410c";
-			badge_bg = "#ffedd5";
+			icon = "burger";
+			badge_color = "#166534";
+			badge_bg = "#dcfce7";
 		} else if (/pizza|slice|calzone|pepperoni|margherita|crust|mozzarella pizza/.test(text)) {
 			category = "Pizzas";
-			icon = "🍕";
+			icon = "pizza";
 			badge_color = "#b91c1c";
 			badge_bg = "#fee2e2";
 		} else if (/sandwich|wrap|roll|sub|panini|club sandwich|shawarma|taco|burrito|quesadilla|gyro|frankie/.test(text)) {
 			category = "Sandwiches & Wraps";
-			icon = "🥪";
+			icon = "sandwich";
 			badge_color = "#047857";
 			badge_bg = "#d1fae5";
 		} else if (/fries|french fry|wedges|onion ring|nugget|tenders|wings|popcorn chicken|garlic bread|dip|sauce|strips|side|appetizer/.test(text)) {
 			category = "Sides & Fries";
-			icon = "🍟";
+			icon = "fries";
 			badge_color = "#b45309";
 			badge_bg = "#fef3c7";
 		} else if (/drink|beverage|shake|smoothie|soda|cola|pepsi|coke|sprite|fanta|coffee|tea|latte|juice|water|mojito|lemonade|espresso|cappuccino/.test(text)) {
 			category = "Drinks & Shakes";
-			icon = "🥤";
+			icon = "drink";
 			badge_color = "#0369a1";
 			badge_bg = "#e0f2fe";
 		} else if (/combo|deal|meal|box|family pack|feast|platter|bucket|duo|trio/.test(text)) {
 			category = "Combos & Deals";
-			icon = "🍱";
+			icon = "combo";
 			badge_color = "#7c3aed";
 			badge_bg = "#ede9fe";
 		} else if (/dessert|cake|pie|ice cream|brownie|cookie|sundae|donut|pastry|churro|waffle|pancake|muffin/.test(text)) {
 			category = "Desserts";
-			icon = "🍰";
+			icon = "dessert";
 			badge_color = "#be185d";
 			badge_bg = "#fce7f3";
 		} else if (item.item_group && item.item_group !== "All Item Groups" && item.item_group !== "Products") {
 			category = item.item_group;
-			icon = "🍴";
+			icon = "plate";
 			badge_color = "#475569";
 			badge_bg = "#f1f5f9";
 		}
@@ -771,7 +713,7 @@ foodpos.FoodPOS.Controller = class {
 		if (!this.pos_profile) return;
 
 		try {
-			const branch = this.branch || (this.profile_data && this.profile_data.custom_branch) || "";
+			// v2: no branch — tables are fetched for the single branch.
 			const [items_res, tables_res] = await Promise.all([
 				frappe.call({
 					method: "foodpos.foodpos.page.food_pos.food_pos.get_items",
@@ -779,7 +721,7 @@ foodpos.FoodPOS.Controller = class {
 				}),
 				frappe.call({
 					method: "foodpos.foodpos.page.food_pos.food_pos.get_available_tables",
-					args: { pos_profile: this.pos_profile, branch: branch },
+					args: { pos_profile: this.pos_profile },
 				}),
 			]);
 
@@ -860,202 +802,164 @@ foodpos.FoodPOS.Controller = class {
 	// ─── 3. HTML Layout Generation ───────────────────────────────────────────
 
 	render_layout() {
-		const branch_name = this.branch || (this.profile_data && this.profile_data.custom_branch) || "Main Branch";
-		const shift_label = this.pos_opening || __("Shift Open");
 
 		this.wrapper.html(`
 			<div class="fpos-wrapper">
 				<!-- Zone 1: Slim Header Bar (Max 6 Elements) -->
-				<header class="fpos-topbar">
+								<header class="fpos-topbar">
+					<!-- v4 CHILI: hamburger + brand left, ONE wide search centre, icon actions right.
+					     No branch chip, no order-type tabs here (type lives in the right order panel). -->
 					<div class="fpos-header-left">
-						<!-- Element 1: Food POS Brand once -->
+						<button class="fpos-topbar-menu-btn" title="${__("Toggle sidebar")}">${fpos_icon("menu")}</button>
 						<div class="fpos-brand">
-							<span class="fpos-brand-icon">🍔</span>
+							<span class="fpos-brand-icon">${fpos_icon("chef")}</span>
 							<span class="fpos-brand-name">Food POS</span>
 						</div>
-
-						<!-- Element 2: Combined branch/register chip once -->
-						<button class="fpos-combined-chip fpos-switch-profile-btn" title="${__("Click to switch branch or register")}">
-							<span class="fpos-chip-branch">📍 ${branch_name}</span>
-							<span class="fpos-chip-sep">•</span>
-							<span class="fpos-chip-shift">${shift_label}</span>
-							<span class="fpos-chip-sep">•</span>
-							<span class="fpos-chip-status">${__("Open")}</span>
-						</button>
 					</div>
 
 					<div class="fpos-header-center">
-						<!-- Element 3: 3-Segmented order-type control -->
-						<div class="fpos-segmented-control">
-							<button class="fpos-ot-tab ${this.order_type === "Dine In" ? "active" : ""}" data-type="Dine In">${__("Dine-In")}</button>
-							<button class="fpos-ot-tab ${this.order_type === "Takeaway" ? "active" : ""}" data-type="Takeaway">${__("Takeaway")}</button>
-							<button class="fpos-ot-tab ${this.order_type === "Delivery" ? "active" : ""}" data-type="Delivery">${__("Delivery")}</button>
+						<div class="fpos-topbar-search">
+							<span class="fpos-search-icon">${fpos_icon("search", "fpos-ic-sm")}</span>
+							<input class="fpos-search-input form-control" type="text" placeholder="${__("Search Product here...")}" />
+						<!-- v5.3: Filters live in the TOP BAR, same single row as the
+						     search bar (user asked: "search bar ka samna 1 hi row ma").
+						     v5.1 had wrongly moved it below the search bar — undone. -->
+						<div class="fpos-filters-dropdown-wrapper">
+							<button class="fpos-filters-dropdown-btn" title="${__("Categories, dietary filters & sort")}">
+								${fpos_icon("filter", "fpos-ic-sm")}<span>${__("Filters")}</span>
+								<span class="fpos-filter-active-badge" style="display:none;"></span>
+								<span class="fpos-caret">▾</span>
+							</button>
+							<div class="fpos-filters-popover" style="display:none;">
+								<div class="fpos-popover-header">
+									<span class="fpos-popover-title">${__("Filters")}</span>
+									<div class="fpos-popover-header-actions">
+										<button class="fpos-reset-filters-btn fpos-link-btn" title="${__("Reset all filters")}">
+											${__("Reset all")}
+										</button>
+										<button class="fpos-close-popover-btn fpos-icon-close-btn" title="${__("Close")}">✕</button>
+									</div>
+								</div>
+
+								<div class="fpos-popover-section" style="margin-top:14px;">
+									<div class="fpos-filter-section-title">${__("Dietary Preference")}</div>
+									<div class="fpos-diet-toggles">
+										<button class="fpos-subfilter-pill ${this.diet_filter === "all" ? "active" : ""}" data-diet="all">
+											<span>${__("All")}</span>
+										</button>
+										<button class="fpos-subfilter-pill ${this.diet_filter === "veg" ? "active" : ""}" data-diet="veg">
+											<span><i style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#16a34a;margin-right:5px;"></i>${__("Veg")}</span>
+										</button>
+										<button class="fpos-subfilter-pill ${this.diet_filter === "non-veg" ? "active" : ""}" data-diet="non-veg">
+											<span><i style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#dc2626;margin-right:5px;"></i>${__("Non-Veg")}</span>
+										</button>
+										<button class="fpos-subfilter-pill ${this.diet_filter === "spicy" ? "active" : ""}" data-diet="spicy">
+											<span><i style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#d97706;margin-right:5px;"></i>${__("Spicy")}</span>
+										</button>
+									</div>
+								</div>
+
+								<div class="fpos-popover-section" style="margin-top:14px;">
+									<div class="fpos-filter-section-title">${__("Sort By")}</div>
+									<div class="fpos-sort-box">
+										<select class="fpos-sort-select form-control">
+											<option value="default" ${this.sort_by === "default" ? "selected" : ""}>${__("Featured (Default)")}</option>
+											<option value="price-asc" ${this.sort_by === "price-asc" ? "selected" : ""}>${__("Price: Low to High")}</option>
+											<option value="price-desc" ${this.sort_by === "price-desc" ? "selected" : ""}>${__("Price: High to Low")}</option>
+											<option value="name-asc" ${this.sort_by === "name-asc" ? "selected" : ""}>${__("Name: A-Z")}</option>
+										</select>
+									</div>
+								</div>
+							</div>
+						</div>
 						</div>
 					</div>
 
 					<div class="fpos-header-right">
-						<!-- Element 4: Held Orders button with count badge -->
-						<button class="fpos-held-orders-btn" title="${__("Held Orders")}">
-							<span>⏸️ ${__("Held")}</span>
+						<button class="fpos-topbar-order-chip" title="${__("Current order — change table / customer")}">
+							${fpos_icon("table", "fpos-ic-sm")} <span class="fpos-topbar-order-label">${this.selected_table_no ? __("Table") + " " + this.selected_table_no : (this.customer || __("Walk-in"))}</span> ${fpos_icon("edit", "fpos-ic-sm")}
+						</button>
+						<button class="fpos-topbar-icon-btn fpos-home-btn" title="${__("Home — Day Open / Close")}">
+							${fpos_icon("home")}
+						</button>
+						<button class="fpos-topbar-icon-btn fpos-held-orders-btn" title="${__("Held Orders")}">
+							${fpos_icon("pause")}
 							<span class="fpos-held-badge" style="display:none;">0</span>
 						</button>
-
-						<!-- Element 5: Small Online/Offline status dot (non-clickable indicator) -->
 						<div class="fpos-status-dot" title="${__("Online — Connected")}">
 							<span class="fpos-dot"></span>
 						</div>
-
-						<!-- Element 6: Single More overflow menu -->
 						<div class="fpos-more-dropdown-wrapper">
-							<button class="fpos-more-btn" id="fpos-more-menu-btn" title="${__("More Actions")}">
+							<button class="fpos-more-btn fpos-topbar-icon-btn" id="fpos-more-menu-btn" title="${__("More Actions")}">
 								<span>⋮</span>
-								<span>${__("More")}</span>
 							</button>
-							<div class="fpos-more-menu" style="display:none;">
-								<button class="fpos-menu-item fpos-new-tab-btn" style="font-weight:700;color:#ea580c;">
-									<span class="fpos-menu-icon">➕</span>
-									<span>${__("New Order Tab")}</span>
-								</button>
-								<button class="fpos-menu-item fpos-kitchen-track-btn">
-									<span class="fpos-menu-icon">🧑‍🍳</span>
-									<span>${__("Kitchen")}</span>
-									<span class="fpos-kot-badge" style="display:none;background:#ea580c;color:#fff;font-size:10px;padding:2px 7px;border-radius:10px;font-weight:700;margin-left:auto;">0</span>
-								</button>
-								<button class="fpos-menu-item fpos-recent-orders-btn">
-									<span class="fpos-menu-icon">🧾</span>
-									<span>${__("Recent Orders")}</span>
-								</button>
-								<button class="fpos-menu-item fpos-exceptions-btn" style="color:#b91c1c;">
-									<span class="fpos-menu-icon">🚨</span>
-									<span>${__("Served Exceptions")}</span>
-									<span class="fpos-exceptions-badge" style="display:none;background:#dc2626;color:#fff;font-size:10px;padding:2px 7px;border-radius:10px;font-weight:700;margin-left:auto;">0</span>
-								</button>
-								<button class="fpos-menu-item fpos-refresh-btn">
-									<span class="fpos-menu-icon">🔄</span>
-									<span>${__("Refresh")}</span>
-								</button>
-								<button class="fpos-menu-item fpos-switch-branch-btn">
-									<span class="fpos-menu-icon">📍</span>
-									<span>${__("Switch Branch")}</span>
-								</button>
-								<button class="fpos-menu-item fpos-exit-desk-btn">
-									<span class="fpos-menu-icon">🏠</span>
-									<span>${__("Exit to Desk")}</span>
-								</button>
-								<div class="fpos-menu-divider"></div>
-								<button class="fpos-menu-item fpos-menu-danger fpos-close-btn-menu">
-									<span class="fpos-menu-icon">📊</span>
-									<span>${__("Close Register")}</span>
-								</button>
-							</div>
-						</div>
-					</div>
 				</header>
 
-				<!-- Zone 2: Orders Strip (Single tab pill when 1 order active) -->
-				<div class="fpos-page-tabs-bar">
-					<div class="fpos-tabs-list"></div>
-				</div>
+				<!-- v4 CHILI: no top order strip — open orders live in the bottom table-chips bar. -->
+				<!-- v2: Home / Tables / Attendance / Daily Report views. Only one
+				     view is visible at a time; show_home/show_pos/... toggle them. -->
+				<div class="fpos-home-view"></div>
+				<div class="fpos-tables-view" style="display:none;"></div>
+				<div class="fpos-attendance-view" style="display:none;"></div>
+				<div class="fpos-daily-report-view" style="display:none;"></div>
 
 				<!-- Main Layout: Left Menu Area (Zone 3) + Right Cart (Zone 4) -->
 				<div class="fpos-body">
+					<!-- v3: left icon sidebar (image 4 concept) — every item goes somewhere real -->
+					<nav class="fpos-pos-sidebar" aria-label="${__("POS sections")}">
+						<button class="fpos-pos-nav-item active" data-nav="menu" title="${__("Menu")}">${fpos_icon("grid")}<span class="fpos-pos-nav-label">${__("Menu")}</span></button>
+						<button class="fpos-pos-nav-item" data-nav="tables" title="${__("Table Services")}">${fpos_icon("table")}<span class="fpos-pos-nav-label">${__("Tables")}</span></button>
+						<button class="fpos-pos-nav-item" data-nav="reservation" title="${__("Reservation")}">${fpos_icon("calendar")}<span class="fpos-pos-nav-label">${__("Reserve")}</span></button>
+						<button class="fpos-pos-nav-item" data-nav="delivery" title="${__("Delivery")}">${fpos_icon("truck")}<span class="fpos-pos-nav-label">${__("Delivery")}</span></button>
+						<button class="fpos-pos-nav-item" data-nav="accounting" title="${__("Accounting")}">${fpos_icon("chart")}<span class="fpos-pos-nav-label">${__("Accounts")}</span></button>
+						<button class="fpos-pos-nav-item" data-nav="settings" title="${__("Settings")}">${fpos_icon("settings")}<span class="fpos-pos-nav-label">${__("Settings")}</span></button>
+						<span class="fpos-pos-nav-spacer"></span>
+						<button class="fpos-pos-nav-item fpos-pos-logout" data-nav="logout" title="${__("Logout")}">${fpos_icon("logout")}<span class="fpos-pos-nav-label">${__("Logout")}</span></button>
+					</nav>
 					<!-- Zone 3: Menu Area (Filter Bar + Items Grid) -->
 					<div class="fpos-left-panel">
-						<!-- Consolidated filter row (Search input + Filters button) -->
-						<div class="fpos-filter-bar">
-							<div class="fpos-search-box">
-								<span class="fpos-search-icon">🔍</span>
-								<input class="fpos-search-input form-control" type="text" placeholder="${__("Search menu items...")}" />
-							</div>
-
-							<div class="fpos-filters-dropdown-wrapper">
-								<button class="fpos-filters-dropdown-btn" title="${__("Categories, dietary filters & sort")}">
-									<span>⚡ ${__("Filters")}</span>
-									<span class="fpos-filter-active-badge" style="display:none;"></span>
-									<span class="fpos-caret">▾</span>
-								</button>
-								<div class="fpos-filters-popover" style="display:none;">
-									<div class="fpos-popover-header">
-										<span class="fpos-popover-title">${__("Categories & Filters")}</span>
-										<div class="fpos-popover-header-actions">
-											<button class="fpos-reset-filters-btn fpos-link-btn" title="${__("Reset all filters")}">
-												${__("Reset all")}
-											</button>
-											<button class="fpos-close-popover-btn fpos-icon-close-btn" title="${__("Close")}">✕</button>
-										</div>
-									</div>
-
-									<div class="fpos-popover-section">
-										<div class="fpos-filter-section-title">${__("Category")}</div>
-										<div class="fpos-categories fpos-popover-categories"></div>
-									</div>
-
-									<div class="fpos-popover-section" style="margin-top:14px;">
-										<div class="fpos-filter-section-title">${__("Dietary Preference")}</div>
-										<div class="fpos-diet-toggles">
-											<button class="fpos-subfilter-pill ${this.diet_filter === "all" ? "active" : ""}" data-diet="all">
-												<span>${__("All")}</span>
-											</button>
-											<button class="fpos-subfilter-pill ${this.diet_filter === "veg" ? "active" : ""}" data-diet="veg">
-												<span>🌱 ${__("Veg")}</span>
-											</button>
-											<button class="fpos-subfilter-pill ${this.diet_filter === "non-veg" ? "active" : ""}" data-diet="non-veg">
-												<span>🍗 ${__("Non-Veg")}</span>
-											</button>
-											<button class="fpos-subfilter-pill ${this.diet_filter === "spicy" ? "active" : ""}" data-diet="spicy">
-												<span>🌶️ ${__("Spicy")}</span>
-											</button>
-										</div>
-									</div>
-
-									<div class="fpos-popover-section" style="margin-top:14px;">
-										<div class="fpos-filter-section-title">${__("Sort By")}</div>
-										<div class="fpos-sort-box">
-											<select class="fpos-sort-select form-control">
-												<option value="default" ${this.sort_by === "default" ? "selected" : ""}>⚡ ${__("Featured (Default)")}</option>
-												<option value="price-asc" ${this.sort_by === "price-asc" ? "selected" : ""}>💲 ${__("Price: Low to High")}</option>
-												<option value="price-desc" ${this.sort_by === "price-desc" ? "selected" : ""}>💲 ${__("Price: High to Low")}</option>
-												<option value="name-asc" ${this.sort_by === "name-asc" ? "selected" : ""}>🔤 ${__("Name: A-Z")}</option>
-											</select>
-										</div>
-									</div>
-								</div>
-							</div>
+						<div class="fpos-menu-main">
+						<!-- v4 CHILI: ONE category row — tiles only. No sidebar,
+						     no second search. Filters live in the top bar, same row as search. -->
+						<div class="fpos-cat-row">
+							<div class="fpos-cat-tiles fpos-categories"></div>
 						</div>
 
 						<div class="fpos-items-grid-wrapper">
 							<div class="fpos-items-grid"></div>
 						</div>
+						</div><!-- /fpos-menu-main -->
 					</div>
 
 					<!-- Zone 4: Fixed Sticky Cart Panel -->
 					<div class="fpos-right-panel">
-						<!-- Cart Header Strip: Customer, Table & Delivery selector + '⋮' Overflow -->
+												<!-- v4 CHILI right panel header: order title + order-type tabs. -->
 						<div class="fpos-cart-header-strip">
-							<div class="fpos-cart-meta">
-								<div class="fpos-meta-field fpos-customer-field">
-									<span>👤</span>
-									<span class="fpos-customer-label">${this.customer || __("Walk-in Customer")}</span>
+							<div class="fpos-order-head">
+								<div class="fpos-order-title-row">
+									<div class="fpos-order-titles">
+										<div class="fpos-order-title"><span class="fpos-table-label">${this.selected_table_no ? __("Table") + " " + this.selected_table_no : ""}</span><span class="fpos-customer-label">${this.customer || __("Walk-in Customer")}</span></div>
+										<div class="fpos-order-sub"></div>
+									</div>
+									<button class="fpos-order-edit-btn" title="${__("Change table / customer")}">${fpos_icon("edit", "fpos-ic-sm")}</button>
+									<!-- Overflow ⋮ menu: Discount & Clear (Confirm lives in the sticky actions below) -->
+									<div class="fpos-cart-overflow-wrapper">
+										<button class="fpos-cart-overflow-btn" title="${__("More cart actions")}">⋮</button>
+										<div class="fpos-cart-overflow-menu" style="display:none;">
+											<button class="fpos-cart-overflow-item fpos-discount-btn">${fpos_icon("tag", "fpos-ic-sm")} ${__("Discount & Presets")}</button>
+											<button class="fpos-cart-overflow-item fpos-danger-text fpos-clear-btn">${fpos_icon("trash", "fpos-ic-sm")} ${__("Clear Order")}</button>
+										</div>
+									</div>
 								</div>
-
-								<div class="fpos-meta-field fpos-table-field ${this.order_type === "Dine In" ? "" : "fpos-hidden"}" style="display:${this.order_type === "Dine In" ? "flex" : "none"};">
-									<span>🪑</span>
-									<span class="fpos-table-label">${this.selected_table_no ? __("Table") + " " + this.selected_table_no : __("Select Table")}</span>
+								<div class="fpos-order-type-tabs">
+									<button class="fpos-ot-tab ${this.order_type === "Walk In" ? "active" : ""}" data-type="Walk In">${__("Walk In")}</button>
+									<button class="fpos-ot-tab ${this.order_type === "Dine In" ? "active" : ""}" data-type="Dine In">${__("Dine In")}</button>
+									<button class="fpos-ot-tab ${this.order_type === "Takeaway" ? "active" : ""}" data-type="Takeaway">${__("Takeaway")}</button>
+									<button class="fpos-ot-tab ${this.order_type === "Delivery" ? "active" : ""}" data-type="Delivery">${__("Delivery")}</button>
 								</div>
-
-								<div class="fpos-meta-field fpos-delivery-field ${this.order_type === "Delivery" ? "" : "fpos-hidden"}" style="display:${this.order_type === "Delivery" ? "flex" : "none"};">
-									<span>🛵</span>
+								<div class="fpos-meta-field fpos-delivery-field" style="display:${this.order_type === "Delivery" ? "flex" : "none"};">
+									<span>${fpos_icon("truck", "fpos-ic-sm")}</span>
 									<span class="fpos-delivery-label">${this.delivery_phone ? `${this.delivery_phone}` : __("Delivery Details *")}</span>
-								</div>
-							</div>
-
-							<!-- Overflow ⋮ menu: KOT, Discount & Clear -->
-							<div class="fpos-cart-overflow-wrapper">
-								<button class="fpos-cart-overflow-btn" title="${__("More cart actions")}">⋮</button>
-								<div class="fpos-cart-overflow-menu" style="display:none;">
-									<button class="fpos-cart-overflow-item fpos-kot-btn">🧑‍🍳 ${__("Send to Kitchen (KOT)")}</button>
-									<button class="fpos-cart-overflow-item fpos-discount-btn">🏷️ ${__("Discount & Presets")}</button>
-									<button class="fpos-cart-overflow-item fpos-danger-text fpos-clear-btn">🗑️ ${__("Clear Order")}</button>
 								</div>
 							</div>
 						</div>
@@ -1064,7 +968,7 @@ foodpos.FoodPOS.Controller = class {
 						<div class="fpos-cart-items-wrapper">
 							<div class="fpos-cart-items"></div>
 							<div class="fpos-cart-empty">
-								<div style="font-size:36px;margin-bottom:8px;">🛒</div>
+								<div style="margin-bottom:8px;color:#94a3b8;">${fpos_icon("cart")}</div>
 								<p style="font-weight:600;font-size:14px;color:#64748b;margin:0 0 4px;">${__("Current order is empty")}</p>
 								<small style="color:#94a3b8;">${__("Tap items on the left to add them")}</small>
 							</div>
@@ -1078,38 +982,52 @@ foodpos.FoodPOS.Controller = class {
 							</div>
 							<div class="fpos-discount-row" style="display:none;justify-content:space-between;margin-bottom:5px;font-size:13px;color:#dc2626;">
 								<span>${__("Discount")}</span>
-								<span class="fpos-discount-val">-Rs 0.00</span>
+								<span class="fpos-discount-val fpos-discount-badge">-Rs 0.00</span>
 							</div>
 							<div class="fpos-delivery-row" style="display:none;justify-content:space-between;margin-bottom:5px;font-size:13px;color:#0284c7;">
 								<span>${__("Delivery Fee")}</span>
 								<span class="fpos-delivery-val">Rs 0.00</span>
 							</div>
-							<div class="fpos-tax-row" style="display:flex;justify-content:space-between;margin-bottom:5px;font-size:13px;color:#475569;">
-								<span>${__("Tax")} (<span class="fpos-tax-rate">${this.profile_data.tax_rate || 0}%</span>)</span>
-								<span class="fpos-tax-val">Rs 0.00</span>
-							</div>
+							<!-- v5.2: NO TAX row — totals are Subtotal − Discount (Rs) + Delivery Fee only. -->
 							<div class="fpos-total-due-row">
 								<span>${__("Total Due")}</span>
 								<span class="fpos-grand-total-val">Rs 0.00</span>
 							</div>
 						</div>
 
-						<!-- Sticky Bottom Action Rows (Exactly 2 Buttons: Pay & Settle, Hold) -->
+						<!-- v3: payment method pick (Cash / Card / QR) — sets the payment page default. -->
+						<div class="fpos-pay-methods" role="group" aria-label="${__("Payment method")}">
+							<button class="fpos-pay-method active" data-mode="Cash">${fpos_icon("cash")} <span>${__("Cash")}</span></button>
+							<button class="fpos-pay-method" data-mode="Card">${fpos_icon("card")} <span>${__("Card")}</span></button>
+							<button class="fpos-pay-method" data-mode="QR">${fpos_icon("qr")} <span>${__("QR")}</span></button>
+						</div>
+						<!-- v3: BILL RULE — the customer bill is printed ONLY at payment (Pay & Print Bill).
+						     Confirming sends the KOT to the kitchen and leaves payment Pending; no bill yet. -->
+						<div class="fpos-pending-banner" role="status"></div>
+						<!-- Sticky Bottom Action Rows: Confirm (Kitchen) + Pay & Print Bill, then Hold -->
 						<div class="fpos-sticky-actions">
+							<!-- v2: Confirm Order — auto-creates the KOT, reserves the table, payment stays Pending -->
+							<button class="fpos-btn fpos-confirm-order-btn" disabled>
+								${fpos_icon("check")} <span>${__("Confirm Order — Kitchen")}</span>
+							</button>
+
 							<!-- Primary: Pay & Settle (full width, green) -->
 							<button class="fpos-btn fpos-pay-btn" disabled>
-								<span>💳 ${__("Pay & Settle")}</span>
+								${fpos_icon("card")} <span>${__("Pay & Print Bill")}</span>
 							</button>
 
 							<!-- Secondary: Hold -->
 							<div class="fpos-secondary-actions-row">
 								<button class="fpos-action-btn-outline fpos-hold-btn" style="width:100%;">
-									<span>⏸️ ${__("Hold")}</span>
-								</button>
+								${fpos_icon("pause")} <span>${__("Hold")}</span>
+							</button>
 							</div>
 						</div>
 					</div>
 				</div>
+
+				<!-- v3: occupied-table chips (image 4 concept) — filled by render_table_chips() -->
+				<div class="fpos-table-chips-bar" style="display:none;"></div>
 
 				<!-- FULL-PAGE SLIDE-IN PAYMENT & CHECKOUT PAGE (Transitions Left to Right) -->
 				<div class="fpos-payment-page"></div>
@@ -1124,7 +1042,7 @@ foodpos.FoodPOS.Controller = class {
 				<div class="fpos-drawer fpos-recent-drawer">
 					<div class="fpos-drawer-header">
 						<div class="fpos-drawer-title">
-							<span>🧾</span>
+							<span>${fpos_icon("receipt")}</span>
 							<span>${__("Recent Customer Orders")}</span>
 						</div>
 						<button class="fpos-drawer-close fpos-close-recent-drawer">&times;</button>
@@ -1136,18 +1054,18 @@ foodpos.FoodPOS.Controller = class {
 				<div class="fpos-drawer fpos-kitchen-drawer">
 					<div class="fpos-drawer-header">
 						<div class="fpos-drawer-title">
-							<span>🧑‍🍳</span>
+							<span>${fpos_icon("chef")}</span>
 							<span>${__("Live Kitchen Orders")}</span>
-							<span class="fpos-kitchen-count-pill" style="font-size:11px;background:#ffedd5;color:#c2410c;padding:2px 8px;border-radius:12px;font-weight:700;">0 active</span>
+							<span class="fpos-kitchen-count-pill" style="font-size:11px;background:#dcfce7;color:#166534;padding:2px 8px;border-radius:12px;font-weight:700;">0 active</span>
 						</div>
 						<button class="fpos-drawer-close fpos-close-kitchen-drawer">&times;</button>
 					</div>
 					<div class="fpos-kitchen-station-filters" style="padding:10px 16px;background:#f8fafc;border-bottom:1px solid #e2e8f0;display:flex;gap:6px;overflow-x:auto;">
 						<button type="button" class="btn btn-default btn-xs fpos-kds-station-btn active" data-station="All" style="font-weight:700;border-radius:6px;">${__("All Stations")}</button>
-						<button type="button" class="btn btn-default btn-xs fpos-kds-station-btn" data-station="Main Kitchen" style="font-weight:700;border-radius:6px;">🍳 ${__("Main Kitchen")}</button>
-						<button type="button" class="btn btn-default btn-xs fpos-kds-station-btn" data-station="Grill" style="font-weight:700;border-radius:6px;">🥩 ${__("Grill")}</button>
-						<button type="button" class="btn btn-default btn-xs fpos-kds-station-btn" data-station="Pizza" style="font-weight:700;border-radius:6px;">🍕 ${__("Pizza")}</button>
-						<button type="button" class="btn btn-default btn-xs fpos-kds-station-btn" data-station="Beverages" style="font-weight:700;border-radius:6px;">🥤 ${__("Beverages")}</button>
+						<button type="button" class="btn btn-default btn-xs fpos-kds-station-btn" data-station="Main Kitchen" style="font-weight:700;border-radius:6px;">${__("Main Kitchen")}</button>
+						<button type="button" class="btn btn-default btn-xs fpos-kds-station-btn" data-station="Grill" style="font-weight:700;border-radius:6px;">${__("Grill")}</button>
+						<button type="button" class="btn btn-default btn-xs fpos-kds-station-btn" data-station="Pizza" style="font-weight:700;border-radius:6px;">${__("Pizza")}</button>
+						<button type="button" class="btn btn-default btn-xs fpos-kds-station-btn" data-station="Beverages" style="font-weight:700;border-radius:6px;">${__("Beverages")}</button>
 					</div>
 					<div class="fpos-drawer-body fpos-kitchen-body"></div>
 				</div>
@@ -1156,7 +1074,7 @@ foodpos.FoodPOS.Controller = class {
 				<div class="fpos-drawer fpos-held-drawer">
 					<div class="fpos-drawer-header">
 						<div class="fpos-drawer-title">
-							<span>⏸️</span>
+							<span>${fpos_icon("pause")}</span>
 							<span>${__("Held Orders")}</span>
 							<span class="fpos-held-count-pill" style="font-size:11px;background:#fef3c7;color:#b45309;padding:2px 8px;border-radius:12px;font-weight:700;">0 held</span>
 						</div>
@@ -1180,37 +1098,45 @@ foodpos.FoodPOS.Controller = class {
 
 	render_categories() {
 		const $box = this.wrapper.find(".fpos-categories");
-		$box.empty();
-
+		// v3: SVG icons per category (no emoji in UI chrome).
+		// v5: real food icons + a tinted icon circle (see .fpos-cat-tile-icon).
 		const cat_icons = {
-			All: "🍽️",
-			Burgers: "🍔",
-			Pizzas: "🍕",
-			"Sandwiches & Wraps": "🥪",
-			"Sides & Fries": "🍟",
-			"Drinks & Shakes": "🥤",
-			"Combos & Deals": "🍱",
-			Desserts: "🍰",
-			Beverages: "🥤",
-			Starters: "🥗",
-			"Main Course": "🍛",
+			All: "grid", Burgers: "burger", Pizzas: "pizza",
+			"Sandwiches & Wraps": "sandwich", "Sides & Fries": "fries",
+			"Drinks & Shakes": "drink", "Combos & Deals": "combo",
+			Desserts: "dessert", Beverages: "drink", Starters: "plate",
+			"Main Course": "plate",
 		};
 
+		// v4 CHILI: categories live ONLY in the tile row — no sidebar, no popover list.
+		const $b = this.wrapper.find(".fpos-cat-tiles");
+		$b.empty();
 		this.categories.forEach((cat) => {
 			const active = (cat === this.fast_food_category) ? "active" : "";
-			const icon = cat_icons[cat] || "🍴";
+			const icon = cat_icons[cat] || "box";
 			const count = (cat === "All")
 				? this.items.length
 				: this.items.filter((i) => i._ff_category === cat).length;
-
-			$box.append(`
-				<button class="fpos-ff-tab ${active}" data-cat="${cat}">
-					<span>${icon}</span>
-					<span>${__(cat)}</span>
-					<span class="fpos-cat-count">${count}</span>
+			$b.append(`
+				<button class="fpos-cat-tile ${active}" data-cat="${cat}">
+					<span class="fpos-cat-tile-name"><span class="fpos-cat-tile-icon">${fpos_icon(icon, "fpos-ic-sm")}</span> ${__(cat)}</span>
+					<span class="fpos-cat-tile-count">${count} ${__("items")}</span>
 				</button>
 			`);
 		});
+	}
+
+	// v5: item photo area — real Item image (object-fit: cover, fills the
+	// 110px photo area) or, when the item has no image, a rich warm
+	// gradient tile with a large SVG food icon for its category.
+	// Never a bare letter, never an emoji. Card geometry is unchanged.
+	item_media_html(item) {
+		const icon = item._ff_icon || "plate";
+		if (item.item_image) {
+			const safe_name = (item.item_name || "").replace(/"/g, "");
+			return `<div class="fpos-item-photo" style="background-image:url('${item.item_image}')" role="img" aria-label="${safe_name}"></div>`;
+		}
+		return `<div class="fpos-item-photo fpos-item-photo-fallback fpos-food-${icon}">${fpos_icon(icon, "fpos-ic-lg")}</div>`;
 	}
 
 	render_items_grid() {
@@ -1255,7 +1181,7 @@ foodpos.FoodPOS.Controller = class {
 		if (list.length === 0) {
 			$grid.html(`
 				<div style="grid-column:1/-1;text-align:center;padding:50px 20px;color:#94a3b8;">
-					<div style="font-size:44px;margin-bottom:10px;">🔍</div>
+					<div style="margin-bottom:10px;color:#94a3b8;">${fpos_icon("search", "fpos-ic-lg")}</div>
 					<h4 style="color:#64748b;font-weight:600;margin-bottom:6px;">${__("No matching food items found")}</h4>
 					<p style="font-size:13px;">${__("Try clearing search filters or selecting another product category.")}</p>
 					<button class="btn btn-default btn-xs fpos-reset-filters-btn" style="margin-top:10px;">${__("Reset Filters")}</button>
@@ -1266,17 +1192,19 @@ foodpos.FoodPOS.Controller = class {
 
 		list.forEach((item) => {
 			const price = this.format_money(item.rate);
-			const img = item.item_image
-				? `<img src="${item.item_image}" style="width:100%;height:110px;object-fit:cover;border-radius:10px 10px 0 0;" loading="lazy" />`
-				: `<div style="height:110px;display:flex;align-items:center;justify-content:center;background:#f8fafc;font-size:42px;border-radius:10px 10px 0 0;user-select:none;">${item._ff_icon || "🍔"}</div>`;
+			const img = this.item_media_html(item);
 
-			// Diet badge (Veg / Spicy)
+			// Diet badges (Veg / Non-Veg / Spicy) + short description (v2 cards)
 			let diet_badge = "";
 			if (item._is_veg) {
-				diet_badge = `<span class="fpos-card-diet-badge fpos-diet-veg">🌱 VEG</span>`;
-			} else if (item._is_spicy) {
-				diet_badge = `<span class="fpos-card-diet-badge fpos-diet-spicy">🌶️ SPICY</span>`;
+				diet_badge = `<span class="fpos-card-diet-badge fpos-diet-veg">VEG</span>`;
+			} else {
+				diet_badge = `<span class="fpos-card-diet-badge fpos-diet-nonveg">NON-VEG</span>`;
 			}
+			if (item._is_spicy) {
+				diet_badge += ` <span class="fpos-card-diet-badge fpos-diet-spicy">SPICY</span>`;
+			}
+			const item_desc = (item.description || "").trim();
 
 			// Clean item card without category banner
 			const card = $(`
@@ -1289,20 +1217,43 @@ foodpos.FoodPOS.Controller = class {
 						<div class="fpos-item-title" title="${item.item_name}">
 							${item.item_name}
 						</div>
+						${item_desc ? `<div class="fpos-item-desc" title="${item_desc}">${item_desc}</div>` : ""}
 						<div class="fpos-item-footer">
 							<span class="fpos-item-rate">${price}</span>
-							<button class="fpos-quick-add-btn" title="${__("Add to Cart")}">+</button>
+							${(() => {
+								// v3: Add to Dish becomes a qty stepper once the item is in the cart.
+								const in_cart = (this.cart_items || []).find((c) => c.item_code === item.item_code);
+								if (in_cart) {
+									return `<span class="fpos-stepper" data-code="${item.item_code}">
+										<button class="fpos-step-minus" title="${__("Remove one")}">−</button>
+										<span class="fpos-stepper-qty">${in_cart.qty}</span>
+										<button class="fpos-step-plus" title="${__("Add one")}">+</button>
+									</span>`;
+								}
+								return `<button class="fpos-add-dish-btn" title="${__("Add to Dish")}">${__("Add to Dish")}</button>`;
+							})()}
 						</div>
 					</div>
 				</div>
 			`);
 
 			card.on("click", () => this.add_item_to_cart(item));
+			// v3: stepper buttons must not re-trigger the card click (which adds one more).
+			card.find(".fpos-step-minus").on("click", (e) => { e.stopPropagation(); this.change_item_qty(item.item_code, -1); });
+			card.find(".fpos-step-plus").on("click", (e) => { e.stopPropagation(); this.change_item_qty(item.item_code, 1); });
 			$grid.append(card);
 		});
 	}
 
 	// ─── 5. Cart Management ──────────────────────────────────────────────────
+
+	// v3: change an item's cart qty by delta (stepper on the card); 0 removes it.
+	change_item_qty(item_code, delta) {
+		const idx = (this.cart_items || []).findIndex((c) => c.item_code === item_code);
+		if (idx < 0) { if (delta > 0) { const it = (this.items || []).find((i) => i.item_code === item_code); if (it) this.add_item_to_cart(it); } return; }
+		this.update_cart_item_qty(idx, (this.cart_items[idx].qty || 0) + delta);
+		this.render_items_grid();
+	}
 
 	add_item_to_cart(item, qty = 1, item_note = "") {
 		if (flt(item.rate) <= 0 && !item.is_free_item) {
@@ -1335,6 +1286,7 @@ foodpos.FoodPOS.Controller = class {
 
 		this.render_cart_items();
 		this.update_cart_summary();
+		this.render_items_grid(); // v3: card shows the stepper once added
 	}
 
 	prompt_manager_pin_for_free_item(item, qty = 1, item_note = "") {
@@ -1393,7 +1345,6 @@ foodpos.FoodPOS.Controller = class {
 						args: {
 							pin: vals.pin,
 							action_type: action_type,
-							branch: (this.profile_data && this.profile_data.custom_branch) || "",
 							cashier: frappe.session.user,
 							details: vals.reason ? `${details} | Reason: ${vals.reason}` : details,
 						},
@@ -1508,17 +1459,17 @@ foodpos.FoodPOS.Controller = class {
 		if (this.cart_items.length === 0) {
 			$empty.show();
 			this.wrapper.find(".fpos-pay-btn").prop("disabled", true);
-			this.wrapper.find(".fpos-kot-btn").prop("disabled", true).css("opacity", "0.5");
+			this.wrapper.find(".fpos-confirm-order-btn").prop("disabled", true).css("opacity", "0.5");
 			return;
 		}
 
 		$empty.hide();
 		this.wrapper.find(".fpos-pay-btn").prop("disabled", false);
-		this.wrapper.find(".fpos-kot-btn").prop("disabled", false).css("opacity", "1");
+		this.wrapper.find(".fpos-confirm-order-btn").prop("disabled", false).css("opacity", "1");
 
 		this.cart_items.forEach((item, idx) => {
 			const note_html = item.item_note
-				? `<div class="fpos-cart-line-note">📝 ${item.item_note}</div>`
+				? `<div class="fpos-cart-line-note">${item.item_note}</div>`
 				: "";
 
 			const row = $(`
@@ -1535,7 +1486,7 @@ foodpos.FoodPOS.Controller = class {
 					</div>
 
 					<div class="fpos-cart-row-sub">
-						<button class="fpos-note-trigger">✏️ ${__("Note / Price")}</button>
+						<button class="fpos-note-trigger">${fpos_icon("edit", "fpos-ic-sm")} ${__("Note / Price")}</button>
 						<div class="fpos-cart-row-stepper">
 							<button class="fpos-qty-minus" title="${item.qty === 1 ? __("Remove Item") : __("Decrease")}">${item.qty === 1 ? "✕" : "−"}</button>
 							<span class="fpos-cart-qty">${item.qty}</span>
@@ -1556,30 +1507,25 @@ foodpos.FoodPOS.Controller = class {
 	update_cart_summary() {
 		const subtotal = this.cart_items.reduce((sum, i) => sum + i.amount, 0);
 
-		let discount = 0;
-		if (this.discount_percentage > 0) {
-			discount = (subtotal * this.discount_percentage) / 100;
-		} else if (this.discount_amount > 0) {
-			discount = this.discount_amount;
-		}
+		// v5.2: NO TAX. Discount is a flat Rs amount only (no % anymore) and is
+		// clamped to the subtotal so Total Due can never go below 0.
+		const discount = Math.min(subtotal, Math.max(0, flt(this.discount_amount || 0)));
 
 		const discounted_subtotal = Math.max(0, subtotal - discount);
-		const tax_rate = flt(this.profile_data.tax_rate || 0);
-		const tax = (discounted_subtotal * tax_rate) / 100;
 		const delivery_fee = (this.order_type === "Delivery") ? flt(this.delivery_charges || 0) : 0;
-		const grand_total = discounted_subtotal + tax + delivery_fee;
+		const grand_total = discounted_subtotal + delivery_fee;
 
 		this.totals = {
 			subtotal: subtotal,
 			discount: discount,
-			tax: tax,
+			tax: 0,
 			delivery_fee: delivery_fee,
 			grand_total: grand_total,
 		};
 
 		this.wrapper.find(".fpos-subtotal-val").text(this.format_money(subtotal));
-		this.wrapper.find(".fpos-tax-val").text(this.format_money(tax));
 		this.wrapper.find(".fpos-grand-total-val").text(this.format_money(grand_total));
+		this.update_order_sub();
 
 		if (discount > 0) {
 			this.wrapper.find(".fpos-discount-row").css("display", "flex");
@@ -1648,6 +1594,7 @@ foodpos.FoodPOS.Controller = class {
 	}
 
 	clear_cart() {
+		this.hide_pending_banner();
 		if (this.selected_table) {
 			const tbl = this.selected_table;
 			frappe.call({
@@ -1694,7 +1641,7 @@ foodpos.FoodPOS.Controller = class {
 				this.selected_table_no = data.table_no || (data.table ? data.table.split("-").pop().trim() : "");
 				this.linked_kot_id = data.linked_kot_id || null;
 				this.pos_order_id = data.pos_order_id || null;
-				this.discount_percentage = flt(data.discount_percentage || 0);
+				this.discount_percentage = 0; // v5.2: % discounts removed — Rs only, stale % never restored.
 				this.discount_amount = flt(data.discount_amount || 0);
 				this.delivery_phone = data.delivery_phone || "";
 				this.delivery_address = data.delivery_address || "";
@@ -1839,8 +1786,8 @@ foodpos.FoodPOS.Controller = class {
 		tab_keys.forEach((key) => {
 			const tab = this.tabs[key];
 			const is_active = (key === this.active_tab_id);
-			const type_icons = { "Dine In": "🪑", "Takeaway": "🥡", "Delivery": "🛵" };
-			const icon = type_icons[tab.order_type] || "📋";
+			const type_icons = { "Dine In": "table", "Takeaway": "box", "Delivery": "truck", "Walk In": "user" };
+			const icon = fpos_icon(type_icons[tab.order_type] || "receipt", "fpos-ic-sm");
 			const total_str = this.format_money(tab.grand_total || 0);
 			const item_count = tab.cart_items ? tab.cart_items.length : 0;
 			const count_str = item_count === 1 ? __("1 item") : (item_count > 1 ? `${item_count} ${__("items")}` : __("Empty"));
@@ -1850,15 +1797,15 @@ foodpos.FoodPOS.Controller = class {
 					display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border-radius:12px;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap;
 					background:${is_active ? "#ffffff" : "#f1f5f9"};
 					color:${is_active ? "#0f172a" : "#475569"};
-					border:1.5px solid ${is_active ? "#f97316" : "#cbd5e1"};
-					box-shadow:${is_active ? "0 2px 8px rgba(249,115,22,0.18)" : "none"};
+					border:1.5px solid ${is_active ? "#15803d" : "#cbd5e1"};
+					box-shadow:${is_active ? "0 2px 8px rgba(21,128,61,0.18)" : "none"};
 					transition:all .15s ease;
 				">
-					${is_active ? `<span style="width:7px;height:7px;border-radius:50%;background:#f97316;display:inline-block;"></span>` : ""}
+					${is_active ? `<span style="width:7px;height:7px;border-radius:50%;background:#15803d;display:inline-block;"></span>` : ""}
 					<span style="font-size:14px;">${icon}</span>
 					<span class="fpos-tab-title" style="font-weight:700;max-width:140px;overflow:hidden;text-overflow:ellipsis;">${tab.title || __("Tab")}</span>
 					<span class="fpos-tab-items-count" style="font-size:11px;color:${is_active ? "#64748b" : "#94a3b8"};background:${is_active ? "#f8fafc" : "#e2e8f0"};padding:2px 7px;border-radius:10px;font-weight:600;">${count_str}</span>
-					<span class="fpos-tab-total" style="font-size:12px;font-weight:800;color:${is_active ? "#ea580c" : "#64748b"};">${total_str}</span>
+					<span class="fpos-tab-total" style="font-size:12px;font-weight:800;color:${is_active ? "#15803d" : "#64748b"};">${total_str}</span>
 					${tab_keys.length > 1 ? `
 						<span class="fpos-close-tab-btn" data-tab-id="${key}" title="${__("Close / Discard Tab")}" style="
 							color:#94a3b8;font-size:14px;line-height:1;margin-left:4px;cursor:pointer;padding:2px 5px;border-radius:50%;
@@ -1886,6 +1833,7 @@ foodpos.FoodPOS.Controller = class {
 
 			$list.append($tab);
 		});
+		this.render_table_chips();
 	}
 
 	update_tab_pill(tab_id) {
@@ -1965,7 +1913,7 @@ foodpos.FoodPOS.Controller = class {
 		this.pos_order_id = target.pos_order_id || null;
 		this.customer = target.customer || (this.profile_data && this.profile_data.customer) || "";
 		this.cart_items = [...(target.cart_items || [])];
-		this.discount_percentage = target.discount_percentage || 0;
+		this.discount_percentage = 0; // v5.2: % discounts removed — Rs only.
 		this.discount_amount = target.discount_amount || 0;
 		this.order_note = target.order_note || "";
 
@@ -2130,13 +2078,13 @@ foodpos.FoodPOS.Controller = class {
 		}
 
 		try {
-			const branch = this.branch || (this.profile_data && this.profile_data.custom_branch) || "";
+			// v2: tables are for the single branch — no branch filter.
 
 			// Fetch latest tables from DB for this branch
 			try {
 				const res = await frappe.call({
 					method: "foodpos.foodpos.page.food_pos.food_pos.get_available_tables",
-					args: { pos_profile: this.pos_profile, branch: branch },
+					args: { pos_profile: this.pos_profile },
 				});
 				this.tables = res.message || [];
 			} catch (e) {
@@ -2147,7 +2095,7 @@ foodpos.FoodPOS.Controller = class {
 			const previous_order_type = this.selected_table ? "Dine In" : (this.previous_order_type || "Takeaway");
 
 			const d = new frappe.ui.Dialog({
-				title: __("Select Table for Dine-In ({0})", [branch || __("All")]),
+				title: __("Select Table for Dine-In"),
 				size: "large",
 			});
 
@@ -2165,7 +2113,7 @@ foodpos.FoodPOS.Controller = class {
 		body.html(`
 			<div style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
 				<div style="font-size:13px;color:#64748b;">
-					Branch: <strong>${branch || __("All Branches")}</strong> (${this.tables.length} tables)
+					${this.tables.length} tables &bull; Main Branch
 				</div>
 				<div style="display:flex;gap:12px;font-size:11px;">
 					<span style="display:flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;border-radius:50%;background:#22c55e;"></span> Available</span>
@@ -2178,7 +2126,7 @@ foodpos.FoodPOS.Controller = class {
 		const grid = body.find(".fpos-table-grid");
 
 		if (this.tables.length === 0) {
-			grid.html(`<div style="grid-column:1/-1;text-align:center;padding:30px 10px;color:#64748b;">${__("No tables found for {0}. Add Restaurant Tables in Desk.", [branch])}</div>`);
+			grid.html(`<div style="grid-column:1/-1;text-align:center;padding:30px 10px;color:#64748b;">${__("No tables found. Add Restaurant Tables in Desk.")}</div>`);
 		} else {
 			this.tables.forEach((t) => {
 				const is_occupied = t.status === "Occupied";
@@ -2194,15 +2142,16 @@ foodpos.FoodPOS.Controller = class {
 				const display_name = t.table_no ? `Table ${t.table_no}` : t.name;
 
 				const card = $(`
-					<div class="fpos-tbl-card" data-table="${t.name}" style="border:2px solid ${t.name === this.selected_table ? "#f97316" : "#e2e8f0"};background:#fff;border-radius:10px;padding:12px;text-align:center;cursor:pointer;position:relative;transition:all .2s ease;">
+					<div class="fpos-tbl-card" data-table="${t.name}" style="border:2px solid ${t.name === this.selected_table ? "#15803d" : "#e2e8f0"};background:#fff;border-radius:10px;padding:12px;text-align:center;cursor:pointer;position:relative;transition:all .2s ease;">
 						<div class="fpos-tbl-dot" style="width:10px;height:10px;border-radius:50%;background:${color};margin:0 auto 6px;"></div>
 						<div style="font-weight:700;font-size:14px;color:#0f172a;">${display_name}</div>
 						<small style="color:#64748b;font-size:11px;">${t.capacity || 4} ${__("Seats")}</small>
 						<div class="fpos-tbl-status" style="font-size:10px;color:${color};font-weight:700;margin-top:4px;">${__(t.status)}</div>
+						${is_occupied && t.occupied_since ? `<div class="fpos-tbl-timer" data-since="${t.occupied_since}" style="font-size:11px;color:#b45309;font-weight:700;margin-top:2px;">⏱ ${this.format_elapsed(t.occupied_since)}</div>` : ""}
 						${has_tab ? `<span style="position:absolute;top:4px;right:6px;font-size:10px;background:#e0f2fe;color:#0284c7;padding:1px 5px;border-radius:6px;font-weight:700;">${__("Tab")}</span>` : ""}
 						${is_occupied ? `
 							<button class="btn btn-xs btn-default fpos-card-free-btn" data-table="${t.name}" style="margin-top:6px;font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #fca5a5;color:#b91c1c;background:#fff5f5;font-weight:600;">
-								🔓 Free Table
+								${fpos_icon("checkCircle", "fpos-ic-sm")} Free Table
 							</button>
 						` : ""}
 					</div>
@@ -2284,18 +2233,103 @@ foodpos.FoodPOS.Controller = class {
 		}
 	}
 
-	async send_to_kitchen() {
+	// BILL RULE v3 — HARD RULE, do not change without the user asking:
+	// confirming an order prints the KOT slip ONLY — never the customer
+	// bill. The customer bill is generated/printed ONLY in
+	// process_invoice_submission() after payment, or on an explicit
+	// reprint from Recent Orders (show_pos_slip, line ~3693). There is
+	// NO show_pos_slip / print_pos_slip / get_invoice_slip_data call in
+	// this function, and none may be added here. The server
+	// confirm_order() likewise creates NO invoice (payment stays
+	// Pending). The pending banner below makes this visible to the user.
+	// v3: show/hide the "Payment Pending — no bill yet" banner in the cart.
+	show_pending_banner(kot_name) {
+		const $b = this.wrapper.find(".fpos-pending-banner");
+		if (!$b.length) return;
+		$b.html(`<b>${__("Payment Pending")}</b> — ${__("KOT {0} is in the kitchen. No bill has been given to the customer yet — the bill is printed only when the customer pays.", [kot_name || ""])}`);
+		$b.addClass("show");
+	}
+	hide_pending_banner() {
+		this.payment_pending = false;
+		this.wrapper.find(".fpos-pending-banner").removeClass("show").empty();
+	}
+
+	// v3: bottom occupied-table chips (image 4) — built from open order tabs.
+	render_table_chips() {
+		const $bar = this.wrapper.find(".fpos-table-chips-bar");
+		if (!$bar.length) return;
+		// v4 CHILI bottom strip: staff avatars first, then ONE chip per OPEN order
+		// (tables AND walk-in/takeaway/delivery — the top tabs bar is gone, so this
+		// strip is the only order switcher).
+		const tabs = Object.values(this.tabs || {});
+		// v4: free tables join the strip too (CHILI shows T1/T2/T3 with "Available") —
+		// tapping one starts a fresh Dine-In order on that table. Capped at 8 so the
+		// strip stays a single scrollable row.
+		const occupied = new Set(tabs.map((t) => t.table).filter(Boolean));
+		const free = (this.tables || [])
+			.filter((t) => t.status !== "Occupied" && !occupied.has(t.name))
+			.slice(0, 8);
+		if (!tabs.length && !free.length) { $bar.hide().empty(); return; }
+		const chips = tabs.map((t) => {
+			const items = (t.cart_items || []).length;
+			const no = t.table_no ? `T${t.table_no}` : (t.order_type === "Walk In" ? "W" : t.order_type === "Takeaway" ? "TA" : "D");
+			const meta = t.order_confirmed ? `${items} ${__("items")} → ${__("Kitchen")}` : (items ? `${items} ${__("items")} • ${__("Ordering")}` : __("Empty"));
+			return `
+			<button class="fpos-table-chip" data-tab-id="${t.id}">
+				<span class="fpos-table-chip-dot ${t.order_confirmed ? "kitchen" : "ordering"}"></span>
+				<span class="fpos-table-chip-no">${no}</span>
+				<span>${t.customer || __("Walk-in")}</span>
+				<span class="fpos-table-chip-meta">${meta}</span>
+			</button>`;
+		}).join("");
+		const free_chips = free.map((t) => {
+			const no = t.table_no || t.name;
+			return `
+			<button class="fpos-table-chip fpos-table-chip-available" data-table-name="${t.name}">
+				<span class="fpos-table-chip-dot free"></span>
+				<span class="fpos-table-chip-no">T${no}</span>
+				<span>${__("Table")} ${no}</span>
+				<span class="fpos-table-chip-meta">${__("Available")}</span>
+			</button>`;
+		}).join("");
+		$bar.html(`
+			<span class="fpos-chips-staff" title="${__("Staff on shift")}">
+				<span class="fpos-chip-avatar fpos-chip-avatar-a">${fpos_icon("user", "fpos-ic-sm")}</span>
+				<span class="fpos-chip-avatar fpos-chip-avatar-b">${fpos_icon("user", "fpos-ic-sm")}</span>
+			</span>${chips}${free_chips}`);
+		$bar.show();
+	}
+
+	// v4: tapping a free-table chip starts a fresh Dine-In order on that table
+	// (same create_new_tab pattern the tables floor uses, line ~6112). If a tab
+	// already exists for the table, switch to it instead.
+	start_table_order(table_name) {
+		const t = (this.tables || []).find((x) => x.name === table_name);
+		if (!t) return;
+		const existing_tab_id = Object.keys(this.tabs || {}).find((k) => this.tabs[k].table === t.name);
+		if (existing_tab_id) { this.switch_tab(existing_tab_id); return; }
+		this.create_new_tab("Dine In", t.name, t.table_no || "", true);
+	}
+
+	// v2: Confirm Order — the ONLY way a KOT reaches the kitchen now.
+	// There is no manual "Send to Kitchen" button any more: confirming
+	// an order auto-creates the KOT server-side (confirm_order API),
+	// reserves the table and starts its timer, and leaves payment
+	// PENDING until the customer pays at settle time. The server is
+	// idempotent per order_id + station (Round 23), and the client
+	// guard below stops a double-click from even sending twice.
+	async confirm_order() {
+		if (this._confirming_order) return; // double-click guard
 		if (this.cart_items.length === 0) {
 			frappe.show_alert({ message: __("Cart is empty. Add items first."), indicator: "orange" });
 			return;
 		}
-
 		if (this.order_type === "Dine In" && !this.selected_table) {
-			frappe.show_alert({ message: __("Please select a table before sending to kitchen."), indicator: "orange" });
+			frappe.show_alert({ message: __("Please select a table before confirming the order."), indicator: "orange" });
 			this.open_table_selector();
 			return;
 		}
-
+		this._confirming_order = true;
 		const order_payload = {
 			// Round 23 fix: send this cart's order token; the server
 			// generates one and returns it if this is the first call.
@@ -2304,24 +2338,23 @@ foodpos.FoodPOS.Controller = class {
 			table: this.selected_table || "",
 			customer: this.customer,
 			pos_profile: this.pos_profile,
-			branch: this.branch || (this.profile_data && this.profile_data.branch) || "",
+			guests: 1,
 			order_note: this.order_note,
 			items: this.cart_items,
 		};
-
 		try {
-			frappe.dom.freeze(__("Sending ticket to kitchen..."));
+			frappe.dom.freeze(__("Confirming order — sending ticket to kitchen..."));
 			const res = await frappe.call({
-				method: "foodpos.foodpos.page.food_pos.food_pos.create_kot",
+				method: "foodpos.foodpos.page.food_pos.food_pos.confirm_order",
 				args: { order_data: order_payload },
 			});
 			frappe.dom.unfreeze();
-
-			const kot_name = res.message?.kot_name;
-			if (res.message?.order_id) {
-				this.pos_order_id = res.message.order_id;
+			const msg = res.message || {};
+			const kot_name = msg.kot_name;
+			if (msg.order_id) {
+				this.pos_order_id = msg.order_id;
 				if (this.active_tab_id && this.tabs && this.tabs[this.active_tab_id]) {
-					this.tabs[this.active_tab_id].pos_order_id = res.message.order_id;
+					this.tabs[this.active_tab_id].pos_order_id = msg.order_id;
 				}
 			}
 			if (kot_name) {
@@ -2331,13 +2364,31 @@ foodpos.FoodPOS.Controller = class {
 				}
 				this.save_cart_backup();
 			}
-			frappe.show_alert({ message: __("Kitchen Ticket {0} dispatched!", [kot_name]), indicator: "green" });
+			this.order_confirmed = true;
+			if (this.active_tab_id && this.tabs && this.tabs[this.active_tab_id]) {
+				this.tabs[this.active_tab_id].order_confirmed = true;
+				this.tabs[this.active_tab_id].payment_status = "Pending";
+			}
+			frappe.show_alert({ message: __("Order confirmed! Kitchen Ticket {0} sent — payment pending.", [kot_name]), indicator: "green" });
+			// BILL RULE v3: payment is Pending and NO bill has been given yet.
+			this.payment_pending = true;
+			this.show_pending_banner(kot_name);
+			this.render_table_chips(); // v3: chip flips to "Kitchen • Pending"
 			this.refresh_kitchen_badge();
+			this.render_tables_view();
+			// v2 thermal: the kitchen slip (parchi) prints automatically on
+			// confirm so the kitchen gets a paper ticket as well as the live KDS.
+			try { this.print_kot_slip(msg, order_payload); } catch (e) { console.warn("KOT slip print skipped:", e); }
 		} catch (e) {
 			frappe.dom.unfreeze();
-			frappe.show_alert({ message: __("Failed to create KOT: {0}", [e.message]), indicator: "red" });
+			frappe.show_alert({ message: __("Failed to confirm order: {0}", [e.message]), indicator: "red" });
+		} finally {
+			this._confirming_order = false;
 		}
 	}
+
+	// Backwards-compatible alias (old callers, if any, get the auto flow).
+	async send_to_kitchen() { return this.confirm_order(); }
 
 	// ─── 7. Customer Picker & Creation ───────────────────────────────────────
 
@@ -2517,7 +2568,8 @@ foodpos.FoodPOS.Controller = class {
 		$(".modal-backdrop").remove();
 		this.payment_tendered = flt(this.totals.grand_total);
 		const methods = (this.profile_data && this.profile_data.payment_methods) || [{ mode_of_payment: "Cash", type: "Cash" }];
-		this.selected_payment_mode = methods[0].mode_of_payment;
+		this.selected_payment_mode = (this.preferred_payment_mode && methods.some((m) => m.mode_of_payment === this.preferred_payment_mode))
+			? this.preferred_payment_mode : methods[0].mode_of_payment;
 
 		this.render_payment_page();
 		const $page = this.wrapper.find(".fpos-payment-page");
@@ -2540,13 +2592,14 @@ foodpos.FoodPOS.Controller = class {
 		const currency = "PKR";
 		const format_curr = (val) => this.format_money(val);
 		const methods = (this.profile_data && this.profile_data.payment_methods) || [
-			{ mode_of_payment: "Cash", icon: "💵" },
-			{ mode_of_payment: "Credit Card", icon: "💳" }
+			{ mode_of_payment: "Cash", icon: "cash" },
+			{ mode_of_payment: "Credit Card", icon: "card" }
 		];
 
 		// Initialize split amounts: Default to full total on Cash (or first mode)
 		this.payment_splits = {};
-		let default_mode = methods[0].mode_of_payment;
+		let default_mode = (this.selected_payment_mode && methods.some((m) => m.mode_of_payment === this.selected_payment_mode))
+			? this.selected_payment_mode : methods[0].mode_of_payment;
 		methods.forEach((m) => {
 			this.payment_splits[m.mode_of_payment] = 0;
 			if (m.mode_of_payment.toLowerCase().includes("cash") || m.default) {
@@ -2560,7 +2613,7 @@ foodpos.FoodPOS.Controller = class {
 			<tr style="border-bottom:1px solid #f1f5f9;">
 				<td style="padding:6px 0;">
 					<div style="font-weight:700;color:#1e293b;">${it.item_name}</div>
-					${it.item_note ? `<div style="font-size:10px;color:#d97706;">📝 ${it.item_note}</div>` : ""}
+					${it.item_note ? `<div style="font-size:10px;color:#d97706;">${it.item_note}</div>` : ""}
 				</td>
 				<td style="padding:6px 10px;text-align:center;font-weight:700;color:#64748b;">${it.qty}</td>
 				<td style="padding:6px 0;text-align:right;font-weight:700;color:#0f172a;">${format_curr(it.amount)}</td>
@@ -2569,16 +2622,16 @@ foodpos.FoodPOS.Controller = class {
 
 		const mop_rows_html = methods.map((m) => {
 			const mop = m.mode_of_payment;
-			const icon = m.icon || (mop.toLowerCase().includes("cash") ? "💵" :
-				mop.toLowerCase().includes("card") ? "💳" :
-				mop.toLowerCase().includes("bank") ? "🏦" : "📱");
+			const icon = m.icon || (mop.toLowerCase().includes("cash") ? "cash" :
+				mop.toLowerCase().includes("card") ? "card" :
+				mop.toLowerCase().includes("bank") ? "card" : "qr");
 			const is_active = mop === default_mode;
 			const init_amt = flt(this.payment_splits[mop] || 0);
 
 			return `
-				<div class="fpos-split-row" data-mode="${mop}" style="background:#fff;border:2px solid ${is_active ? "#ea580c" : "#e2e8f0"};border-radius:12px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;">
+				<div class="fpos-split-row" data-mode="${mop}" style="background:#fff;border:2px solid ${is_active ? "#15803d" : "#e2e8f0"};border-radius:12px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;">
 					<div style="display:flex;align-items:center;gap:10px;min-width:140px;">
-						<span style="font-size:22px;">${icon}</span>
+						<span style="color:#15803d;">${fpos_icon(icon)}</span>
 						<div>
 							<div style="font-weight:800;color:#0f172a;font-size:14px;">${mop}</div>
 							<div style="font-size:11px;color:#64748b;">${m.type || "Payment"}</div>
@@ -2612,10 +2665,10 @@ foodpos.FoodPOS.Controller = class {
 					</button>
 					<div>
 						<h3 style="margin:0;font-size:18px;font-weight:800;color:#0f172a;display:flex;align-items:center;gap:8px;">
-							<span>💳</span> ${__("Payment & Order Settlement")}
+							<span>${fpos_icon("card")}</span> ${__("Payment & Order Settlement")}
 						</h3>
 						<div style="font-size:12px;color:#64748b;margin-top:2px;">
-							${this.branch ? `<b style="color:#ea580c;">📍 ${this.branch}</b> &bull; ` : ""}
+							${this.branch ? `<b style="color:#15803d;">${this.branch}</b> &bull; ` : ""}
 							<span>${this.order_type}</span>
 							${this.selected_table_no ? `&bull; <b>Table ${this.selected_table_no}</b>` : ""}
 							&bull; <span>Customer: <b>${this.customer || "Walk-in Customer"}</b></span>
@@ -2624,9 +2677,9 @@ foodpos.FoodPOS.Controller = class {
 				</div>
 
 				<div style="display:flex;align-items:center;gap:12px;">
-					<div style="background:#fff7ed;border:1px solid #fed7aa;padding:8px 16px;border-radius:12px;text-align:right;">
-						<span style="font-size:11px;color:#c2410c;font-weight:700;text-transform:uppercase;">${__("Amount Due")}</span>
-						<div style="font-size:22px;font-weight:900;color:#ea580c;line-height:1.2;">${format_curr(total)}</div>
+					<div style="background:#f0fdf4;border:1px solid #fed7aa;padding:8px 16px;border-radius:12px;text-align:right;">
+						<span style="font-size:11px;color:#166534;font-weight:700;text-transform:uppercase;">${__("Amount Due")}</span>
+						<div style="font-size:22px;font-weight:900;color:#15803d;line-height:1.2;">${format_curr(total)}</div>
 					</div>
 				</div>
 			</div>
@@ -2644,7 +2697,7 @@ foodpos.FoodPOS.Controller = class {
 						<div class="fpos-quick-full-mops" style="display:flex;gap:8px;flex-wrap:wrap;">
 							${methods.map(m => `
 								<button type="button" class="btn btn-default btn-sm fpos-quick-full-btn" data-mode="${m.mode_of_payment}" style="font-weight:700;border-radius:8px;padding:6px 12px;display:inline-flex;align-items:center;gap:6px;">
-									<span>${m.icon || "💳"}</span>
+									<span>${fpos_icon(m.icon || "card", "fpos-ic-sm")}</span>
 									<span>${m.mode_of_payment}</span>
 								</button>
 							`).join("")}
@@ -2666,7 +2719,7 @@ foodpos.FoodPOS.Controller = class {
 					<div style="border-top:1px solid #f1f5f9;padding-top:14px;">
 						<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
 							<label style="font-size:12px;font-weight:800;color:#334155;margin:0;">
-								${__("Numpad for:")} <span class="fpos-active-mode-label" style="color:#ea580c;font-weight:900;">${default_mode}</span>
+								${__("Numpad for:")} <span class="fpos-active-mode-label" style="color:#15803d;font-weight:900;">${default_mode}</span>
 							</label>
 							<div class="fpos-cash-pills" style="display:flex;gap:6px;flex-wrap:wrap;">
 								<button type="button" class="btn btn-default btn-xs fpos-cp fpos-cp-exact" data-exact="1" data-amt="${total}">${__("Exact")} (${format_curr(total)})</button>
@@ -2696,7 +2749,7 @@ foodpos.FoodPOS.Controller = class {
 					<div style="border-top:1px solid #f1f5f9;padding-top:10px;">
 						<details style="cursor:pointer;">
 							<summary style="font-size:12px;font-weight:700;color:#64748b;user-select:none;">
-								🛒 ${__("Review Line Items")} (${this.cart_items.length} ${__("items")})
+								${fpos_icon("cart", "fpos-ic-sm")} ${__("Review Line Items")} (${this.cart_items.length} ${__("items")})
 							</summary>
 							<div style="margin-top:8px;max-height:140px;overflow-y:auto;">
 								<table style="width:100%;font-size:12px;border-collapse:collapse;">
@@ -2724,15 +2777,11 @@ foodpos.FoodPOS.Controller = class {
 							<span>${__("Discount")}</span>
 							<strong>-${format_curr(this.totals.discount)}</strong>
 						</div>` : ""}
-
-						<div style="display:flex;justify-content:space-between;font-size:13px;color:#64748b;">
-							<span>${__("Taxes & Charges")} (${this.profile_data.tax_rate || 0}%)</span>
-							<strong style="color:#0f172a;">${format_curr(this.totals.tax)}</strong>
-						</div>
+						<!-- v5.2: NO TAX line — Subtotal − Discount (Rs) + Delivery Fee only. -->
 
 						<div style="display:flex;justify-content:space-between;font-size:18px;font-weight:900;color:#0f172a;border-top:2px dashed #e2e8f0;padding-top:10px;">
 							<span>${__("Grand Total Due")}</span>
-							<span style="color:#ea580c;">${format_curr(total)}</span>
+							<span style="color:#15803d;">${format_curr(total)}</span>
 						</div>
 
 						<div style="display:flex;justify-content:space-between;font-size:14px;font-weight:700;color:#1e293b;background:#f8fafc;padding:10px 14px;border-radius:10px;">
@@ -2749,12 +2798,12 @@ foodpos.FoodPOS.Controller = class {
 								<div class="fpos-pay-change-title" style="font-size:11px;font-weight:700;color:#15803d;text-transform:uppercase;">${__("Change to Return")}</div>
 								<div class="fpos-pay-summary-change" style="font-size:20px;font-weight:900;color:#16a34a;">${format_curr(0)}</div>
 							</div>
-							<span class="fpos-pay-change-icon" style="font-size:26px;">💵</span>
+							<span class="fpos-pay-change-icon" style="color:#15803d;">${fpos_icon("cash")}</span>
 						</div>
 
 						<!-- Customer POS Slip Toggle -->
 						<div style="display:flex;align-items:center;gap:8px;margin-top:6px;font-size:13px;color:#475569;">
-							<input type="checkbox" id="fpos-auto-print-slip" ${this.auto_print_slip ? "checked" : ""} style="width:16px;height:16px;accent-color:#ea580c;cursor:pointer;" />
+							<input type="checkbox" id="fpos-auto-print-slip" ${this.auto_print_slip ? "checked" : ""} style="width:16px;height:16px;accent-color:#15803d;cursor:pointer;" />
 							<label for="fpos-auto-print-slip" style="margin:0;cursor:pointer;font-weight:600;">${__("Generate & Print POS Slip on Settlement")}</label>
 						</div>
 
@@ -2787,7 +2836,7 @@ foodpos.FoodPOS.Controller = class {
 				if (amt > 0) {
 					pills.push(`
 						<span style="font-size:11px;font-weight:700;background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;padding:3px 8px;border-radius:6px;">
-							${m.icon || "💳"} ${mop}: <b>${format_curr(amt)}</b>
+							${fpos_icon(m.icon || "card", "fpos-ic-sm")} ${mop}: <b>${format_curr(amt)}</b>
 						</span>
 					`);
 				}
@@ -2809,7 +2858,7 @@ foodpos.FoodPOS.Controller = class {
 				$card.css({ background: "#f0fdf4", borderColor: "#bbf7d0" });
 				$title.css("color", "#15803d").text(__("Change to Return"));
 				$change_val.css("color", "#16a34a").text(format_curr(change));
-				$icon.text("💵");
+				$icon.text("");
 				$confirm_btn.prop("disabled", false).css({ background: "#22c55e", cursor: "pointer", opacity: 1 });
 				$btn_label.text(__("Confirm & Settle Payment ({0})", [format_curr(total_tendered)]));
 			} else {
@@ -2817,7 +2866,7 @@ foodpos.FoodPOS.Controller = class {
 				$card.css({ background: "#fee2e2", borderColor: "#fca5a5" });
 				$title.css("color", "#b91c1c").text(__("Remaining Amount Due"));
 				$change_val.css("color", "#b91c1c").text(`-${format_curr(shortage)}`);
-				$icon.text("⚠️");
+				$icon.text("");
 				$confirm_btn.prop("disabled", true).css({ background: "#94a3b8", cursor: "not-allowed", opacity: 0.7 });
 				$btn_label.text(__("Remaining Due: {0}", [format_curr(shortage)]));
 			}
@@ -2830,7 +2879,7 @@ foodpos.FoodPOS.Controller = class {
 			$page.find(".fpos-split-row").each(function () {
 				const row_mode = $(this).data("mode");
 				if (row_mode === mop) {
-					$(this).css({ borderColor: "#ea580c", background: "#fffaf5" });
+					$(this).css({ borderColor: "#15803d", background: "#fffaf5" });
 				} else {
 					$(this).css({ borderColor: "#e2e8f0", background: "#fff" });
 				}
@@ -3004,7 +3053,6 @@ foodpos.FoodPOS.Controller = class {
 			delivery_address: this.delivery_address || "",
 			delivery_charges: flt(this.delivery_charges || 0),
 			pos_profile: this.pos_profile,
-			branch: this.branch || (this.profile_data && this.profile_data.custom_branch) || null,
 			pos_opening_entry: this.pos_opening,
 			discount_percentage: this.discount_percentage,
 			discount_amount: this.discount_amount,
@@ -3033,6 +3081,9 @@ foodpos.FoodPOS.Controller = class {
 			frappe.dom.unfreeze();
 
 			const inv = res.message.invoice;
+			// BILL RULE v3: this is the FIRST time the customer gets a bill —
+			// payment is made, so the pending banner goes away here.
+			this.hide_pending_banner();
 			frappe.show_alert({ message: __("Invoice {0} Submitted!", [inv]), indicator: "green" });
 
 			const receipt_data = res.message.receipt_data || res.message;
@@ -3147,7 +3198,7 @@ foodpos.FoodPOS.Controller = class {
 
 					<div style="text-align: center; margin-bottom: 8px;">
 						<div style="font-size: 20px; font-weight: 900; color: #0f172a;">${receipt_data.company || "FOOD POS RESTAURANT"}</div>
-						<div style="font-size: 11px; color: #64748b;">${receipt_data.branch ? `<b style="color:#ea580c;">📍 ${receipt_data.branch}</b> &bull; ` : ""}${receipt_data.pos_profile || this.pos_profile} &bull; Register Receipt</div>
+						<div style="font-size: 11px; color: #64748b;">${receipt_data.branch ? `<b style="color:#15803d;">${receipt_data.branch}</b> &bull; ` : ""}${receipt_data.pos_profile || this.pos_profile} &bull; Register Receipt</div>
 						<div style="font-size: 11px; color: #64748b;">${receipt_data.posting_date || ""} ${this.format_time_hh_mm(receipt_data.posting_time)}</div>
 					</div>
 
@@ -3158,6 +3209,16 @@ foodpos.FoodPOS.Controller = class {
 							<span>Invoice #:</span>
 							<strong style="color: #0f172a;">${receipt_data.invoice}</strong>
 						</div>
+						${receipt_data.kot_numbers && receipt_data.kot_numbers.length ? `
+						<div style="display: flex; justify-content: space-between;">
+							<span>KOT #:</span>
+							<strong>${receipt_data.kot_numbers.join(", ")}</strong>
+						</div>` : ""}
+						${flt(receipt_data.outstanding_amount) > 0 ? `
+						<div style="display: flex; justify-content: space-between; background: #fef3c7; color: #92400e; font-weight: 800; padding: 4px 6px; border-radius: 4px; margin-top: 4px;">
+							<span>⏳ PENDING PAYMENT:</span>
+							<span>${format_curr(receipt_data.outstanding_amount)}</span>
+						</div>` : ""}
 						<div style="display: flex; justify-content: space-between;">
 							<span>Order Type:</span>
 							<strong>${receipt_data.order_type || receipt_data.custom_order_type || "Takeaway"}${this.format_table_label(receipt_data.table_no || receipt_data.custom_table || receipt_data.table) ? ` (${this.format_table_label(receipt_data.table_no || receipt_data.custom_table || receipt_data.table)})` : ""}</strong>
@@ -3206,11 +3267,7 @@ foodpos.FoodPOS.Controller = class {
 							<span>Discount:</span>
 							<span>-${format_curr(receipt_data.discount_amount)}</span>
 						</div>` : ""}
-						${flt(receipt_data.total_taxes_and_charges) > 0 ? `
-						<div style="display: flex; justify-content: space-between;">
-							<span>Tax:</span>
-							<span>${format_curr(receipt_data.total_taxes_and_charges)}</span>
-						</div>` : ""}
+						<!-- v5.2: NO TAX on the receipt. -->
 						${flt(receipt_data.delivery_charges) > 0 ? `
 						<div style="display: flex; justify-content: space-between; color: #0284c7;">
 							<span>Delivery Fee:</span>
@@ -3246,8 +3303,8 @@ foodpos.FoodPOS.Controller = class {
 						<button class="btn btn-default fpos-close-slip-btn" style="flex: 1; font-weight: 700; border-radius: 8px; cursor: pointer;">
 							${is_settlement ? __("Next Order (Close)") : __("Close")}
 						</button>
-						<button class="btn btn-primary fpos-print-slip-btn" style="flex: 1; font-weight: 700; background: #ea580c; border-color: #ea580c; border-radius: 8px; cursor: pointer;">
-							🖨️ ${__("Print Slip")}
+						<button class="btn btn-primary fpos-print-slip-btn" style="flex: 1; font-weight: 700; background: #15803d; border-color: #15803d; border-radius: 8px; cursor: pointer;">
+							${fpos_icon("printer", "fpos-ic-sm")} ${__("Print Slip")}
 						</button>
 					</div>
 				</div>
@@ -3399,6 +3456,7 @@ foodpos.FoodPOS.Controller = class {
 				<div class="text-center" style="font-size:10px;">${receipt_data.posting_date || ""} ${this.format_time_hh_mm(receipt_data.posting_time)}</div>
 				<div class="divider"></div>
 				<div class="row"><span>Invoice:</span><span class="bold">${receipt_data.invoice}</span></div>
+				${receipt_data.kot_numbers && receipt_data.kot_numbers.length ? `<div class="row"><span>KOT #:</span><span class="bold">${receipt_data.kot_numbers.join(", ")}</span></div>` : ""}
 				<div class="row"><span>Order:</span><span>${receipt_data.order_type || receipt_data.custom_order_type || "Takeaway"}${this.format_table_label(receipt_data.table_no || receipt_data.custom_table || receipt_data.table) ? ` (${this.format_table_label(receipt_data.table_no || receipt_data.custom_table || receipt_data.table)})` : ""}</span></div>
 				<div class="row"><span>Customer:</span><span>${receipt_data.customer_name || receipt_data.customer || "Walk-in"}</span></div>
 				<div class="divider"></div>
@@ -3416,8 +3474,10 @@ foodpos.FoodPOS.Controller = class {
 				<div class="divider"></div>
 				<div class="row"><span>Subtotal:</span><span>${format_curr(receipt_data.net_total || receipt_data.subtotal || receipt_data.grand_total)}</span></div>
 				${flt(receipt_data.discount_amount) > 0 ? `<div class="row"><span>Discount:</span><span>-${format_curr(receipt_data.discount_amount)}</span></div>` : ""}
-				${flt(receipt_data.total_taxes_and_charges) > 0 ? `<div class="row"><span>Tax:</span><span>${format_curr(receipt_data.total_taxes_and_charges)}</span></div>` : ""}
+				<!-- v5.2: NO TAX on the thermal receipt. -->
+				${flt(receipt_data.delivery_charges) > 0 ? `<div class="row"><span>Delivery Fee:</span><span>${format_curr(receipt_data.delivery_charges)}</span></div>` : ""}
 				<div class="row bold" style="font-size:14px; margin-top: 4px;"><span>GRAND TOTAL:</span><span>${format_curr(receipt_data.grand_total)}</span></div>
+				${flt(receipt_data.outstanding_amount) > 0 ? `<div class="row bold" style="font-size:13px; color:#92400e;"><span>PENDING PAYMENT:</span><span>${format_curr(receipt_data.outstanding_amount)}</span></div>` : ""}
 				<div class="divider"></div>
 				<div class="row"><span>Paid Amount:</span><span>${format_curr(receipt_data.paid_amount || receipt_data.grand_total)}</span></div>
 				${(flt(receipt_data.change_amount) || Math.max(0, flt(receipt_data.paid_amount) - flt(receipt_data.grand_total))) > 0 ? `<div class="row bold" style="font-size:13px; color:#15803d;"><span>Change Due:</span><span>${format_curr(flt(receipt_data.change_amount) || Math.max(0, flt(receipt_data.paid_amount) - flt(receipt_data.grand_total)))}</span></div>` : ""}
@@ -3460,7 +3520,6 @@ foodpos.FoodPOS.Controller = class {
 				method: "foodpos.foodpos.page.food_pos.food_pos.get_recent_pos_orders",
 				args: {
 					pos_profile: this.pos_profile || (this.profile_data && this.profile_data.name) || "",
-					branch: this.branch || (this.profile_data && this.profile_data.custom_branch) || "",
 					limit: 15,
 				},
 				freeze: false,
@@ -3476,7 +3535,7 @@ foodpos.FoodPOS.Controller = class {
 	}
 
 	async show_recent_orders_drawer() {
-		const branch_name = this.branch || (this.profile_data && this.profile_data.custom_branch) || "Branch";
+		const branch_name = FPOS_SINGLE_BRANCH;
 		const d = new frappe.ui.Dialog({
 			title: __("Recent Customer Orders — {0}", [branch_name]),
 			size: "large",
@@ -3501,7 +3560,6 @@ foodpos.FoodPOS.Controller = class {
 				method: "foodpos.foodpos.page.food_pos.food_pos.get_recent_pos_orders",
 				args: {
 					pos_profile: this.pos_profile || (this.profile_data && this.profile_data.name) || "",
-					branch: this.branch || (this.profile_data && this.profile_data.custom_branch) || "",
 					limit: 15,
 				},
 				freeze: false,
@@ -3534,7 +3592,7 @@ foodpos.FoodPOS.Controller = class {
 		if (!orders || orders.length === 0) {
 			$body.html(`
 				<div style="text-align:center;padding:50px 20px;color:#94a3b8;">
-					<div style="font-size:40px;margin-bottom:8px;">🧾</div>
+					<div style="margin-bottom:8px;color:#94a3b8;">${fpos_icon("receipt")}</div>
 					<div style="font-weight:600;font-size:14px;color:#64748b;">${__("No recent customer orders today")}</div>
 					<p style="font-size:12px;margin-top:4px;">${__("Completed POS invoices will appear here.")}</p>
 				</div>
@@ -3561,14 +3619,14 @@ foodpos.FoodPOS.Controller = class {
 						<div>
 							<div style="font-weight:800;font-size:14px;color:#0f172a;">${o.name}</div>
 							<div style="font-size:12px;color:#1e293b;font-weight:600;margin-top:2px;">
-								👤 ${o.customer_name || o.customer || "Walk-in"}
+								${fpos_icon("user", "fpos-ic-sm")} ${o.customer_name || o.customer || "Walk-in"}
 							</div>
 							<div style="font-size:11px;color:#64748b;margin-top:2px;">
 								${o.order_type || o.custom_order_type || "Takeaway"}${recent_tbl_label ? ` &bull; ${recent_tbl_label}` : ""} &bull; ${this.format_time_hh_mm(o.posting_time)}
 							</div>
 						</div>
 						<div style="text-align:right;">
-							<div style="font-weight:800;font-size:15px;color:#ea580c;">${format_curr(o.grand_total)}</div>
+							<div style="font-weight:800;font-size:15px;color:#15803d;">${format_curr(o.grand_total)}</div>
 							<div style="margin-top:4px;">${status_badge}</div>
 						</div>
 					</div>
@@ -3580,11 +3638,11 @@ foodpos.FoodPOS.Controller = class {
 					<!-- Restaurant Actions: Edit / Reload to Cart & Print Slip -->
 					<div style="display:flex;gap:8px;margin-top:4px;border-top:1px dashed #e2e8f0;padding-top:8px;">
 						<button class="btn btn-default btn-xs fpos-reload-order-btn" style="flex:1;font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:4px;color:#2563eb;background:#eff6ff;border-color:#bfdbfe;border-radius:6px;padding:6px 10px;">
-							<span>✏️</span>
+							<span>${fpos_icon("edit", "fpos-ic-sm")}</span>
 							<span>${__("Edit / Reload Cart")}</span>
 						</button>
 						<button class="btn btn-default btn-xs fpos-view-slip-btn" style="font-weight:600;display:inline-flex;align-items:center;gap:4px;border-radius:6px;padding:6px 10px;">
-							<span>🖨️</span>
+							<span>${fpos_icon("printer", "fpos-ic-sm")}</span>
 							<span>${__("POS Slip")}</span>
 						</button>
 					</div>
@@ -3626,6 +3684,8 @@ foodpos.FoodPOS.Controller = class {
 		if ($body.length) {
 			this.render_recent_orders_in_dialog(orders, $body, null);
 		}
+		// v5: the same data feeds the home "Recent Orders" strip.
+		this.render_home_recent_orders();
 	}
 
 	reload_order_to_cart(order) {
@@ -3682,7 +3742,7 @@ foodpos.FoodPOS.Controller = class {
 		$drawer.addClass("active");
 		$body.html(`
 			<div style="display:flex;justify-content:center;align-items:center;height:200px;flex-direction:column;gap:10px;">
-				<div class="fpos-spinner" style="width:32px;height:32px;border:3px solid #e2e8f0;border-top-color:#ea580c;border-radius:50%;animation:fpos-spin .8s linear infinite;"></div>
+				<div class="fpos-spinner" style="width:32px;height:32px;border:3px solid #e2e8f0;border-top-color:#15803d;border-radius:50%;animation:fpos-spin .8s linear infinite;"></div>
 				<span style="color:#64748b;font-size:13px;">${__("Loading active kitchen tickets...")}</span>
 			</div>
 		`);
@@ -3706,9 +3766,9 @@ foodpos.FoodPOS.Controller = class {
 		} catch (e) {
 			$body.html(`
 				<div style="text-align:center;padding:30px;color:#ef4444;">
-					<div style="font-size:24px;margin-bottom:8px;">🧑‍🍳</div>
+					<div style="margin-bottom:8px;color:#94a3b8;">${fpos_icon("chef", "fpos-ic-lg")}</div>
 					<div style="font-weight:600;">${__("Failed to load kitchen tickets")}</div>
-					<button class="btn btn-default btn-xs fpos-retry-kitchen-btn" style="margin-top:10px;font-weight:700;">🔄 ${__("Retry")}</button>
+					<button class="btn btn-default btn-xs fpos-retry-kitchen-btn" style="margin-top:10px;font-weight:700;">${fpos_icon("refresh", "fpos-ic-sm")} ${__("Retry")}</button>
 				</div>
 			`);
 			$body.find(".fpos-retry-kitchen-btn").on("click", () => this.show_kitchen_drawer());
@@ -3732,7 +3792,7 @@ foodpos.FoodPOS.Controller = class {
 		if (!kots || kots.length === 0) {
 			$body.html(`
 				<div style="text-align:center;padding:50px 20px;color:#94a3b8;">
-					<div style="font-size:40px;margin-bottom:8px;">🧑‍🍳</div>
+					<div style="margin-bottom:8px;color:#94a3b8;">${fpos_icon("chef", "fpos-ic-lg")}</div>
 					<div style="font-weight:600;font-size:14px;color:#64748b;">${__("No pending kitchen tickets")}</div>
 					<p style="font-size:12px;margin-top:4px;">${__("When orders are sent to kitchen, they will appear here with live preparation status.")}</p>
 				</div>
@@ -3758,7 +3818,7 @@ foodpos.FoodPOS.Controller = class {
 								<span style="font-weight:700;font-size:13px;color:#1e293b;">${it.qty}x ${it.item_name}</span>
 								${is_done ? `<span style="font-size:10px;background:#dcfce7;color:#15803d;padding:1px 6px;border-radius:8px;font-weight:700;">DONE</span>` : `<span style="font-size:10px;background:#fef3c7;color:#b45309;padding:1px 6px;border-radius:8px;font-weight:700;">COOKING</span>`}
 							</div>
-							${it.item_note ? `<div style="font-size:11px;color:#ea580c;background:#fff7ed;padding:2px 6px;border-radius:4px;margin-top:3px;display:inline-block;">📝 ${it.item_note}</div>` : ""}
+							${it.item_note ? `<div style="font-size:11px;color:#15803d;background:#f0fdf4;padding:2px 6px;border-radius:4px;margin-top:3px;display:inline-block;">${it.item_note}</div>` : ""}
 						</div>
 					</div>
 				`;
@@ -3769,9 +3829,9 @@ foodpos.FoodPOS.Controller = class {
 			if (kot.status === "Pending") {
 				stage_btn = `<button class="btn btn-default btn-xs fpos-kot-stage-btn" data-kot="${kot.name}" data-stage="In Progress" style="font-weight:700;background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe;border-radius:6px;padding:5px 12px;">▶ ${__("Start Cooking")}</button>`;
 			} else if (kot.status === "In Progress") {
-				stage_btn = `<button class="btn btn-default btn-xs fpos-kot-stage-btn" data-kot="${kot.name}" data-stage="Ready" style="font-weight:700;background:#f0fdf4;color:#15803d;border-color:#bbf7d0;border-radius:6px;padding:5px 12px;">✓ ${__("Mark Ready")}</button>`;
+				stage_btn = `<button class="btn btn-default btn-xs fpos-kot-stage-btn" data-kot="${kot.name}" data-stage="Ready" style="font-weight:700;background:#f0fdf4;color:#15803d;border-color:#bbf7d0;border-radius:6px;padding:5px 12px;">${fpos_icon("check", "fpos-ic-sm")} ${__("Mark Ready")}</button>`;
 			} else if (kot.status === "Ready") {
-				stage_btn = `<button class="btn btn-default btn-xs fpos-kot-stage-btn" data-kot="${kot.name}" data-stage="Served" style="font-weight:700;background:#f8fafc;color:#334155;border-color:#cbd5e1;border-radius:6px;padding:5px 12px;">🍽️ ${__("Mark Served")}</button>`;
+				stage_btn = `<button class="btn btn-default btn-xs fpos-kot-stage-btn" data-kot="${kot.name}" data-stage="Served" style="font-weight:700;background:#f8fafc;color:#334155;border-color:#cbd5e1;border-radius:6px;padding:5px 12px;">${fpos_icon("check", "fpos-ic-sm")} ${__("Mark Served")}</button>`;
 			}
 
 			const card = $(`
@@ -3783,7 +3843,7 @@ foodpos.FoodPOS.Controller = class {
 								<span style="background:${sc.bg};color:${sc.text};padding:2px 7px;border-radius:10px;font-size:10px;font-weight:800;text-transform:uppercase;">
 									${kot.status}
 								</span>
-								${kot.kitchen_station ? `<span style="background:#e0f2fe;color:#0369a1;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700;">📍 ${kot.kitchen_station.split("-").pop()}</span>` : ""}
+								${kot.kitchen_station ? `<span style="background:#e0f2fe;color:#0369a1;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700;">${kot.kitchen_station.split("-").pop()}</span>` : ""}
 							</div>
 							<div style="font-size:11px;color:#64748b;margin-top:3px;">
 								<span>${kot.order_type || "Dine In"}</span>
@@ -3793,16 +3853,16 @@ foodpos.FoodPOS.Controller = class {
 						</div>
 
 						<div style="text-align:right;">
-							<div style="font-size:12px;font-weight:800;color:${kot.status !== "Ready" && kot.remaining_items > 0 ? "#ea580c" : "#15803d"};background:${kot.status !== "Ready" && kot.remaining_items > 0 ? "#fff7ed" : "#dcfce7"};padding:4px 8px;border-radius:8px;">
-								${kot.status !== "Ready" && kot.remaining_items > 0 ? `🍳 ${kot.remaining_items} of ${kot.total_items} left` : `✓ All Ready`}
+							<div style="font-size:12px;font-weight:800;color:${kot.status !== "Ready" && kot.remaining_items > 0 ? "#15803d" : "#15803d"};background:${kot.status !== "Ready" && kot.remaining_items > 0 ? "#f0fdf4" : "#dcfce7"};padding:4px 8px;border-radius:8px;">
+								${kot.status !== "Ready" && kot.remaining_items > 0 ? `${kot.remaining_items} of ${kot.total_items} left` : `✓ All Ready`}
 							</div>
 						</div>
 					</div>
 
 					<!-- Remaining items alert indicator -->
 					${kot.status !== "Ready" && kot.remaining_items > 0 ? `
-						<div style="font-size:11px;font-weight:600;color:#c2410c;background:#fff7ed;padding:4px 8px;border-radius:6px;">
-							⚠️ ${__("{0} cooking item(s) remaining for this ticket", [kot.remaining_items])}
+						<div style="font-size:11px;font-weight:600;color:#166534;background:#f0fdf4;padding:4px 8px;border-radius:6px;">
+							${__("{0} cooking item(s) remaining for this ticket", [kot.remaining_items])}
 						</div>
 					` : ""}
 
@@ -3939,9 +3999,9 @@ foodpos.FoodPOS.Controller = class {
 	}
 
 	async show_served_kot_exceptions_dialog() {
-		const branch_name = this.branch || (this.profile_data && this.profile_data.custom_branch) || "Branch";
+		const branch_name = FPOS_SINGLE_BRANCH;
 		const d = new frappe.ui.Dialog({
-			title: __("🚨 Served KOT Exceptions (Manager Review) — {0}", [branch_name]),
+			title: __("Served KOT Exceptions (Manager Review) — {0}", [branch_name]),
 			size: "large",
 		});
 
@@ -3975,7 +4035,7 @@ foodpos.FoodPOS.Controller = class {
 		if (!exceptions || exceptions.length === 0) {
 			$body.html(`
 				<div style="text-align:center;padding:50px 20px;color:#15803d;">
-					<div style="font-size:40px;margin-bottom:8px;">✅</div>
+					<div style="margin-bottom:8px;color:#15803d;">${fpos_icon("checkCircle")}</div>
 					<div style="font-weight:800;font-size:15px;color:#166534;">${__("All Served KOTs Fully Settled")}</div>
 					<p style="font-size:12px;color:#64748b;margin-top:4px;">${__("No un-invoiced or un-voided kitchen tickets found. Shift data integrity intact.")}</p>
 				</div>
@@ -3986,7 +4046,7 @@ foodpos.FoodPOS.Controller = class {
 		const $container = $('<div style="display:flex;flex-direction:column;gap:12px;max-height:65vh;overflow-y:auto;padding-right:4px;"></div>');
 		$container.append(`
 			<div style="background:#fff1f2;border:1px solid #fecdd3;border-radius:8px;padding:10px 14px;font-size:12px;color:#9f1239;line-height:1.4;">
-				<b>⚠️ Safeguard Warning:</b> The following kitchen tickets were marked <b>Served</b> but have no linked submitted invoice or manager void. Under restaurant policy, every served order must either be billed or voided with Manager PIN.
+				<b>Safeguard Warning:</b> The following kitchen tickets were marked <b>Served</b> but have no linked submitted invoice or manager void. Under restaurant policy, every served order must either be billed or voided with Manager PIN.
 			</div>
 		`);
 
@@ -4003,7 +4063,7 @@ foodpos.FoodPOS.Controller = class {
 								<span style="background:${(ex.status || '').includes('Mismatch') ? '#fef3c7' : '#fee2e2'};color:${(ex.status || '').includes('Mismatch') ? '#92400e' : '#b91c1c'};padding:2px 8px;border-radius:12px;font-size:10.5px;font-weight:800;">${(ex.status || 'Served (Uninvoiced)').toUpperCase()}</span>
 							</div>
 							<div style="font-size:12px;color:#475569;margin-top:3px;font-weight:600;">
-								📍 ${ex.branch} &bull; ${ex.order_type}${ex.table && ex.table !== 'N/A' ? ` &bull; Table ${ex.table_no}` : ''} &bull; 👤 ${ex.customer}
+								${ex.branch} &bull; ${ex.order_type}${ex.table && ex.table !== 'N/A' ? ` &bull; Table ${ex.table_no}` : ''} &bull; ${ex.customer}
 							</div>
 							<div style="font-size:11px;color:#dc2626;font-weight:700;margin-top:2px;">
 								⏱️ Elapsed: ${ex.time_ago} (${ex.elapsed_mins} mins ago)
@@ -4011,7 +4071,7 @@ foodpos.FoodPOS.Controller = class {
 						</div>
 						<div style="text-align:right;">
 							<div style="font-size:11px;color:#64748b;font-weight:600;">Estimated Value</div>
-							<div style="font-size:16px;font-weight:900;color:#ea580c;">${format_curr(ex.estimated_total)}</div>
+							<div style="font-size:16px;font-weight:900;color:#15803d;">${format_curr(ex.estimated_total)}</div>
 						</div>
 					</div>
 
@@ -4022,10 +4082,10 @@ foodpos.FoodPOS.Controller = class {
 
 					<div style="display:flex;gap:10px;margin-top:12px;border-top:1px solid #f1f5f9;padding-top:10px;">
 						<button class="btn btn-default btn-xs fpos-settle-kot-btn" style="flex:1;background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe;font-weight:700;padding:6px 12px;border-radius:6px;">
-							<span>💳 ${__("Load to Cart & Settle")}</span>
+							<span>${fpos_icon("card", "fpos-ic-sm")} ${__("Load to Cart & Settle")}</span>
 						</button>
 						<button class="btn btn-danger btn-xs fpos-void-kot-btn" style="background:#dc2626;color:#fff;font-weight:700;padding:6px 12px;border-radius:6px;">
-							<span>🗑️ ${__("Manager Void (PIN)")}</span>
+							<span>${fpos_icon("trash", "fpos-ic-sm")} ${__("Manager Void (PIN)")}</span>
 						</button>
 					</div>
 				</div>
@@ -4172,7 +4232,7 @@ foodpos.FoodPOS.Controller = class {
 		if (!orders || orders.length === 0) {
 			$body.html(`
 				<div style="text-align:center;padding:50px 20px;color:#94a3b8;">
-					<div style="font-size:40px;margin-bottom:8px;">⏸️</div>
+					<div style="margin-bottom:8px;color:#94a3b8;">${fpos_icon("pause")}</div>
 					<div style="font-weight:600;font-size:14px;color:#64748b;">${__("No held orders")}</div>
 					<p style="font-size:12px;margin-top:4px;">${__("When you put an order on hold, it will appear here so you can resume it later.")}</p>
 				</div>
@@ -4208,11 +4268,11 @@ foodpos.FoodPOS.Controller = class {
 								${this.format_table_label(o.table || order_data.table || "") ? `&bull; <b>${this.format_table_label(o.table || order_data.table || "")}</b>` : ""}
 								&bull; <span>Customer: <b>${o.customer_name || o.customer || "Walk-in"}</b></span>
 							</div>
-							${o.phone ? `<div style="font-size:11px;color:#64748b;">📞 ${o.phone}</div>` : ""}
+							${o.phone ? `<div style="font-size:11px;color:#64748b;">${o.phone}</div>` : ""}
 						</div>
 
 						<div style="text-align:right;">
-							<div style="font-weight:900;font-size:16px;color:#ea580c;">${format_curr(order_total)}</div>
+							<div style="font-weight:900;font-size:16px;color:#15803d;">${format_curr(order_total)}</div>
 							<div style="font-size:11px;color:#94a3b8;margin-top:2px;">${o.creation ? o.creation.substring(11, 16) : ""}</div>
 						</div>
 					</div>
@@ -4221,7 +4281,7 @@ foodpos.FoodPOS.Controller = class {
 						<b style="color:#0f172a;">${items.length} items:</b> ${items_preview || "Items"}
 					</div>
 
-					${o.hold_reason ? `<div style="font-size:11px;color:#92400e;background:#fef3c7;padding:3px 8px;border-radius:4px;margin-bottom:8px;">📝 ${o.hold_reason}</div>` : ""}
+					${o.hold_reason ? `<div style="font-size:11px;color:#92400e;background:#fef3c7;padding:3px 8px;border-radius:4px;margin-bottom:8px;">${o.hold_reason}</div>` : ""}
 
 					<div style="display:flex;gap:8px;border-top:1px dashed #e2e8f0;padding-top:8px;">
 						<button class="btn btn-default btn-xs fpos-resume-held-btn" style="flex:1;font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:4px;color:#15803d;background:#f0fdf4;border-color:#bbf7d0;border-radius:6px;padding:6px 10px;">
@@ -4229,7 +4289,7 @@ foodpos.FoodPOS.Controller = class {
 							<span>${__("Resume Order")}</span>
 						</button>
 						<button class="btn btn-default btn-xs fpos-discard-held-btn" style="font-weight:700;display:inline-flex;align-items:center;gap:4px;color:#b91c1c;background:#fee2e2;border-color:#fca5a5;border-radius:6px;padding:6px 10px;">
-							<span>🗑️</span>
+							<span>${fpos_icon("trash", "fpos-ic-sm")}</span>
 							<span>${__("Discard")}</span>
 						</button>
 					</div>
@@ -4271,7 +4331,6 @@ foodpos.FoodPOS.Controller = class {
 					delivery_address: this.delivery_address || "",
 					delivery_charges: flt(this.delivery_charges || 0),
 					pos_profile: this.pos_profile,
-					branch: this.branch || (this.profile_data && this.profile_data.custom_branch) || null,
 					pos_opening_entry: this.pos_opening,
 					discount_percentage: this.discount_percentage,
 					discount_amount: this.discount_amount,
@@ -4343,7 +4402,7 @@ foodpos.FoodPOS.Controller = class {
 				this.delivery_phone = data.phone || "";
 				this.delivery_address = data.delivery_address || "";
 				this.delivery_charges = flt(data.delivery_charges || 0);
-				this.discount_percentage = flt(data.discount_percentage || 0);
+				this.discount_percentage = 0; // v5.2: % discounts removed — Rs only, stale % never restored.
 				this.discount_amount = flt(data.discount_amount || 0);
 				this.order_note = data.order_note || "";
 
@@ -4543,24 +4602,43 @@ foodpos.FoodPOS.Controller = class {
 		this.wrapper.find(".fpos-ot-tab").removeClass("active");
 		this.wrapper.find(`.fpos-ot-tab[data-type="${this.order_type}"]`).addClass("active");
 
-		const $tableField = this.wrapper.find(".fpos-table-field");
-		const $deliveryField = this.wrapper.find(".fpos-delivery-field");
-
-		if (this.order_type === "Dine In") {
-			$tableField.removeClass("fpos-hidden").show().css("display", "flex");
-			$deliveryField.addClass("fpos-hidden").hide();
-			$tableField.find(".fpos-table-label").text(
-				this.selected_table_no ? __("Table") + " " + this.selected_table_no : __("Select Table")
-			);
+		// v4 CHILI order header: Dine In shows the table as the title, other types
+		// show the customer. The .fpos-table-label / .fpos-customer-label spans are
+		// kept (same class names) so every existing label update keeps working.
+		const is_dinein = this.order_type === "Dine In";
+		const $t = this.wrapper.find(".fpos-table-label");
+		const $c = this.wrapper.find(".fpos-customer-label");
+		const $d = this.wrapper.find(".fpos-delivery-field");
+		if (is_dinein) {
+			$t.show().text(this.selected_table_no ? __("Table") + " " + this.selected_table_no : __("Select Table"));
+			$c.hide();
+			$d.hide();
 		} else if (this.order_type === "Delivery") {
-			$tableField.addClass("fpos-hidden").hide();
-			$deliveryField.removeClass("fpos-hidden").show().css("display", "flex");
-			$deliveryField.find(".fpos-delivery-label").text(this.delivery_phone || __("Delivery Details *"));
+			$t.hide();
+			$c.show().text(this.customer || __("Walk-in Customer"));
+			$d.show().css("display", "flex");
+			$d.find(".fpos-delivery-label").text(this.delivery_phone || __("Delivery Details *"));
 		} else {
-			// Takeaway — permanently hide both Table and Delivery rows
-			$tableField.addClass("fpos-hidden").hide();
-			$deliveryField.addClass("fpos-hidden").hide();
+			$t.hide();
+			$c.show().text(this.customer || __("Walk-in Customer"));
+			$d.hide();
 		}
+		this.wrapper.find(".fpos-topbar-order-label").text(
+			is_dinein
+				? (this.selected_table_no ? __("Table") + " " + this.selected_table_no : __("Select Table"))
+				: (this.order_type === "Walk In" ? (this.customer || __("Walk-in")) : this.order_type));
+		this.update_order_sub();
+	}
+
+	// v4: "{type} • N items" subtitle under the order title; refreshed on every cart change.
+	update_order_sub() {
+		const n = (this.cart_items || []).length;
+		const sub = `${this.order_type} • ${n === 1 ? __("1 item") : `${n} ${__("items")}`}`
+			+ (this.order_type === "Dine In" && this.customer ? ` • ${this.customer}` : "");
+		this.wrapper.find(".fpos-order-sub").text(sub);
+	}
+
+	set_order_type(new_type) {
 	}
 
 	set_order_type(new_type) {
@@ -4646,11 +4724,12 @@ foodpos.FoodPOS.Controller = class {
 		});
 
 		// Fast food category selection
-		this.wrapper.on("click", ".fpos-ff-tab, .fpos-category-tab", (e) => {
+		this.wrapper.on("click", ".fpos-ff-tab, .fpos-category-tab, .fpos-cat-tile", (e) => {
 			this.fast_food_category = $(e.currentTarget).data("cat");
 			this.current_category = this.fast_food_category;
-			this.wrapper.find(".fpos-ff-tab, .fpos-category-tab").removeClass("active");
+			this.wrapper.find(".fpos-ff-tab, .fpos-category-tab, .fpos-cat-tile").removeClass("active");
 			$(e.currentTarget).addClass("active");
+			this.wrapper.find(`.fpos-ff-tab[data-cat='${this.fast_food_category}'], .fpos-category-tab[data-cat='${this.fast_food_category}'], .fpos-cat-tile[data-cat='${this.fast_food_category}']`).addClass("active");
 			this.update_filter_button_indicator();
 			this.render_items_grid();
 		});
@@ -4689,8 +4768,8 @@ foodpos.FoodPOS.Controller = class {
 			this.current_category = "All";
 			this.diet_filter = "all";
 			this.sort_by = "default";
-			this.wrapper.find(".fpos-ff-tab, .fpos-category-tab").removeClass("active");
-			this.wrapper.find(".fpos-ff-tab[data-cat='All'], .fpos-category-tab[data-cat='All']").addClass("active");
+			this.wrapper.find(".fpos-ff-tab, .fpos-category-tab, .fpos-cat-tile").removeClass("active");
+			this.wrapper.find(".fpos-ff-tab[data-cat='All'], .fpos-category-tab[data-cat='All'], .fpos-cat-tile[data-cat='All']").addClass("active");
 			this.wrapper.find(".fpos-subfilter-pill").removeClass("active");
 			this.wrapper.find(".fpos-subfilter-pill[data-diet='all']").addClass("active");
 			this.wrapper.find(".fpos-sort-select").val("default");
@@ -4784,13 +4863,52 @@ foodpos.FoodPOS.Controller = class {
 		});
 
 		// Table selector click
-		this.wrapper.on("click", ".fpos-table-field", () => this.open_table_selector());
+		this.wrapper.on("click", ".fpos-order-edit-btn, .fpos-topbar-order-chip", () => {
+			if (this.order_type === "Dine In") this.open_table_selector();
+			else this.open_customer_dialog();
+		});
+		this.wrapper.on("click", ".fpos-topbar-menu-btn", () => {
+			this.wrapper.toggleClass("fpos-sidebar-collapsed");
+		});
 
 		// Customer picker click
-		this.wrapper.on("click", ".fpos-customer-field", () => this.open_customer_dialog());
+
+		// v3: left icon sidebar — every item goes somewhere real.
+		this.wrapper.on("click", ".fpos-pos-nav-item", (e) => {
+			const key = $(e.currentTarget).data("nav");
+			this.wrapper.find(".fpos-pos-nav-item").removeClass("active");
+			$(e.currentTarget).addClass("active");
+			if (key === "menu") this.show_pos();
+			else if (key === "tables" || key === "reservation") this.show_tables();
+			else if (key === "delivery") this.show_daily_report();
+			else if (key === "accounting") this.show_closing_page();
+			else if (key === "settings") frappe.set_route("Form", "POS Profile", this.pos_profile);
+			else if (key === "logout") {
+				if (window.frappe && frappe.app && frappe.app.logout) frappe.app.logout();
+				else frappe.set_route("desk");
+			}
+		});
+		// v3: occupied-table chip -> open that order's tab.
+		this.wrapper.on("click", ".fpos-table-chip", (e) => {
+			const $chip = $(e.currentTarget);
+			const tab_id = $chip.data("tab-id");
+			if (tab_id && this.tabs && this.tabs[tab_id]) { this.switch_tab(tab_id); return; }
+			// v4: a free-table chip starts a Dine-In order on that table.
+			const table_name = $chip.data("table-name");
+			if (table_name) this.start_table_order(table_name);
+		});
+
+		// v3: cart-panel payment method pick (Cash / Card / QR) — payment page default.
+		this.wrapper.on("click", ".fpos-pay-method", (e) => {
+			const mode = $(e.currentTarget).data("mode");
+			this.preferred_payment_mode = mode;
+			this.wrapper.find(".fpos-pay-method").removeClass("active");
+			$(e.currentTarget).addClass("active");
+		});
 
 		// KOT button click
-		this.wrapper.on("click", ".fpos-kot-btn", () => this.send_to_kitchen());
+		this.wrapper.on("click", ".fpos-confirm-order-btn", () => this.confirm_order());
+		this.wrapper.on("click", ".fpos-home-btn", () => this.show_home());
 
 		// Clear cart click with KOT safeguard
 		this.wrapper.on("click", ".fpos-clear-btn", async () => {
@@ -4880,11 +4998,7 @@ foodpos.FoodPOS.Controller = class {
 			frappe.show_alert({ message: __("POS screen refreshed"), indicator: "blue" });
 		});
 
-		// Switch branch action in More menu
-		this.wrapper.on("click", ".fpos-switch-branch-btn", () => {
-			this.wrapper.find(".fpos-more-menu").hide();
-			this.render_profile_selection_dialog(this.available_profiles, true);
-		});
+		// v2: Switch Branch removed — single branch, no branch switching.
 
 		// Exit to Desk action in More menu
 		this.wrapper.on("click", ".fpos-exit-desk-btn", () => {
@@ -4969,20 +5083,7 @@ foodpos.FoodPOS.Controller = class {
 			this.show_closing_page();
 		});
 
-		// Switch POS Profile click
-		this.wrapper.on("click", ".fpos-switch-profile-btn", () => {
-			if (this.available_profiles && this.available_profiles.length) {
-				this.render_profile_selection_dialog(this.available_profiles, true);
-			} else {
-				frappe.call({
-					method: "foodpos.foodpos.page.food_pos.food_pos.get_pos_profiles",
-					callback: (r) => {
-						this.available_profiles = r.message || [];
-						this.render_profile_selection_dialog(this.available_profiles, true);
-					},
-				});
-			}
-		});
+		// v2: the branch/register chip is a static label now — no profile switching.
 
 		// Discount modal
 		this.wrapper.on("click", ".fpos-discount-btn", () => {
@@ -5007,35 +5108,27 @@ foodpos.FoodPOS.Controller = class {
 								<span style="font-size:16px;color:#0f172a;font-weight:800;">${format_curr(subtotal)}</span>
 							</div>
 							<div style="font-size:11px;color:#94a3b8;margin-top:4px;">
-								${__("Cashier cap: Max 10% or Rs 100 without Manager PIN.")}
+								${__("Cashier cap: Max Rs 100 without Manager PIN. Discount is always in Rs, never %.")}
 							</div>
 						</div>
 
 						<div style="margin-bottom:14px;">
-							<label style="font-size:12px;font-weight:700;color:#334155;margin-bottom:6px;display:block;">${__("Discount Presets")}</label>
+							<label style="font-size:12px;font-weight:700;color:#334155;margin-bottom:6px;display:block;">${__("Discount Presets (Rs)")}</label>
 							<div class="fpos-disc-presets" style="display:flex;gap:6px;flex-wrap:wrap;">
-								<button type="button" class="btn btn-default btn-sm fpos-preset-btn" data-type="pct" data-val="5" style="font-weight:700;">5%</button>
-								<button type="button" class="btn btn-default btn-sm fpos-preset-btn" data-type="pct" data-val="10" style="font-weight:700;">10%</button>
-								<button type="button" class="btn btn-default btn-sm fpos-preset-btn" data-type="pct" data-val="15" style="font-weight:700;border-color:#f59e0b;color:#b45309;">15% 🔒</button>
-								<button type="button" class="btn btn-default btn-sm fpos-preset-btn" data-type="pct" data-val="20" style="font-weight:700;border-color:#f59e0b;color:#b45309;">20% 🔒</button>
 								<button type="button" class="btn btn-default btn-sm fpos-preset-btn" data-type="amt" data-val="50" style="font-weight:700;">Rs 50</button>
 								<button type="button" class="btn btn-default btn-sm fpos-preset-btn" data-type="amt" data-val="100" style="font-weight:700;">Rs 100</button>
-								<button type="button" class="btn btn-default btn-sm fpos-preset-btn" data-type="amt" data-val="200" style="font-weight:700;border-color:#f59e0b;color:#b45309;">Rs 200 🔒</button>
+								<button type="button" class="btn btn-default btn-sm fpos-preset-btn" data-type="amt" data-val="200" style="font-weight:700;border-color:#f59e0b;color:#b45309;">Rs 200 (PIN)</button>
+								<button type="button" class="btn btn-default btn-sm fpos-preset-btn" data-type="amt" data-val="500" style="font-weight:700;border-color:#f59e0b;color:#b45309;">Rs 500 (PIN)</button>
 								<button type="button" class="btn btn-default btn-sm fpos-preset-clear text-danger" style="font-weight:700;">${__("Clear")}</button>
 							</div>
 						</div>
 					`
 				},
 				{
-					fieldname: "discount_percentage",
-					fieldtype: "Percent",
-					label: __("Discount Percentage (%)"),
-					default: this.discount_percentage,
-				},
-				{
+					// v5.2: discount is a flat Rs amount only — no % field anymore.
 					fieldname: "discount_amount",
 					fieldtype: "Currency",
-					label: __("Flat Discount Amount"),
+					label: __("Discount Amount (Rs)"),
 					default: this.discount_amount,
 				},
 				{
@@ -5049,7 +5142,7 @@ foodpos.FoodPOS.Controller = class {
 					fieldtype: "Password",
 					label: __("Manager PIN"),
 					hidden: 1,
-					description: __("Exceeds cashier cap (Max 10% or Rs 100). Manager PIN is required."),
+					description: __("Exceeds cashier cap (Max Rs 100). Manager PIN is required."),
 				},
 				{
 					fieldname: "discount_reason",
@@ -5060,11 +5153,11 @@ foodpos.FoodPOS.Controller = class {
 				}
 			],
 			primary_action_label: __("Apply Discount"),
+			// v5.2: discount is a flat Rs amount only — no % anywhere.
 			primary_action: async (values) => {
-				const pct = flt(values.discount_percentage);
 				const amt = flt(values.discount_amount);
 
-				if (pct <= 0 && amt <= 0) {
+				if (amt <= 0) {
 					this.discount_percentage = 0;
 					this.discount_amount = 0;
 					this.discount_approved_by = null;
@@ -5074,14 +5167,14 @@ foodpos.FoodPOS.Controller = class {
 					return;
 				}
 
-				const exceeds_cap = pct > 10.0 || amt > 100.0;
+				const exceeds_cap = amt > 100.0;
 				if (exceeds_cap) {
 					const pin = (values.manager_pin || "").trim();
 					if (!pin) {
 						frappe.msgprint({
 							title: __("Manager PIN Required"),
 							indicator: "orange",
-							message: __("Discount of {0}% or {1} exceeds the cashier cap (10% or Rs 100). Please provide a valid Manager PIN.", [pct, format_curr(amt)])
+							message: __("Discount of {0} exceeds the cashier cap (Rs 100). Please provide a valid Manager PIN.", [format_curr(amt)])
 						});
 						d.set_df_property("pin_section", "hidden", 0);
 						d.set_df_property("manager_pin", "hidden", 0);
@@ -5096,15 +5189,14 @@ foodpos.FoodPOS.Controller = class {
 							args: {
 								pin: pin,
 								action_type: "discount",
-								branch: this.branch || (this.profile_data && this.profile_data.custom_branch) || null,
 								cashier: frappe.session.user,
-								details: `Discount override: ${pct}% or Rs ${amt}. Reason: ${values.discount_reason || "Manager approval"}`
+								details: `Discount override: Rs ${amt}. Reason: ${values.discount_reason || "Manager approval"}`
 							}
 						});
 						frappe.dom.unfreeze();
 
 						if (vres.message && vres.message.success) {
-							this.discount_percentage = pct;
+							this.discount_percentage = 0;
 							this.discount_amount = amt;
 							this.discount_approved_by = vres.message.approved_by;
 							this.discount_manager_pin = pin;
@@ -5125,7 +5217,7 @@ foodpos.FoodPOS.Controller = class {
 					}
 				} else {
 					// Within cashier cap
-					this.discount_percentage = pct;
+					this.discount_percentage = 0;
 					this.discount_amount = amt;
 					this.discount_approved_by = null;
 					this.discount_manager_pin = null;
@@ -5136,39 +5228,24 @@ foodpos.FoodPOS.Controller = class {
 		});
 
 		const check_cap_visibility = () => {
-			const p = flt(d.get_value("discount_percentage"));
 			const a = flt(d.get_value("discount_amount"));
-			const show_pin = p > 10.0 || a > 100.0;
+			const show_pin = a > 100.0;
 			d.set_df_property("pin_section", "hidden", show_pin ? 0 : 1);
 			d.set_df_property("manager_pin", "hidden", show_pin ? 0 : 1);
 			d.set_df_property("discount_reason", "hidden", show_pin ? 0 : 1);
 		};
 
-		d.$wrapper.on("input", "input[data-fieldname='discount_percentage']", () => {
-			d.set_value("discount_amount", 0);
-			check_cap_visibility();
-		});
-
 		d.$wrapper.on("input", "input[data-fieldname='discount_amount']", () => {
-			d.set_value("discount_percentage", 0);
 			check_cap_visibility();
 		});
 
 		d.$wrapper.on("click", ".fpos-preset-btn", (e) => {
-			const type = $(e.currentTarget).data("type");
 			const val = flt($(e.currentTarget).data("val"));
-			if (type === "pct") {
-				d.set_value("discount_amount", 0);
-				d.set_value("discount_percentage", val);
-			} else {
-				d.set_value("discount_percentage", 0);
-				d.set_value("discount_amount", val);
-			}
+			d.set_value("discount_amount", val);
 			check_cap_visibility();
 		});
 
 		d.$wrapper.on("click", ".fpos-preset-clear", () => {
-			d.set_value("discount_percentage", 0);
 			d.set_value("discount_amount", 0);
 			check_cap_visibility();
 		});
@@ -5184,7 +5261,7 @@ foodpos.FoodPOS.Controller = class {
 		const $closing = this.wrapper.find(".fpos-closing-page");
 		$closing.show().addClass("active").html(`
 			<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:65vh;gap:16px;">
-				<div class="fpos-spinner" style="width:44px;height:44px;border:3px solid #e2e8f0;border-top-color:#ea580c;border-radius:50%;animation:fpos-spin .8s linear infinite;"></div>
+				<div class="fpos-spinner" style="width:44px;height:44px;border:3px solid #e2e8f0;border-top-color:#15803d;border-radius:50%;animation:fpos-spin .8s linear infinite;"></div>
 				<div style="color:#475569;font-size:16px;font-weight:700;">${__("Compiling Today's Register Closing & Sales Analytics...")}</div>
 				<div style="color:#94a3b8;font-size:13px;">${__("Reconciling Sales Invoices, Cash Drawer & Payment Modes")}</div>
 			</div>
@@ -5223,7 +5300,7 @@ foodpos.FoodPOS.Controller = class {
 		if (data.top_items && data.top_items.length) {
 			top_items_html = data.top_items.map((it, idx) => `
 				<tr style="border-bottom: 1px solid #f1f5f9;">
-					<td style="padding: 10px 14px; font-weight: 700; color: #ea580c; width: 40px;">#${idx + 1}</td>
+					<td style="padding: 10px 14px; font-weight: 700; color: #15803d; width: 40px;">#${idx + 1}</td>
 					<td style="padding: 10px 14px;">
 						<div style="font-weight: 600; color: #1e293b;">${it.item_name}</div>
 						<small style="color: #94a3b8;">${it.item_code}</small>
@@ -5252,7 +5329,7 @@ foodpos.FoodPOS.Controller = class {
 			total_counted += flt(p.closing_amount);
 
 			const is_cash = (p.mode_of_payment || "").toLowerCase().includes("cash");
-			const icon = is_cash ? "💵" : (p.mode_of_payment || "").toLowerCase().includes("card") ? "💳" : "📱";
+			const icon = "";
 
 			return `
 				<tr class="fpos-recon-row" data-mode="${p.mode_of_payment}" data-opening="${p.opening_amount}" data-sales="${p.invoice_amount}" data-expected="${p.expected_amount}" style="border-bottom: 1px solid #f1f5f9;">
@@ -5273,7 +5350,7 @@ foodpos.FoodPOS.Controller = class {
 					</td>
 					<td style="padding: 8px 14px; text-align: center; width: 140px;">
 						<span class="fpos-mode-variance-badge" data-mode="${p.mode_of_payment}" style="font-size: 11px; font-weight: 700; padding: 4px 8px; border-radius: 6px; background: #dcfce7; color: #15803d; white-space: nowrap;">
-							🟢 ${__("Exact Match")}
+							● ${__("Exact Match")}
 						</span>
 					</td>
 				</tr>
@@ -5282,7 +5359,7 @@ foodpos.FoodPOS.Controller = class {
 
 		// Order Types Rows
 		const ot_rows = (data.order_types || []).map(ot => {
-			const icon = ot.order_type === "Dine In" ? "🍽️" : ot.order_type === "Takeaway" ? "🥡" : "🛵";
+			const icon = fpos_icon(ot.order_type === "Dine In" ? "table" : ot.order_type === "Takeaway" ? "box" : "truck", "fpos-ic-sm");
 			return `
 				<tr style="border-bottom: 1px solid #f1f5f9;">
 					<td style="padding: 10px 14px; font-weight: 600; color: #1e293b;">${icon} ${ot.order_type}</td>
@@ -5297,7 +5374,7 @@ foodpos.FoodPOS.Controller = class {
 		const invoices = data.invoices || [];
 		if (invoices.length > 0) {
 			inv_rows = invoices.map(inv => {
-				const ot_icon = inv.custom_order_type === "Dine In" ? "🍽️" : inv.custom_order_type === "Takeaway" ? "🥡" : "🛵";
+				const ot_icon = fpos_icon(inv.custom_order_type === "Dine In" ? "table" : inv.custom_order_type === "Takeaway" ? "box" : "truck", "fpos-ic-sm");
 				const doc_route = inv.doctype === "POS Invoice" ? `/app/pos-invoice/${inv.name}` : `/app/sales-invoice/${inv.name}`;
 				const is_paid = flt(inv.outstanding_amount) <= 0.001;
 				const status_badge = is_paid
@@ -5332,7 +5409,7 @@ foodpos.FoodPOS.Controller = class {
 						</button>
 						<div>
 							<h3 style="margin: 0; font-size: 18px; font-weight: 800; color: #0f172a; display: flex; align-items: center; gap: 8px;">
-								<span>📊</span> ${__("POS Shift Complete & Shift-Closing")}
+								<span>${fpos_icon("chart", "fpos-ic-sm")}</span> ${__("POS Shift Complete & Shift-Closing")}
 							</h3>
 							<div style="font-size: 12px; color: #64748b; margin-top: 2px;">
 								${__("POS Profile")}: <b style="color: #1e293b;">${data.pos_profile || this.pos_profile}</b> &bull;
@@ -5345,11 +5422,11 @@ foodpos.FoodPOS.Controller = class {
 
 					<div style="display: flex; gap: 10px;">
 						<button class="btn btn-default fpos-print-closing-btn" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600; border-radius: 8px;">
-							<span>🖨️</span>
+							<span>${fpos_icon("printer", "fpos-ic-sm")}</span>
 							<span>${__("Print Z-Report")}</span>
 						</button>
 						<button class="btn btn-danger fpos-exit-desk-btn" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 800; border-radius: 8px;">
-							<span>🔒</span>
+							<span>${fpos_icon("checkCircle", "fpos-ic-sm")}</span>
 							<span>${__("Submit POS Closing Entry & Exit")}</span>
 						</button>
 					</div>
@@ -5361,7 +5438,7 @@ foodpos.FoodPOS.Controller = class {
 					<div style="background: #fff; border: 1px solid #bbf7d0; border-left: 5px solid #22c55e; border-radius: 12px; padding: 18px 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
 						<div style="font-size: 12px; font-weight: 700; color: #166534; text-transform: uppercase; letter-spacing: .5px;">${__("Total Net Sales")}</div>
 						<div style="font-size: 26px; font-weight: 900; color: #15803d; margin: 6px 0 2px;">${format_curr(data.net_sales)}</div>
-						<div style="font-size: 11px; color: #16a34a;">${__("Gross")}: ${format_curr(data.gross_sales)} &bull; ${__("Taxes")}: ${format_curr(data.total_taxes)}</div>
+						<div style="font-size: 11px; color: #16a34a;">${__("Gross")}: ${format_curr(data.gross_sales)} &bull; ${__("Discounts")}: -${format_curr(data.total_discounts)}</div>
 					</div>
 
 					<!-- Total Orders -->
@@ -5372,10 +5449,10 @@ foodpos.FoodPOS.Controller = class {
 					</div>
 
 					<!-- Cash Drawer -->
-					<div style="background: #fff; border: 1px solid #fed7aa; border-left: 5px solid #ea580c; border-radius: 12px; padding: 18px 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+					<div style="background: #fff; border: 1px solid #fed7aa; border-left: 5px solid #15803d; border-radius: 12px; padding: 18px 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
 						<div style="font-size: 12px; font-weight: 700; color: #9a3412; text-transform: uppercase; letter-spacing: .5px;">${__("Expected Cash in Drawer")}</div>
-						<div style="font-size: 26px; font-weight: 900; color: #ea580c; margin: 6px 0 2px;">${format_curr(data.expected_cash)}</div>
-						<div style="font-size: 11px; color: #c2410c;">${__("Opening")}: ${format_curr(data.opening_cash)} &bull; ${__("Cash Sales")}: ${format_curr(data.cash_sales)}</div>
+						<div style="font-size: 26px; font-weight: 900; color: #15803d; margin: 6px 0 2px;">${format_curr(data.expected_cash)}</div>
+						<div style="font-size: 11px; color: #166534;">${__("Opening")}: ${format_curr(data.opening_cash)} &bull; ${__("Cash Sales")}: ${format_curr(data.cash_sales)}</div>
 					</div>
 
 					<!-- Settled Status -->
@@ -5395,7 +5472,7 @@ foodpos.FoodPOS.Controller = class {
 						<div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f5f9; padding-bottom: 12px;">
 							<div>
 								<div style="font-size: 15px; font-weight: 800; color: #0f172a; display: flex; align-items: center; gap: 8px;">
-									<span>💵</span> ${__("Payment Reconciliation & Cash Drawer Count")}
+									<span>${fpos_icon("cash", "fpos-ic-sm")}</span> ${__("Payment Reconciliation & Cash Drawer Count")}
 								</div>
 								<div style="font-size: 12px; color: #64748b; margin-top: 2px;">
 									${__("Physical count vs. expected totals (Opening Float + Shift Invoices)")}
@@ -5429,7 +5506,7 @@ foodpos.FoodPOS.Controller = class {
 										<td style="padding: 10px 14px; text-align: right; color: #0f172a;" class="fpos-recon-total-expected">${format_curr(total_expected)}</td>
 										<td style="padding: 10px 14px; text-align: right; color: #0f172a;" class="fpos-recon-total-counted">${format_curr(total_counted)}</td>
 										<td style="padding: 10px 14px; text-align: center;" class="fpos-recon-total-variance">
-											<span style="font-size: 11px; font-weight: 700; padding: 4px 8px; border-radius: 6px; background: #dcfce7; color: #15803d;">🟢 ${__("Balanced")}</span>
+											<span style="font-size: 11px; font-weight: 700; padding: 4px 8px; border-radius: 6px; background: #dcfce7; color: #15803d;">● ${__("Balanced")}</span>
 										</td>
 									</tr>
 								</tfoot>
@@ -5447,7 +5524,7 @@ foodpos.FoodPOS.Controller = class {
 						<!-- Order Channels Breakdown -->
 						<div style="background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
 							<div style="background: #f8fafc; padding: 12px 16px; font-size: 13px; font-weight: 800; color: #1e293b; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
-								<span>📋 ${__("Order Channels (Dine-In, Takeaway, Delivery)")}</span>
+								<span>${fpos_icon("receipt", "fpos-ic-sm")} ${__("Order Channels (Dine-In, Takeaway, Delivery)")}</span>
 								<span style="font-size: 11px; font-weight: 600; color: #64748b;">${(data.order_types || []).length} ${__("Channels")}</span>
 							</div>
 							<table style="width: 100%; border-collapse: collapse; font-size: 12px;">
@@ -5488,7 +5565,7 @@ foodpos.FoodPOS.Controller = class {
 				<!-- Top Selling Fast Food Items Table -->
 				<div style="background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
 					<div style="background: #f8fafc; padding: 14px 18px; font-size: 14px; font-weight: 800; color: #1e293b; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
-						<span>🍔 ${__("Top Selling Fast Food Items in this Shift")}</span>
+						<span>${fpos_icon("chef", "fpos-ic-sm")} ${__("Top Selling Fast Food Items in this Shift")}</span>
 						<span style="font-size: 11px; color: #64748b; font-weight: 600;">${(data.top_items || []).length} ${__("Products Ranked")}</span>
 					</div>
 					<table style="width: 100%; border-collapse: collapse; font-size: 13px;">
@@ -5507,7 +5584,7 @@ foodpos.FoodPOS.Controller = class {
 				<!-- Today's Transaction Journal (Sales Invoices) Table -->
 				<div style="background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
 					<div style="background: #f8fafc; padding: 14px 18px; font-size: 14px; font-weight: 800; color: #1e293b; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
-						<span>🧾 ${__("Shift Invoice Transactions")}</span>
+						<span>${fpos_icon("receipt", "fpos-ic-sm")} ${__("Shift Invoice Transactions")}</span>
 						<span style="font-size: 11px; color: #64748b; font-weight: 600;">${invoices.length} ${__("Total Invoices Generated")}</span>
 					</div>
 					<div style="max-height: 380px; overflow-y: auto;">
@@ -5535,10 +5612,10 @@ foodpos.FoodPOS.Controller = class {
 
 					<div style="display: flex; gap: 12px;">
 						<button class="btn btn-default fpos-print-closing-btn" style="font-weight: 700; border-radius: 8px; padding: 8px 18px; border: 1px solid #cbd5e1;">
-							<span>🖨️ ${__("Print Z-Report")}</span>
+							<span>${fpos_icon("printer", "fpos-ic-sm")} ${__("Print Z-Report")}</span>
 						</button>
 						<button class="btn btn-danger fpos-exit-desk-btn" style="font-weight: 800; border-radius: 8px; padding: 8px 22px;">
-							<span>🔒 ${__("Submit POS Closing Entry & Exit")}</span>
+							<span>${fpos_icon("checkCircle", "fpos-ic-sm")} ${__("Submit POS Closing Entry & Exit")}</span>
 						</button>
 					</div>
 				</div>
@@ -5574,11 +5651,11 @@ foodpos.FoodPOS.Controller = class {
 
 				const $badge = $row.find(".fpos-mode-variance-badge");
 				if (Math.abs(diff) < 0.01) {
-					$badge.css({ background: "#dcfce7", color: "#15803d" }).text(`🟢 ${__("Exact Match")}`);
+					$badge.css({ background: "#dcfce7", color: "#15803d" }).text(`● ${__("Exact Match")}`);
 				} else if (diff < 0) {
-					$badge.css({ background: "#fee2e2", color: "#b91c1c" }).text(`🔴 ${__("Short")}: -${format_curr(Math.abs(diff))}`);
+					$badge.css({ background: "#fee2e2", color: "#b91c1c" }).text(`● ${__("Short")}: -${format_curr(Math.abs(diff))}`);
 				} else {
-					$badge.css({ background: "#fef3c7", color: "#b45309" }).text(`🟡 ${__("Surplus")}: +${format_curr(diff)}`);
+					$badge.css({ background: "#fef3c7", color: "#b45309" }).text(`● ${__("Surplus")}: +${format_curr(diff)}`);
 				}
 			});
 
@@ -5588,11 +5665,11 @@ foodpos.FoodPOS.Controller = class {
 			const total_diff = total_cnt - total_exp;
 			const $tot_badge = $page.find(".fpos-recon-total-variance");
 			if (Math.abs(total_diff) < 0.01) {
-				$tot_badge.html(`<span style="font-size: 11px; font-weight: 700; padding: 4px 8px; border-radius: 6px; background: #dcfce7; color: #15803d;">🟢 ${__("Balanced")}</span>`);
+				$tot_badge.html(`<span style="font-size: 11px; font-weight: 700; padding: 4px 8px; border-radius: 6px; background: #dcfce7; color: #15803d;">● ${__("Balanced")}</span>`);
 			} else if (total_diff < 0) {
-				$tot_badge.html(`<span style="font-size: 11px; font-weight: 700; padding: 4px 8px; border-radius: 6px; background: #fee2e2; color: #b91c1c;">🔴 -${format_curr(Math.abs(total_diff))}</span>`);
+				$tot_badge.html(`<span style="font-size: 11px; font-weight: 700; padding: 4px 8px; border-radius: 6px; background: #fee2e2; color: #b91c1c;">● -${format_curr(Math.abs(total_diff))}</span>`);
 			} else {
-				$tot_badge.html(`<span style="font-size: 11px; font-weight: 700; padding: 4px 8px; border-radius: 6px; background: #fef3c7; color: #b45309;">🟡 +${format_curr(total_diff)}</span>`);
+				$tot_badge.html(`<span style="font-size: 11px; font-weight: 700; padding: 4px 8px; border-radius: 6px; background: #fef3c7; color: #b45309;">● +${format_curr(total_diff)}</span>`);
 			}
 		};
 
@@ -5725,7 +5802,6 @@ foodpos.FoodPOS.Controller = class {
 				<div class="bold" style="margin:4px 0;">SALES TOTALS</div>
 				<div class="row"><span>Total Orders:</span><span class="bold">${data.total_orders}</span></div>
 				<div class="row"><span>Gross Sales:</span><span>${format_curr(data.gross_sales)}</span></div>
-				<div class="row"><span>Taxes:</span><span>${format_curr(data.total_taxes)}</span></div>
 				<div class="row"><span>Discounts:</span><span>-${format_curr(data.total_discounts)}</span></div>
 				<div class="row bold" style="font-size:14px;margin-top:4px;"><span>NET TOTAL SALES:</span><span>${format_curr(data.net_sales)}</span></div>
 				<div class="divider"></div>
@@ -5760,6 +5836,587 @@ foodpos.FoodPOS.Controller = class {
 			win.focus();
 			win.print();
 		}, 300);
+	}
+
+	// ─── v2: Home / Day Open-Close, Tables, Attendance, Daily Report ───
+	// All views live inside the POS page (no new frappe.ui.Dialog).
+
+	// Live elapsed time, e.g. "04:37" or "01:12:05" (hh:mm:ss once over an hour).
+	format_elapsed(since) {
+		if (!since) return "00:00";
+		let start = new Date(since);
+		if (isNaN(start.getTime())) {
+			// Frappe datetimes come as "2026-11-14 09:15:00" — parse as local time.
+			start = new Date(String(since).replace(" ", "T"));
+		}
+		if (isNaN(start.getTime())) return "00:00";
+		let secs = Math.max(0, Math.floor((Date.now() - start.getTime()) / 1000));
+		const h = Math.floor(secs / 3600); secs -= h * 3600;
+		const m = Math.floor(secs / 60); const s = secs - m * 60;
+		const pad = (n) => String(n).padStart(2, "0");
+		return h > 0 ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
+	}
+
+	// One 1-second ticker for every live timer on screen (home day timer +
+	// occupied-table timers). Ticks without any page reload.
+	start_home_timers() {
+		if (this._home_timer) return;
+		this._home_timer = setInterval(() => {
+			this.wrapper.find("[data-since]").each((_, el) => {
+				const $el = $(el);
+				$el.text("⏱ " + this.format_elapsed($el.attr("data-since")));
+			});
+			const $day = this.wrapper.find("#fpos-day-elapsed");
+			if ($day.length && $day.attr("data-since")) {
+				$day.text(this.format_elapsed($day.attr("data-since")));
+			}
+		}, 1000);
+	}
+
+	// Show exactly one view: "home" | "pos" | "tables" | "attendance" | "report".
+	set_view(name) {
+		this.current_view = name;
+		// v4: each view has exactly one header — on Home/Tables/Attendance/Report
+		// the POS topbar hides (those views have their own header + Home button).
+		this.wrapper.toggleClass("fpos-view-pos", name === "pos");
+		const show = (sel, on) => this.wrapper.find(sel).toggle(!!on);
+		show(".fpos-home-view", name === "home");
+		show(".fpos-tables-view", name === "tables");
+		show(".fpos-attendance-view", name === "attendance");
+		show(".fpos-daily-report-view", name === "report");
+		show(".fpos-body", name === "pos");
+		this.start_home_timers();
+	}
+
+	// ── Home screen (the main screen): Sync status, Shift / Day Open state,
+	// Day Open time + running elapsed, user-settable Day Start / Day End,
+	// four order-type tiles, bottom nav. No dialog is opened to get here.
+	async show_home() {
+		this.set_view("home");
+		const $home = this.wrapper.find(".fpos-home-view");
+		let day = { day_open: !!this.pos_opening, day_start_time: "", day_end_time: "", period_start_date: "" };
+		try {
+			const res = await frappe.call({
+				method: "foodpos.foodpos.page.food_pos.food_pos.get_day_status",
+				args: { pos_profile: this.pos_profile },
+			});
+			day = Object.assign(day, res.message || {});
+		} catch (e) { console.warn("get_day_status failed:", e); }
+		if (day.pos_opening_entry) this.pos_opening = day.pos_opening_entry;
+		this.day_open = !!day.day_open;
+		this.day_open_time = day.period_start_date || "";
+
+		// v5: "Today at a glance" — reuses the EXISTING daily-report hook
+		// (get_daily_report, same endpoint the Reports nav uses). No new
+		// server API. On failure the cards render "—" instead of blocking.
+		let daily = null;
+		try {
+			const rres = await frappe.call({
+				method: "foodpos.foodpos.page.food_pos.food_pos.get_daily_report",
+				args: { pos_profile: this.pos_profile },
+			});
+			daily = rres.message || null;
+		} catch (e) { console.warn("get_daily_report failed (home stats):", e); }
+		this.home_daily = daily;
+		const stat_sales = daily ? (daily.total_sales || 0) : null;
+		const stat_orders = daily ? (daily.total_orders || 0) : null;
+		const stat_avg = (stat_orders && stat_orders > 0) ? stat_sales / stat_orders : null;
+		const stat_top = (daily && daily.top_items && daily.top_items[0]) ? daily.top_items[0] : null;
+
+		const queue = JSON.parse(localStorage.getItem(this.offline_queue_key) || "[]");
+		const online = navigator.onLine !== false;
+		const sync_label = online
+			? (queue.length ? `${queue.length} ${__("pending sync")}` : __("Connected — Synced"))
+			: __("Offline — will sync when back online");
+		// v3: SVG icons, not emoji, on the home tiles.
+		const tiles = [
+			{ type: "Walk In", icon: "user", desc: __("Counter orders") },
+			{ type: "Take Away", icon: "box", desc: __("Takeaway orders") },
+			{ type: "Delivery", icon: "truck", desc: __("Delivery orders") },
+			{ type: "Dine In", icon: "table", desc: __("Tables — dine in") },
+		];
+		// v3: SVG icons, not emoji, on the bottom nav.
+		const nav = [
+			{ key: "orders", icon: "receipt", label: __("Orders") },
+			{ key: "dispatch", icon: "truck", label: __("Dispatch") },
+			{ key: "cashier", icon: "cash", label: __("Cashier") },
+			{ key: "kds", icon: "chef", label: __("KDS") },
+			{ key: "shifts", icon: "clock", label: __("Shifts") },
+			{ key: "staff", icon: "users", label: __("Staff") },
+			{ key: "attendance", icon: "checkCircle", label: __("Attendance") },
+			{ key: "reports", icon: "chart", label: __("Reports") },
+			{ key: "printer", icon: "printer", label: __("Printer") },
+			{ key: "settings", icon: "settings", label: __("Settings") },
+		];
+		$home.html(`
+			<div class="fpos-home">
+				<div class="fpos-home-top">
+					<div class="fpos-home-brand">
+						<div class="fpos-home-title">${__("Food POS")}</div>
+						<div class="fpos-home-sub">${__("Main Branch")} &bull; ${this.pos_profile || ""}</div>
+					</div>
+					<div class="fpos-home-sync ${online ? "online" : "offline"}">
+						<span class="fpos-sync-dot"></span> ${sync_label}
+					</div>
+				</div>
+
+				<div class="fpos-home-shift">
+					<div class="fpos-shift-card">
+						<div class="fpos-shift-label">${__("Shift Management")}</div>
+						<div class="fpos-shift-state ${day.day_open ? "open" : "closed"}">
+							${day.day_open ? __("● Day Open") : __("○ Day Closed")}
+						</div>
+						${day.day_open && this.day_open_time ? `
+							<div class="fpos-shift-opened">
+								${__("Day Open")}: ${this.day_open_time}
+								&bull; <span id="fpos-day-elapsed" data-since="${this.day_open_time}">${this.format_elapsed(this.day_open_time)}</span>
+							</div>` : ""}
+						<div class="fpos-shift-times">
+							<label>${__("Day Start")}
+								<input type="time" class="fpos-day-start" value="${day.day_start_time || ""}">
+							</label>
+							<label>${__("Day End / Close")}
+								<input type="time" class="fpos-day-end" value="${day.day_end_time || ""}">
+							</label>
+							<button class="fpos-btn fpos-day-times-save">${__("Save Times")}</button>
+						</div>
+						<div class="fpos-shift-actions">
+							${day.day_open
+								? `<button class="fpos-btn fpos-day-close-btn">${__("Close Day — Z Report")}</button>`
+								: `<button class="fpos-btn fpos-day-open-btn">${__("Open Day")}</button>`}
+						</div>
+					</div>
+				</div>
+
+				<div class="fpos-home-stats">
+					<div class="fpos-home-stat">
+						<div class="fpos-home-stat-label">${__("Today's Sales")}</div>
+						<div class="fpos-home-stat-value fpos-home-stat-gold">${stat_sales === null ? "—" : this.format_money(stat_sales)}</div>
+						<div class="fpos-home-stat-sub">${stat_orders === null ? "" : `${stat_orders} ${__("orders today")}`}</div>
+					</div>
+					<div class="fpos-home-stat">
+						<div class="fpos-home-stat-label">${__("Orders")}</div>
+						<div class="fpos-home-stat-value">${stat_orders === null ? "—" : stat_orders}</div>
+						<div class="fpos-home-stat-sub">${__("today")}</div>
+					</div>
+					<div class="fpos-home-stat">
+						<div class="fpos-home-stat-label">${__("Avg Bill")}</div>
+						<div class="fpos-home-stat-value">${stat_avg === null ? "—" : this.format_money(stat_avg)}</div>
+						<div class="fpos-home-stat-sub">${__("per order")}</div>
+					</div>
+					<div class="fpos-home-stat">
+						<div class="fpos-home-stat-label">${__("Top Item")}</div>
+						<div class="fpos-home-stat-value fpos-home-stat-item">${stat_top ? stat_top.item_name : "—"}</div>
+						<div class="fpos-home-stat-sub">${stat_top ? `× ${stat_top.qty} ${__("sold")}` : __("no sales yet")}</div>
+					</div>
+				</div>
+
+				<div class="fpos-home-tiles">
+					${tiles.map((t) => `
+						<button class="fpos-home-tile" data-type="${t.type}">
+							<span class="fpos-tile-icon">${fpos_icon(t.icon)}</span>
+							<span class="fpos-tile-label">${__(t.type)}</span>
+							<span class="fpos-tile-desc">${t.desc}</span>
+						</button>`).join("")}
+				</div>
+
+				<div class="fpos-home-recent">
+					<div class="fpos-home-recent-head">
+						<span class="fpos-home-recent-title">${__("Recent Orders")}</span>
+						<button class="fpos-home-recent-all">${__("View all")}</button>
+					</div>
+					<div class="fpos-home-recent-list" id="fpos-home-recent-list">
+						${this.home_recent_rows_html()}
+					</div>
+				</div>
+
+				<nav class="fpos-home-nav">
+					${nav.map((n) => `
+						<button class="fpos-home-nav-item" data-nav="${n.key}">
+							<span class="fpos-nav-icon">${fpos_icon(n.icon)}</span>
+							<span>${n.label}</span>
+						</button>`).join("")}
+				</nav>
+			</div>
+		`);
+
+		// Tiles: start an order of that type (Dine In goes to the floor plan).
+		$home.find(".fpos-home-tile").on("click", (e) => {
+			this.start_order($(e.currentTarget).data("type"));
+		});
+		// Day times: user-settable, saved on the POS Opening Entry.
+		$home.find(".fpos-day-times-save").on("click", async () => {
+			const start = $home.find(".fpos-day-start").val();
+			const end = $home.find(".fpos-day-end").val();
+			try {
+				await frappe.call({
+					method: "foodpos.foodpos.page.food_pos.food_pos.set_day_times",
+					args: { pos_profile: this.pos_profile, day_start_time: start, day_end_time: end },
+				});
+				frappe.show_alert({ message: __("Day times saved."), indicator: "green" });
+			} catch (e) {
+				frappe.show_alert({ message: __("Could not save day times: {0}", [e.message]), indicator: "red" });
+			}
+		});
+		$home.find(".fpos-day-open-btn").on("click", () => this.show_opening_shift_dialog());
+		$home.find(".fpos-day-close-btn").on("click", () => this.start_day_close());
+		// Bottom nav — each item goes to the existing page/drawer or a new view.
+		$home.find(".fpos-home-nav-item").on("click", (e) => {
+			const key = $(e.currentTarget).data("nav");
+			if (key === "orders") this.show_recent_orders_drawer();
+			else if (key === "dispatch") this.show_daily_report();
+			else if (key === "cashier") this.show_pos();
+			else if (key === "kds") this.show_kitchen_drawer();
+			else if (key === "shifts") frappe.set_route("List", "POS Opening Entry");
+			else if (key === "staff" || key === "attendance") this.show_attendance();
+			else if (key === "reports") this.show_daily_report();
+			else if (key === "printer") this.show_recent_orders_drawer();
+			else if (key === "settings") frappe.set_route("Form", "POS Profile", this.pos_profile);
+		});
+		// v5: Recent Orders strip — "View all" + row tap open the existing drawer.
+		$home.on("click", ".fpos-home-recent-all", () => this.show_recent_orders_drawer());
+		$home.on("click", ".fpos-home-recent-row", () => this.show_recent_orders_drawer());
+		// Refresh the strip from the already-fetched Recent Orders data.
+		this.load_recent_orders();
+	}
+
+	// v5: home "Recent Orders" strip rows — reuses this.recent_orders,
+	// already fetched by load_recent_orders(); no new endpoint. Shows
+	// the latest 3 so the strip fits above the fixed bottom nav.
+	home_recent_rows_html() {
+		const orders = (this.recent_orders || []).slice(0, 3);
+		if (!orders.length) {
+			return `<div class="fpos-home-recent-empty">${__("No orders yet today — new bills will appear here.")}</div>`;
+		}
+		return orders.map((o) => {
+			const is_paid = flt(o.outstanding_amount) <= 0.001;
+			const tbl = o.table_no || o.custom_table || o.custom_restaurant_table || "";
+			const type = o.order_type || o.custom_order_type || "";
+			const meta_bits = [type, tbl ? this.format_table_label(tbl) : "", this.format_time_hh_mm(o.posting_time)].filter(Boolean);
+			return `<button class="fpos-home-recent-row" data-order="${o.name}">
+				<span class="fpos-home-recent-id">${o.name}</span>
+				<span class="fpos-home-recent-cust">${o.customer_name || o.customer || __("Walk-in")}</span>
+				<span class="fpos-home-recent-meta">${meta_bits.join(" • ")}</span>
+				<span class="fpos-home-recent-amt">${this.format_money(o.grand_total)}</span>
+				<span class="fpos-home-recent-pill ${is_paid ? "paid" : "unpaid"}">${is_paid ? "PAID" : "UNPAID"}</span>
+			</button>`;
+		}).join("");
+	}
+
+	// Refresh the home strip whenever Recent Orders data lands.
+	render_home_recent_orders() {
+		const $list = this.wrapper.find("#fpos-home-recent-list");
+		if ($list.length) $list.html(this.home_recent_rows_html());
+	}
+
+	// Back to the order screen (menu + cart).
+	show_pos() {
+		this.set_view("pos");
+	}
+
+	// Start an order of a type from the home tiles.
+	start_order(order_type) {
+		const type = FPOS_ORDER_TYPES.includes(order_type) ? order_type : "Walk In";
+		if (type === "Dine In") {
+			this.show_tables();
+			return;
+		}
+		this.order_type = type;
+		this.update_order_type_ui();
+		this.create_new_tab(type, null, "", true);
+		this.show_pos();
+	}
+
+	// ── Tables — floor plan with a realistic look: table shape + chairs,
+	// capacity, section, live status colours, live timer, guests, tap to open.
+	async show_tables() {
+		this.set_view("tables");
+		const $view = this.wrapper.find(".fpos-tables-view");
+		$view.html(`<div class="fpos-tables-loading">${__("Loading tables...")}</div>`);
+		let tables = [];
+		try {
+			const res = await frappe.call({
+				method: "foodpos.foodpos.page.food_pos.food_pos.get_available_tables",
+				args: { pos_profile: this.pos_profile },
+			});
+			tables = res.message || [];
+		} catch (e) {
+			$view.html(`<div class="fpos-tables-loading">${__("Could not load tables: {0}", [e.message])}</div>`);
+			return;
+		}
+		this.tables = tables;
+		const sections = [...new Set(tables.map((t) => t.section || __("Main Hall")))];
+		const status_class = (s) => ({
+			"Available": "available", "Occupied": "occupied",
+			"Reserved": "reserved", "Cleaning": "cleaning",
+		})[s] || "available";
+		$view.html(`
+			<div class="fpos-floor">
+				<div class="fpos-floor-head">
+					<div>
+						<div class="fpos-floor-title">${__("Dine-In — Tables")}</div>
+						<div class="fpos-floor-sub">${tables.length} ${__("tables")} &bull; ${tables.filter((t) => t.status === "Occupied").length} ${__("occupied")} &bull; ${__("Main Branch")}</div>
+					</div>
+					<div class="fpos-floor-actions">
+						<button class="fpos-btn fpos-floor-home">${fpos_icon("home", "fpos-ic-sm")} ${__("Home")}</button>
+						<button class="fpos-btn fpos-floor-edit">${fpos_icon("settings", "fpos-ic-sm")} ${__("Edit Layout")}</button>
+					</div>
+				</div>
+				${sections.map((sec) => `
+					<div class="fpos-floor-section">
+						<div class="fpos-floor-section-title">${sec}</div>
+						<div class="fpos-floor-grid">
+							${tables.filter((t) => (t.section || __("Main Hall")) === sec).map((t) => {
+								const occupied = t.status === "Occupied";
+								// v3: realistic round wooden table — chairs left/right (2-4 by
+								// capacity), pedestal under the top, status pill + dot, live timer.
+								const cap = Math.max(2, t.capacity || 4);
+								const pill_icon = t.status === "Available" ? "checkCircle" : t.status === "Occupied" ? "people" : t.status === "Reserved" ? "star" : "clock";
+								return `
+								<button class="fpos-table-card fpos-table-${status_class(t.status)}" data-table="${t.name}">
+									<span class="fpos-table-dot ${status_class(t.status)}"></span>
+									<span class="fpos-table-scene">
+										<span class="fpos-chair fpos-chair-left"></span>
+										<span class="fpos-table-top">${t.table_no || t.name}</span>
+										<span class="fpos-chair fpos-chair-right"></span>
+										<span class="fpos-table-pedestal"></span>
+									</span>
+									<span class="fpos-table-num">${__("Table")} ${t.table_no || t.name}</span>
+									<span class="fpos-table-status-pill ${status_class(t.status)}">${fpos_icon(pill_icon)} ${__(t.status)}</span>
+									${occupied && t.occupied_since ? `<span class="fpos-table-time" data-since="${t.occupied_since}">${fpos_icon("timer", "fpos-ic-sm")} ${this.format_elapsed(t.occupied_since)}</span>` : ""}
+									<span class="fpos-table-meta2">${cap} ${__("seats")}${t.guests ? ` &bull; ${__("Guests")}: ${t.guests}` : ""}${t.order_id ? ` &bull; ${t.order_id}` : ""}</span>
+								</button>`;
+							}).join("")}
+						</div>
+					</div>`).join("")}
+				<div class="fpos-floor-legend">
+					<span><i class="dot available"></i> ${__("Available")}</span>
+					<span><i class="dot occupied"></i> ${__("Occupied")}</span>
+					<span><i class="dot reserved"></i> ${__("Reserved")}</span>
+					<span><i class="dot cleaning"></i> ${__("Cleaning")}</span>
+				</div>
+			</div>
+		`);
+		$view.find(".fpos-floor-home").on("click", () => this.show_home());
+		$view.find(".fpos-floor-edit").on("click", () => frappe.set_route("List", "Restaurant Table"));
+		$view.find(".fpos-table-card").on("click", (e) => {
+			const name = $(e.currentTarget).data("table");
+			const table = (this.tables || []).find((t) => t.name === name);
+			if (table) this.open_table_order(table);
+		});
+		this.start_home_timers();
+	}
+
+	// Light refresh of the tables view after a confirm/settle (no full reload).
+	render_tables_view() {
+		if (this.current_view === "tables") this.show_tables();
+	}
+
+	// Tap a table → open its order (or start a new Dine-In order on it).
+	open_table_order(table) {
+		this.order_type = "Dine In";
+		this.selected_table = table.name;
+		this.selected_table_no = table.table_no || "";
+		if (table.order_id) this.pos_order_id = table.order_id;
+		this.create_new_tab("Dine In", table.name, table.table_no || "", true);
+		this.update_order_type_ui();
+		this.show_pos();
+	}
+
+	// ── Staff Attendance — inline controls inside the POS page (no dialog).
+	// One row per staff per day, tied to the Day Open/Close day.
+	async show_attendance() {
+		this.set_view("attendance");
+		const $view = this.wrapper.find(".fpos-attendance-view");
+		$view.html(`<div class="fpos-tables-loading">${__("Loading attendance...")}</div>`);
+		let data = { date: "", rows: [], note: "" };
+		try {
+			const res = await frappe.call({
+				method: "foodpos.foodpos.page.food_pos.food_pos.get_staff_attendance",
+				args: { pos_profile: this.pos_profile },
+			});
+			data = res.message || data;
+		} catch (e) {
+			$view.html(`<div class="fpos-tables-loading">${__("Could not load attendance: {0}", [e.message])}</div>`);
+			return;
+		}
+		const rows = data.rows || [];
+		$view.html(`
+			<div class="fpos-attendance">
+				<div class="fpos-floor-head">
+					<div>
+						<div class="fpos-floor-title">${__("Staff Attendance")}</div>
+						<div class="fpos-floor-sub">${data.date || ""} &bull; ${rows.length} ${__("staff")} &bull; ${__("Main Branch")}</div>
+					</div>
+					<button class="fpos-btn fpos-att-home">${fpos_icon("home", "fpos-ic-sm")} ${__("Home")}</button>
+				</div>
+				${data.note ? `<div class="fpos-att-note">${data.note}</div>` : ""}
+				<div class="fpos-att-mark">
+					<input class="fpos-att-name" placeholder="${__("Staff name")}">
+					<button class="fpos-btn fpos-att-checkin">${__("Check In")}</button>
+					<button class="fpos-btn fpos-att-checkout">${__("Check Out")}</button>
+					<button class="fpos-btn fpos-att-absent">${__("Absent")}</button>
+				</div>
+				<table class="fpos-att-table">
+					<thead><tr><th>${__("Staff")}</th><th>${__("Status")}</th><th>${__("Check In")}</th><th>${__("Check Out")}</th><th></th></tr></thead>
+					<tbody>
+						${rows.length ? rows.map((r) => `
+							<tr>
+								<td>${r.staff_name || ""}</td>
+								<td>${__(r.status || "")}</td>
+								<td>${r.check_in || "—"}</td>
+								<td>${r.check_out || "—"}</td>
+								<td>${r.check_in && !r.check_out ? `<button class="fpos-btn fpos-att-row-out" data-name="${r.staff_name}">${__("Check Out")}</button>` : ""}</td>
+							</tr>`).join("") : `<tr><td colspan="5" style="text-align:center;color:#64748b;">${__("No attendance marked yet today.")}</td></tr>`}
+					</tbody>
+				</table>
+			</div>
+		`);
+		const mark = async (action) => {
+			const name = $view.find(".fpos-att-name").val().trim();
+			if (!name) { frappe.show_alert({ message: __("Enter a staff name first."), indicator: "orange" }); return; }
+			try {
+				await frappe.call({
+					method: "foodpos.foodpos.page.food_pos.food_pos.mark_staff_attendance",
+					args: { staff_name: name, action },
+				});
+				frappe.show_alert({ message: __("Attendance saved for {0}.", [name]), indicator: "green" });
+				this.show_attendance();
+			} catch (e) {
+				frappe.show_alert({ message: __("Could not save attendance: {0}", [e.message]), indicator: "red" });
+			}
+		};
+		$view.find(".fpos-att-home").on("click", () => this.show_home());
+		$view.find(".fpos-att-checkin").on("click", () => mark("check_in"));
+		$view.find(".fpos-att-checkout").on("click", () => mark("check_out"));
+		$view.find(".fpos-att-absent").on("click", () => mark("absent"));
+		$view.find(".fpos-att-row-out").on("click", async (e) => {
+			const name = $(e.currentTarget).data("name");
+			try {
+				await frappe.call({
+					method: "foodpos.foodpos.page.food_pos.food_pos.mark_staff_attendance",
+					args: { staff_name: name, action: "check_out" },
+				});
+				this.show_attendance();
+			} catch (err) {
+				frappe.show_alert({ message: __("Could not check out: {0}", [err.message]), indicator: "red" });
+			}
+		});
+	}
+
+	// ── Daily Orders Report — POS-page section (simpler + reliable than a
+	// full Frappe report; data from get_daily_report, which reuses the
+	// closing-details queries where possible).
+	async show_daily_report() {
+		this.set_view("report");
+		const $view = this.wrapper.find(".fpos-daily-report-view");
+		$view.html(`<div class="fpos-tables-loading">${__("Loading daily report...")}</div>`);
+		let r = null;
+		try {
+			const res = await frappe.call({
+				method: "foodpos.foodpos.page.food_pos.food_pos.get_daily_report",
+				args: { pos_profile: this.pos_profile },
+			});
+			r = res.message || null;
+		} catch (e) {
+			$view.html(`<div class="fpos-tables-loading">${__("Could not load report: {0}", [e.message])}</div>`);
+			return;
+		}
+		if (!r) { $view.html(`<div class="fpos-tables-loading">${__("No report data.")}</div>`); return; }
+		const money = (v) => this.format_money(v || 0);
+		$view.html(`
+			<div class="fpos-report">
+				<div class="fpos-floor-head">
+					<div>
+						<div class="fpos-floor-title">${__("Daily Orders Report")}</div>
+						<div class="fpos-floor-sub">${r.date || ""} &bull; ${__("Main Branch")}</div>
+					</div>
+					<button class="fpos-btn fpos-report-home">${fpos_icon("home", "fpos-ic-sm")} ${__("Home")}</button>
+				</div>
+				<div class="fpos-report-cards">
+					<div class="fpos-report-card"><div class="fpos-rc-label">${__("Total Orders")}</div><div class="fpos-rc-value">${r.total_orders || 0}</div></div>
+					<div class="fpos-report-card"><div class="fpos-rc-label">${__("Total Sales")}</div><div class="fpos-rc-value">${money(r.total_sales)}</div></div>
+					<div class="fpos-report-card"><div class="fpos-rc-label">${__("Pending KOTs")}</div><div class="fpos-rc-value">${r.pending_kot_count || 0}</div></div>
+					<div class="fpos-report-card"><div class="fpos-rc-label">${__("Staff Present")}</div><div class="fpos-rc-value">${(r.attendance && r.attendance.present) || 0} / ${(r.attendance && r.attendance.total) || 0}</div></div>
+				</div>
+				<div class="fpos-report-cols">
+					<div class="fpos-report-col">
+						<div class="fpos-report-h">${__("Orders by Type")}</div>
+						${Object.entries(r.by_order_type || {}).map(([k, v]) => `<div class="fpos-report-row"><span>${k}</span><span>${v.orders} &bull; ${money(v.sales)}</span></div>`).join("") || `<div class="fpos-report-row">${__("No orders yet.")}</div>`}
+						<div class="fpos-report-h" style="margin-top:16px;">${__("Payment Modes")}</div>
+						${Object.entries(r.payment_modes || {}).map(([k, v]) => `<div class="fpos-report-row"><span>${k}</span><span>${v.invoices} &bull; ${money(v.amount)}</span></div>`).join("") || `<div class="fpos-report-row">${__("No payments yet.")}</div>`}
+					</div>
+					<div class="fpos-report-col">
+						<div class="fpos-report-h">${__("Top Items Sold")}</div>
+						${(r.top_items || []).map((i) => `<div class="fpos-report-row"><span>${i.item_name} × ${i.qty}</span><span>${money(i.amount)}</span></div>`).join("") || `<div class="fpos-report-row">${__("No items sold yet.")}</div>`}
+						<div class="fpos-report-h" style="margin-top:16px;">${__("Pending Dine-In Payments")}</div>
+						${(r.pending_tables || []).length
+							? r.pending_tables.map((t) => `<div class="fpos-report-row"><span>${__("Table")} ${t.table} &bull; ${__(t.status)}${t.occupied_since ? ` &bull; <span data-since="${t.occupied_since}">⏱ ${this.format_elapsed(t.occupied_since)}</span>` : ""}</span><span>${t.guests ? __("Guests") + ": " + t.guests : ""}</span></div>`).join("")
+							: `<div class="fpos-report-row">${__("No pending dine-in tables.")}</div>`}
+					</div>
+				</div>
+			</div>
+		`);
+		$view.find(".fpos-report-home").on("click", () => this.show_home());
+		this.start_home_timers();
+	}
+
+	// Day Close — reuses the existing PIN-gated close-register flow, which
+	// opens the closing page / Z-report. Closing never deletes data.
+	start_day_close() {
+		frappe.confirm(
+			__("Close Day & reconcile daily sales for this shift?"),
+			() => {
+				this.prompt_manager_pin({
+					action_type: "Close Register",
+					title: __("Manager PIN — Close Day"),
+					details: __("Closing the day for shift {0} requires manager PIN authorization.", [this.pos_opening || ""]),
+					on_success: () => { this.show_closing_page(); },
+				});
+			}
+		);
+	}
+
+	// v2 thermal: kitchen slip (KOT parchi) — 80mm/58mm monospace, printed
+	// automatically when an order is confirmed, so the kitchen gets paper
+	// as well as the live KDS ticket.
+	print_kot_slip(msg, order_payload) {
+		const kot = (msg && (msg.kot_name || msg.kot)) || this.linked_kot_id || "";
+		const items = (order_payload && order_payload.items) || this.cart_items || [];
+		if (!items.length) return;
+		const lines = items.map((i) => {
+			const qty = i.qty || 1;
+			const name = (i.item_name || i.item_code || "").toUpperCase();
+			const note = i.item_note ? `  (${i.item_note})` : "";
+			return `<div class="row"><span>${qty} x ${name}${note}</span></div>`;
+		}).join("");
+		const html = `
+			<html><head><title>KOT</title><style>
+				* { margin:0; padding:0; box-sizing:border-box; }
+				body { font-family:'Courier New', monospace; font-size:12px; color:#000; width:80mm; padding:4mm 2mm; }
+				.center { text-align:center; } .bold { font-weight:bold; }
+				.row { display:flex; justify-content:space-between; }
+				.divider { border-top:1px dashed #000; margin:6px 0; }
+				.big { font-size:16px; }
+			</style></head><body>
+				<div class="center bold big">*** KITCHEN TICKET ***</div>
+				<div class="center bold">${kot || ""}</div>
+				<div class="divider"></div>
+				<div class="row"><span>Order:</span><span class="bold">${(msg && msg.order_id) || this.pos_order_id || ""}</span></div>
+				<div class="row"><span>Type:</span><span class="bold">${order_payload.order_type || this.order_type}</span></div>
+				${order_payload.table ? `<div class="row"><span>Table:</span><span class="bold">${order_payload.table}</span></div>` : ""}
+				<div class="row"><span>Time:</span><span>${new Date().toLocaleString()}</span></div>
+				<div class="divider"></div>
+				${lines}
+				<div class="divider"></div>
+				${order_payload.order_note ? `<div>Note: ${order_payload.order_note}</div>` : ""}
+				<div class="center" style="margin-top:8px;">— ${__("Please prepare") } —</div>
+			</body></html>`;
+		const win = window.open("", "_blank");
+		if (!win) return;
+		win.document.write(html);
+		win.document.close();
+		setTimeout(() => { win.focus(); win.print(); }, 300);
 	}
 
 	refresh() {
