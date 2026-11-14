@@ -1,5 +1,22 @@
 # CHANGELOG — Food POS v5 (premium vibe)
 
+## v5.11 — Single-tab print preview + menu scroll fix (2026-11-15, user feedback)
+
+- **One tab only:** `window.open` is gone from the page JS entirely. Bill,
+  KOT slip and Z-report now open as ONE centered print-preview dialog in
+  the same tab (dimmed backdrop, paper slip, green Print + Close, Esc or
+  backdrop click closes). Print runs `window.print()` only when the user
+  taps Print; `@media print` shows ONLY the slip (`.fpos-print-area`),
+  so the POS UI never prints. Preview design verified by screenshot
+  (`ui-screenshots/v5.11/1-print-preview.png`).
+- **Menu scroll fixed:** the item grid never scrolled because
+  `.fpos-menu-main` (and its parents) missed `min-height: 0` — the flex
+  column refused to shrink below the full height of all items, so the
+  grid wrapper never got a constrained height. Added `min-height: 0` to
+  `.fpos-body`, `.fpos-left-panel`, `.fpos-menu-main` (now also
+  `overflow: hidden`) and `.fpos-items-grid-wrapper`, plus a thin visible
+  scrollbar on the grid. Sanity **160/160 PASS**.
+
 ## v5.10 — Fix: no auto KOT slip/print on Confirm (2026-11-15, live bench re-test by agent)
 
 - **Root cause (corrected):** v5.9 moved `print()` into the new tab, but the

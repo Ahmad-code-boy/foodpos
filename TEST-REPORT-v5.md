@@ -1,5 +1,20 @@
 # TEST REPORT — Food POS v5 (premium vibe)
 
+## v5.11 — single-tab print preview + menu scroll (2026-11-15)
+
+- User feedback: too many separate tabs were opening; everything must stay
+  in ONE tab, print must be a centered dialog (nothing separate), preview
+  and print nicely designed; the menu grid did not scroll so not all items
+  were reachable. Fix: `show_print_preview()` shared dialog for bill/KOT/
+  Z-report (3 call sites, 0 `window.open` left); menu scroll root cause was
+  the missing `min-height: 0` on `.fpos-menu-main` (flex column never
+  shrank below full content height). Preview rendered from the real CSS
+  and visually checked (centered card, paper slip, green Print button).
+- Sanity **160/160 PASS**, seed stub **9/9 PASS**. NOT verified live: user
+  must pull v5.11 + build + clear-cache + restart, then check: no new tab
+  opens on any print; the preview dialog is centered with the slip; the
+  menu grid scrolls to the last item.
+
 ## v5.10 — direct confirm→Pay freeze STILL present in v5.9 (2026-11-15)
 
 - Live bench re-test (agent, as Administrator) of v5.9 after pull + migrate

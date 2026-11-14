@@ -3437,6 +3437,51 @@ foodpos.FoodPOS.Controller = class {
 		}
 	}
 
+	// ─── v5.11: one-tab print preview ─────────────────────────────
+	// Every print (bill, KOT slip, Z-report) opens ONE centered dialog
+	// in this tab — no new tab, no popup window, no auto print dialog.
+	// Print runs window.print() (user-initiated, so the dialog is
+	// expected) and @media print shows ONLY the slip (.fpos-print-area).
+	show_print_preview({ title, subtitle, body_html, wide = false }) {
+		this.close_print_preview();
+		const $overlay = $(`
+			<div class="fpos-print-preview-overlay">
+				<div class="fpos-print-preview">
+					<div class="fpos-print-preview-header">
+						<div class="fpos-print-preview-title">
+							<span class="fpos-print-preview-icon">${fpos_icon("printer")}</span>
+							<div>
+								<div class="fpos-print-preview-name">${title || __("Print Preview")}</div>
+								${subtitle ? `<div class="fpos-print-preview-sub">${subtitle}</div>` : ""}
+							</div>
+						</div>
+						<button class="fpos-print-preview-close" title="${__("Close")}">✕</button>
+					</div>
+					<div class="fpos-print-preview-paper">
+						<div class="fpos-print-area ${wide ? "fpos-print-a4" : ""}">${body_html}</div>
+					</div>
+					<div class="fpos-print-preview-footer">
+						<button class="fpos-print-preview-cancel">${__("Close")}</button>
+						<button class="fpos-print-preview-print">${fpos_icon("printer", "fpos-ic-sm")} ${__("Print")}</button>
+					</div>
+				</div>
+			</div>`);
+		$overlay.on("click", (e) => {
+			if ($(e.target).hasClass("fpos-print-preview-overlay")) this.close_print_preview();
+		});
+		$overlay.find(".fpos-print-preview-close, .fpos-print-preview-cancel").on("click", () => this.close_print_preview());
+		$overlay.find(".fpos-print-preview-print").on("click", () => window.print());
+		$(document).off("keydown.fpos_print_preview").on("keydown.fpos_print_preview", (e) => {
+			if (e.key === "Escape" || e.keyCode === 27) this.close_print_preview();
+		});
+		$("body").append($overlay);
+	}
+
+	close_print_preview() {
+		$(".fpos-print-preview-overlay").remove();
+		$(document).off("keydown.fpos_print_preview");
+	}
+
 	print_pos_slip(receipt_data) {
 		if (!receipt_data) return;
 		const now = Date.now();
@@ -3470,25 +3515,10 @@ foodpos.FoodPOS.Controller = class {
 			</tr>
 		`).join("");
 
-		const html = `
-			<!DOCTYPE html>
-			<html>
-			<head>
-				<meta charset="utf-8">
-				<title>POS Receipt - ${receipt_data.invoice}</title>
-				<style>
-					body { font-family: 'Courier New', Courier, monospace; width: 78mm; margin: 0 auto; padding: 8px; font-size: 12px; color: #000; }
-					.text-center { text-align: center; }
-					.bold { font-weight: bold; }
-					.divider { border-top: 1px dashed #000; margin: 6px 0; }
-					.row { display: flex; justify-content: space-between; margin: 2px 0; }
-					table { width: 100%; border-collapse: collapse; font-size: 11px; }
-					@media print {
-						body { width: 100%; margin: 0; padding: 0; }
-					}
-				</style>
-			</head>
-			<body>
+		// v5.11: a fragment, not a full document — it renders inside the
+		// centered print-preview dialog (.fpos-print-area carries the
+		// thermal styles from food_pos.css). No new tab any more.
+		const body_html = `
 				<div class="text-center bold" style="font-size:15px;">${receipt_data.company || "FOOD POS RESTAURANT"}</div>
 				<div class="text-center" style="font-size:11px;">${receipt_data.pos_profile || ""}</div>
 				<div class="text-center" style="font-size:10px;">${receipt_data.posting_date || ""} ${this.format_time_hh_mm(receipt_data.posting_time)}</div>
@@ -3524,30 +3554,13 @@ foodpos.FoodPOS.Controller = class {
 					<p style="margin: 0;" class="bold">Thank you for dining with us!</p>
 					<p style="margin: 2px 0;">Please visit again.</p>
 				</div>
-				<script>
-					window.addEventListener("load", function() {
-						setTimeout(function() {
-							try { window.print(); } catch(e) {}
-						}, 300);
-					});
-					window.addEventListener("afterprint", function() {
-						try { window.close(); } catch(e) {}
-					});
-				</script>
-			</body>
-			</html>
 		`;
 
-		try {
-			const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-			const blobUrl = URL.createObjectURL(blob);
-			const win = window.open(blobUrl, "_blank", "noopener,noreferrer,width=420,height=650");
-			setTimeout(() => {
-				try { URL.revokeObjectURL(blobUrl); } catch (e) {}
-			}, 30000);
-		} catch (e) {
-			console.warn("Print popup error:", e);
-		}
+		this.show_print_preview({
+			title: __("Receipt"),
+			subtitle: receipt_data.invoice || "",
+			body_html,
+		});
 	}
 
 	// ─── 8.2 Recent Orders & Customers Drawer (Last 10 Customers with Edit Ability)
@@ -5927,25 +5940,9 @@ foodpos.FoodPOS.Controller = class {
 			</tr>
 		`).join("") || `<tr><td colspan="2" style="text-align:center;">None</td></tr>`;
 
-		const print_content = `
-			<!DOCTYPE html>
-			<html>
-			<head>
-				<meta charset="utf-8">
-				<title>POS Register Closing Report</title>
-				<style>
-					body { font-family: monospace, sans-serif; width: 300px; margin: 0 auto; padding: 15px; font-size: 12px; color: #000; }
-					.text-center { text-align: center; }
-					.bold { font-weight: bold; }
-					.divider { border-top: 1px dashed #000; margin: 8px 0; }
-					.row { display: flex; justify-content: space-between; margin: 3px 0; }
-					table { width: 100%; border-collapse: collapse; margin: 4px 0; }
-					@media print {
-						body { width: 100%; margin: 0; padding: 0; }
-					}
-				</style>
-			</head>
-			<body>
+		// v5.11: fragment for the centered print-preview dialog (wide A4
+		// paper). No new tab — the dialog's own Print button prints it.
+		const body_html = `
 				<div class="text-center bold" style="font-size:16px;">${data.company || "RESTAURANT POS"}</div>
 				<div class="text-center" style="font-size:13px;margin:2px 0;">DAILY REGISTER CLOSING (Z-REPORT)</div>
 				<div class="divider"></div>
@@ -5980,17 +5977,14 @@ foodpos.FoodPOS.Controller = class {
 					<div style="border-top:1px solid #000;width:45%;text-align:center;padding-top:4px;">Manager Sign</div>
 				</div>
 				<div class="text-center" style="margin-top:20px;font-size:10px;color:#666;">Generated on ${new Date().toLocaleTimeString()}</div>
-			</body>
-			</html>
 		`;
 
-		const win = window.open("", "_blank");
-		// v5.9: same as the KOT slip — print() must run inside the new tab,
-		// never win.print() from this page (it blocks the POS thread).
-		const content_with_print = print_content.replace("</body>",
-			`<script>window.addEventListener("load", function(){ setTimeout(function(){ window.print(); }, 300); });</script></body>`);
-		win.document.write(content_with_print);
-		win.document.close();
+		this.show_print_preview({
+			title: __("Z-Report"),
+			subtitle: `${data.pos_profile || ""} • ${data.today || ""}`,
+			body_html,
+			wide: true,
+		});
 	}
 
 	// ─── v2: Home / Day Open-Close, Tables, Attendance, Daily Report ───
@@ -6602,17 +6596,10 @@ foodpos.FoodPOS.Controller = class {
 			const note = i.item_note ? `  (${i.item_note})` : "";
 			return `<div class="row"><span>${qty} x ${name}${note}</span></div>`;
 		}).join("");
-		const html = `
-			<html><head><title>KOT</title><style>
-				* { margin:0; padding:0; box-sizing:border-box; }
-				body { font-family:'Courier New', monospace; font-size:12px; color:#000; width:80mm; padding:4mm 2mm; }
-				.center { text-align:center; } .bold { font-weight:bold; }
-				.row { display:flex; justify-content:space-between; }
-				.divider { border-top:1px dashed #000; margin:6px 0; }
-				.big { font-size:16px; }
-				.kot-print-btn { display:block; margin:10px auto; padding:8px 22px; font-size:14px; font-weight:700; background:#15803d; color:#fff; border:0; border-radius:8px; cursor:pointer; }
-				@media print { .kot-print-btn { display:none; } }
-			</style></head><body>
+		// v5.11: fragment for the centered print-preview dialog (styles
+		// live in .fpos-print-area). No new tab — the dialog's own Print
+		// button does the printing.
+		const body_html = `
 				<div class="center bold big">*** KITCHEN TICKET ***</div>
 				<div class="center bold">${kot || ""}</div>
 				<div class="divider"></div>
@@ -6625,12 +6612,12 @@ foodpos.FoodPOS.Controller = class {
 				<div class="divider"></div>
 				${order_payload.order_note ? `<div>Note: ${order_payload.order_note}</div>` : ""}
 				<div class="center" style="margin-top:8px;">— ${__("Please prepare") } —</div>
-				<button class="kot-print-btn" onclick="window.print()">${__("Print")}</button>
-			</body></html>`;
-		const win = window.open("", "_blank");
-		if (!win) return;
-		win.document.write(html);
-		win.document.close();
+		`;
+		this.show_print_preview({
+			title: __("Kitchen Ticket"),
+			subtitle: kot || "",
+			body_html,
+		});
 	}
 
 	// Backwards-compatible alias (old callers, if any, get the manual slip).
