@@ -1,5 +1,24 @@
 # TEST REPORT — Food POS v5 (premium vibe)
 
+## v5.7 — kitchen station link fix (2026-11-15)
+
+- Live bench test (agent, as Administrator on the user's ngrok bench)
+  reproduced BOTH errors: Confirm to Kitchen failed with "Could not
+  find Branch: Main Branch, Kitchen Station: Main Kitchen" (no KOT
+  created), and Pay & Print Bill still failed with ERPNext's
+  `Unknown column 'tabContact.is_billing_contact'`. Page itself loads
+  fine past the spinner (v5.6 fix works); day was already open; menu
+  shows the user's own 35 items; tables floor was empty (0 tables).
+- Root cause found by reading the code + original v1 repo: `create_kot`
+  stored the bare station name in a Link field whose docnames are
+  "Main Branch-<station>" — it could never validate. Fixed to store
+  the docname + ensure the station doc on demand; seed patch now also
+  creates all 4 stations. `py_compile` OK, sanity **134/134 PASS**,
+  seed stub **9/9 PASS** (35 docs on run 1, idempotent on run 2).
+- NOT verified live: the user must pull + `bench migrate` first — that
+  one command fixes the ERPNext column AND seeds branch/tables/stations.
+  Re-test confirm + payment after migrate.
+
 ## v5.6 — custom_branch crash fix (2026-11-14)
 
 - Reproduced from the user's traceback: `get_pos_profiles` line 83

@@ -65,6 +65,13 @@ The migrate log should print `foodpos seed:` lines. Then verify:
       Item Price on **Standard Selling**.
 - [ ] **Branch** "Main Branch" exists; **Restaurant Tables** T1–T4 (Main Hall,
       4 seats) + T5–T6 (Family Hall, 6 seats), all Available.
+- [ ] **Food Kitchen Stations**: "Main Branch-Main Kitchen",
+      "Main Branch-Pizza", "Main Branch-Grill", "Main Branch-Beverages"
+      (v5.7 — without these, Confirm to Kitchen fails link validation).
+- [ ] **Confirm to Kitchen works**: Walk-In order → add 7UP (or a seed item)
+      → Confirm Order — Kitchen → a KOT appears in Live Kitchen Orders
+      (no "Could not find ... Kitchen Station" error). This failed on a
+      fresh site before v5.7.
 - [ ] **POS Profile "Food POS"** exists — ONLY if the site had no enabled POS
       Profile before. If you already had a profile, no second one is created
       (check: still exactly one profile / your old one untouched).

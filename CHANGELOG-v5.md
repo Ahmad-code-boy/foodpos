@@ -1,5 +1,30 @@
 # CHANGELOG — Food POS v5 (premium vibe)
 
+## v5.7 — Fix: "Could not find Branch: Main Branch, Kitchen Station: Main Kitchen" on Confirm (2026-11-15, live bench test by agent)
+
+- **Root cause (a v1 bug, not a v5 regression):** `create_kot` stored the
+  BARE station name ("Main Kitchen") in `Food KOT.kitchen_station`, but
+  that field is a Link to Food Kitchen Station, whose documents are named
+  "Main Branch-Main Kitchen". The bare name can never validate — and on
+  the user's site neither the Branch doc nor any station doc existed, so
+  both links failed at once and Confirm to Kitchen threw. The tables
+  floor was empty for the same reason (no Restaurant Table docs — the
+  seed patch had never run, because migrate had never run).
+- **Fix 1 — code:** new `_ensure_kitchen_station()` helper ensures the
+  Branch + station doc exist (same on-demand pattern as the walk-in
+  customer) and `create_kot` now stores the full docname
+  ("Main Branch-Main Kitchen") — also in the Round-23 reuse lookup, so
+  double-confirm still reuses the same KOT. KDS station filter uses
+  LIKE, so it still matches docnames.
+- **Fix 2 — seed:** the v0.4.0 patch now also creates the 4 kitchen
+  stations (Main Kitchen, Pizza, Grill, Beverages) on migrate.
+- **Not fixed by code — needs the user's migrate:** the payment error
+  `Unknown column 'tabContact.is_billing_contact'` is ERPNext's own
+  schema drift (its `party.py` queries a column the DB lacks) and only
+  `bench migrate` adds that column. After migrate, confirm + payment
+  should both work. Sanity **134/134 PASS**, seed stub **9/9 PASS**
+  (run 1 now creates 35 docs).
+
 ## v5.6 — Fix: page stuck on "Loading Food POS environment..." (2026-11-14, live bench error from user)
 
 - **Root cause:** `get_pos_profiles` selected the `custom_branch` column

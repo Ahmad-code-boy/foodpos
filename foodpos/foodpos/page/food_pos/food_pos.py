@@ -1138,6 +1138,44 @@ def _get_item_station(item, branch_val):
 	return base_station
 
 
+def _ensure_kitchen_station(station):
+	"""Return the Food Kitchen Station docname for a base station name.
+
+	v5.7: Food KOT.kitchen_station is a Link to Food Kitchen Station, whose
+	documents are named "{branch}-{station_name}" (e.g.
+	"Main Branch-Main Kitchen"). create_kot used to store the BARE station
+	name ("Main Kitchen"), which failed link validation on save
+	("Could not find Branch: Main Branch, Kitchen Station: Main Kitchen")
+	on any site where the station doc did not exist — and the bare name
+	could never validate even when it did. This helper ensures the Branch
+	and the station doc exist (same on-demand pattern as
+	_get_walk_in_customer) and returns the full docname. The seed patch
+	(v0.4.0) also creates all four stations on migrate.
+	"""
+	branch_val = SINGLE_BRANCH
+	if not frappe.db.exists("Branch", branch_val):
+		try:
+			b = frappe.get_doc({"doctype": "Branch", "branch": branch_val})
+			b.flags.ignore_permissions = True
+			b.insert()
+		except Exception:
+			pass
+	docname = f"{branch_val}-{station}"
+	if not frappe.db.exists("Food Kitchen Station", docname):
+		try:
+			st = frappe.get_doc({
+				"doctype": "Food Kitchen Station",
+				"branch": branch_val,
+				"station_name": station,
+				"is_active": 1,
+			})
+			st.flags.ignore_permissions = True
+			st.insert()
+		except Exception:
+			pass
+	return docname
+
+
 @frappe.whitelist()
 def create_kot(order_data):
 	"""
@@ -1178,13 +1216,18 @@ def create_kot(order_data):
 	created_kots = []
 	reused_kot_names = set()
 	for station, s_items in station_items.items():
+		# v5.7: store the station DOCNAME ("Main Branch-Main Kitchen"),
+		# not the bare station name — kitchen_station is a Link and the
+		# bare name fails validation on save. The helper also creates
+		# the Branch / station doc if it is missing.
+		station_doc = _ensure_kitchen_station(station)
 		# Round 23 fix: a second "Send to Kitchen" for the same order +
 		# station must REUSE the open KOT, never create a duplicate.
 		# (One KOT per station per order is allowed; two for the same
 		# station is always a duplicate — that is how FKOT-00038/00039
 		# were created for one Club Sandwich cart.)
 		if has_order_field:
-			existing = _find_open_kots_for_order(pos_order_id, kitchen_station=station)
+			existing = _find_open_kots_for_order(pos_order_id, kitchen_station=station_doc)
 			if existing:
 				reused = frappe.get_doc("Food KOT", existing[0].name)
 				# Items added to the cart since the first send still have
@@ -1217,7 +1260,7 @@ def create_kot(order_data):
 		kot.order_note = order_data.get("order_note", "")
 		kot.pos_profile = order_data.get("pos_profile", "")
 		kot.branch = branch_val
-		kot.kitchen_station = station
+		kot.kitchen_station = station_doc  # v5.7: full docname, not bare station name.
 
 		if order_data.get("customer"):
 			kot.customer = order_data["customer"]

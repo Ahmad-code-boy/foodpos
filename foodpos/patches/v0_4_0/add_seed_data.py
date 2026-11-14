@@ -21,6 +21,12 @@ changes nothing:
   * Branch "Main Branch" (needed — Restaurant Table.branch links to Branch).
   * Restaurant Tables T1–T4 (Main Hall, 4 seats) + T5–T6 (Family Hall,
     6 seats), all Available.
+  * Food Kitchen Stations "Main Kitchen", "Pizza", "Grill", "Beverages"
+    (v5.7 — Food KOT.kitchen_station is a Link to Food Kitchen Station,
+    named "Main Branch-<station>"; without these docs Confirm to Kitchen
+    fails link validation with "Could not find ... Kitchen Station").
+    create_kot also creates a missing station on demand, so confirm works
+    even if this patch is skipped.
   * POS Profile "Food POS" — ONLY when the site has no enabled POS Profile
     at all. Company = site default company, warehouse = first warehouse of
     that company, selling price list "Standard Selling", item groups = the
@@ -61,6 +67,9 @@ SEED_TABLES = (
 	("T5", "Family Hall", 6),
 	("T6", "Family Hall", 6),
 )
+
+# v5.7: every station _get_item_station can route to (see food_pos.py).
+SEED_STATIONS = ("Main Kitchen", "Pizza", "Grill", "Beverages")
 
 
 def _ensure_price_list(currency):
@@ -163,6 +172,23 @@ def _ensure_tables():
 		print(f"  foodpos seed: created Restaurant Table {table_no} ({section}, {capacity} seats)")
 
 
+def _ensure_kitchen_stations():
+	# Food Kitchen Station autoname is {branch}-{station_name}.
+	for station in SEED_STATIONS:
+		docname = f"Main Branch-{station}"
+		if frappe.db.exists("Food Kitchen Station", docname):
+			continue
+		st = frappe.get_doc({
+			"doctype": "Food Kitchen Station",
+			"branch": "Main Branch",
+			"station_name": station,
+			"is_active": 1,
+		})
+		st.flags.ignore_permissions = True
+		st.insert()
+		print(f"  foodpos seed: created Food Kitchen Station {station}")
+
+
 def _ensure_pos_profile(company):
 	# Never create a second profile — only seed when the site has none.
 	if frappe.get_all("POS Profile", filters={"disabled": 0}, limit=1):
@@ -200,6 +226,7 @@ def execute():
 	_ensure_item_groups()
 	_ensure_items()
 	_ensure_tables()
+	_ensure_kitchen_stations()
 	_ensure_pos_profile(company)
 	frappe.db.commit()
 	print("  foodpos seed: done — open /food-pos to test (Day Open, then order).")
