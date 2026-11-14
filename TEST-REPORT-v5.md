@@ -1,5 +1,21 @@
 # TEST REPORT — Food POS v5 (premium vibe)
 
+## v5.8 — Walk-In order_type fix (2026-11-15)
+
+- Live bench re-test (agent, as Administrator): the v5.7 station error is
+  GONE (stations exist now — created on demand by the v5.7 helper), but
+  Confirm failed with a NEW error: 'Order Type cannot be "Walk In". It
+  should be one of "Dine In", "Takeaway", "Delivery"'. Root cause: both
+  order_type Selects missed "Walk In". Fixed in both JSONs. Sanity
+  **136/136 PASS**, seed stub **9/9 PASS**.
+- Same re-test proved the user's migrate did NOT run/complete: tables
+  T1–T6 still absent (seed patch runs only on migrate) AND
+  `tabContact.is_billing_contact` still missing (ERPNext schema sync
+  runs only on migrate). Payment error therefore unchanged. The 2
+  offline-queued test bills ("2 pending sync") did not auto-sync.
+- NOT verified live: user must pull + run a COMPLETE `bench migrate`
+  (and confirm it finishes without error), then re-test confirm + pay.
+
 ## v5.7 — kitchen station link fix (2026-11-15)
 
 - Live bench test (agent, as Administrator on the user's ngrok bench)

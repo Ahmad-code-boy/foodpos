@@ -71,7 +71,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Order Type",
-   "options": "Dine In\nTakeaway\nDelivery"
+   "options": "Walk In\nDine In\nTakeaway\nDelivery"
   },
   {
    "fieldname": "table",
@@ -209,4 +209,3 @@
  "states": [],
  "track_changes": 1
 }
-

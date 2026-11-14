@@ -1,5 +1,17 @@
 # CHANGELOG — Food POS v5 (premium vibe)
 
+## v5.8 — Fix: Walk-In Confirm fails 'Order Type cannot be "Walk In"' (2026-11-15, live bench re-test by agent)
+
+- **Root cause:** the POS sends 4 order types (Walk In, Dine In, Takeaway,
+  Delivery), but the `order_type` Select on Food KOT **and** Food POS Held
+  Order only allowed 3 ("Dine In", "Takeaway", "Delivery"). Every Walk-In
+  confirm failed Frappe's Select validation on save — this only surfaced
+  in the re-test because the v5.7 station fix had unblocked the earlier
+  failure. **Fix:** "Walk In" added to both doctypes' `order_type`
+  options (default stays "Dine In"). Takes effect on `bench migrate`
+  (doctype sync) — same migrate that fixes the ERPNext column and seeds
+  the tables. Sanity **136/136 PASS**.
+
 ## v5.7 — Fix: "Could not find Branch: Main Branch, Kitchen Station: Main Kitchen" on Confirm (2026-11-15, live bench test by agent)
 
 - **Root cause (a v1 bug, not a v5 regression):** `create_kot` stored the
