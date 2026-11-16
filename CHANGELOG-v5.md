@@ -506,3 +506,43 @@ the real CSS and visually checked: `../ui-screenshots/v6.2/1-closing-bottom.png`
 the user must pull + build + clear-cache + restart, then open the
 closing page and tap "Close Day" with the mouse (no PIN change — the
 Manager PIN is still 1234 from the v6.1 test).
+
+## v6.3 — Home: POS top bar removed + hero Chef's Pick never empty (2026-11-16 21:50 PKT)
+
+User's screenshot (2026-11-16 21:47 PKT): the POS top bar (search,
+Filters, Takeaway chip, home/pause/menu buttons) sat on top of the
+Home page, and the hero's right side was empty on a fresh day.
+
+**1. Top bar removed from Home (real bug, v4 intent broken):**
+- Root cause: the v4 hide rule
+  `.fpos-wrapper:not(.fpos-view-pos) .fpos-topbar { display: none; }`
+  was defeated by the later "Zone 1" block
+  `.fpos-topbar { display: flex !important; }` — `!important` beats
+  a higher-specificity non-important rule, so the top bar could never
+  hide on any non-POS view.
+- Fix: the hide rule is now
+  `.fpos-wrapper:not(.fpos-view-pos) .fpos-topbar { display: none !important; }`
+  — with both rules `!important`, specificity decides and the hide
+  rule (0,3,0) wins over the base rule (0,1,0). The top bar shows on
+  the POS screen only; Home, Tables, Attendance and Report each keep
+  their own header + bottom nav. Nothing on Home depended on the
+  top bar (sidebar toggle, order chip and held orders are POS-only;
+  Settings lives in the bottom nav).
+- No layout change to the POS screen itself.
+
+**2. Hero Chef's Pick on a fresh day (small UX):**
+- Root cause: the pick rendered only when `stat_top` existed (sales
+  today), so on a day with no sales yet the hero's right side was
+  empty except the cloche watermark.
+- Fix: `pick_item = stat_top || first menu item from the cached menu`
+  (`home_cached_items()` — same source the pick photo uses), with the
+  sub-line "Try it today" when there are no sales yet, else
+  "× N sold today". Tap still opens the menu.
+
+**Verify:** sanity 188/188 PASS (3 new v6.3 checks), seed stub 9/9,
+`node --check` + `py_compile` OK. Home rendered from the real CSS
+and visually checked: `../ui-screenshots/v6.3/1-home-no-topbar.png`
+(no top bar, hero starts the page, Chef's Pick card visible on the
+right). NOT verified live: the user must pull + build + clear-cache +
+restart, then open Home — the top bar must be gone and the hero must
+show a pick card.

@@ -370,3 +370,22 @@ correctly in the screenshots).
   below, no nav overlapping it.
 - **NOT verified live:** needs pull + build + clear-cache + restart,
   then open the closing page and click "Close Day" with the mouse.
+
+## v6.3 — Home top bar removed + Chef's Pick fallback (2026-11-16 21:50 PKT)
+
+- **What changed:** (1) the Home/Tables/Attendance/Report top-bar
+  hide rule now carries `!important`, so it finally beats the
+  "Zone 1" `.fpos-topbar { display: flex !important; }` block that
+  kept the search/Filters bar stuck on the Home page. (2) Chef's
+  Pick falls back to the first menu item ("Try it today") when there
+  are no sales yet today, so the hero's right side is never empty.
+- **Static checks:** `node --check` OK, `py_compile` OK,
+  `scratch/v5_sanity.py` **188/188 PASS** (3 new v6.3 checks),
+  `scratch/v5_seed_test.py` **9/9 PASS**.
+- **Visual check:** `../ui-screenshots/v6.3/1-home-no-topbar.png`
+  rendered from the real `food_pos.css` — no top bar, hero starts
+  the page, Chef's Pick card (Chicken Tikka Pizza, "Try it today")
+  on the right, Your Day card / stats / tiles / bottom nav intact.
+- **NOT verified live:** needs pull + build + clear-cache + restart,
+  then check Home (top bar gone, pick card shown) and the POS screen
+  (top bar still there with search + Filters).

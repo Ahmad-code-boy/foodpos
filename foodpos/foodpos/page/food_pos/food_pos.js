@@ -6300,6 +6300,11 @@ foodpos.FoodPOS.Controller = class {
 		const stat_orders = daily ? (daily.total_orders || 0) : null;
 		const stat_avg = (stat_orders && stat_orders > 0) ? stat_sales / stat_orders : null;
 		const stat_top = (daily && daily.top_items && daily.top_items[0]) ? daily.top_items[0] : null;
+		// v6.3: on a fresh day with no sales yet, the hero's Chef's Pick
+		// still shows the first menu item ("Try it today") so the hero
+		// never looks empty.
+		const pick_item = stat_top || ((this.home_cached_items() || [])[0] || null);
+		const pick_sub = stat_top ? `× ${stat_top.qty} ${__("sold today")}` : __("Try it today");
 
 		const queue = JSON.parse(localStorage.getItem(this.offline_queue_key) || "[]");
 		const online = navigator.onLine !== false;
@@ -6343,13 +6348,13 @@ foodpos.FoodPOS.Controller = class {
 							<span class="fpos-hero-day ${day.day_open ? "open" : "closed"}">${day.day_open ? __("● Day Open") : __("○ Day Closed")}</span>
 						</div>
 					</div>
-					${stat_top ? `
+					${pick_item ? `
 					<button class="fpos-hero-pick" title="${__("Open menu")}">
-						${this.home_dish_photo_html(stat_top.item_name, "pizza")}
+						${this.home_dish_photo_html(pick_item.item_name, "pizza")}
 						<span class="fpos-hero-pick-body">
 							<span class="fpos-hero-pick-label">${__("Chef's Pick")}</span>
-							<span class="fpos-hero-pick-name">${stat_top.item_name}</span>
-							<span class="fpos-hero-pick-sub">× ${stat_top.qty} ${__("sold today")}</span>
+							<span class="fpos-hero-pick-name">${pick_item.item_name}</span>
+							<span class="fpos-hero-pick-sub">${pick_sub}</span>
 						</span>
 					</button>` : ""}
 				</div>

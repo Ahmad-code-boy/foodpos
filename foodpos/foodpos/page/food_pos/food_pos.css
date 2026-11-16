@@ -2309,8 +2309,11 @@ button.fpos-home-sync:hover { filter: brightness(0.97); }
    Anchor it to the shell instead, with matching bottom corners. */
 .fpos-wrapper .fpos-home-nav { position: absolute; left: 0; right: 0; bottom: 0; border-radius: 0 0 20px 20px; }
 /* One header per view: off the POS screen the POS topbar hides — Home,
-   Tables, Attendance and Report each have their own header + Home button. */
-.fpos-wrapper:not(.fpos-view-pos) .fpos-topbar { display: none; }
+   Tables, Attendance and Report each have their own header + Home button.
+   v6.3: needs !important — the "Zone 1" block below sets
+   `.fpos-topbar { display: flex !important; }`, which used to defeat
+   this rule, so the search/Filters bar stayed stuck on the Home page. */
+.fpos-wrapper:not(.fpos-view-pos) .fpos-topbar { display: none !important; }
 
 /* --- CHILI top bar --- */
 .fpos-topbar { height: 64px; padding: 0 16px; gap: 14px; }
