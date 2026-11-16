@@ -599,6 +599,7 @@ def force_free_table(table, manager_pin, reason=None):
 			"table": table,
 			"status": "Available",
 			"order_id": None,
+			"occupied_since": None,
 		}
 	)
 
@@ -651,8 +652,8 @@ def transfer_table(from_table, to_table, manager_pin=None, reason=None):
 
 	frappe.db.commit()
 
-	frappe.publish_realtime("fpos_table_status_changed", {"table": from_table, "status": "Available", "order_id": None})
-	frappe.publish_realtime("fpos_table_status_changed", {"table": to_table, "status": "Occupied", "order_id": order_id})
+	frappe.publish_realtime("fpos_table_status_changed", {"table": from_table, "status": "Available", "order_id": None, "occupied_since": None})
+	frappe.publish_realtime("fpos_table_status_changed", {"table": to_table, "status": "Occupied", "order_id": order_id, "occupied_since": occupied_since})
 
 	return {"success": True, "from_table": from_table, "to_table": to_table}
 
@@ -682,6 +683,7 @@ def update_table_status(table, status):
 				"table": table,
 				"status": updates["status"],
 				"order_id": updates.get("order_id"),
+				"occupied_since": updates.get("occupied_since"),
 			}
 		)
 		return {"success": True, "table": table, "status": updates["status"]}
@@ -1354,13 +1356,16 @@ def create_kot(order_data):
 		# the same order must not restart occupied_since.
 		existing_since = frappe.db.get_value("Restaurant Table", table_no, "occupied_since")
 		existing_status = frappe.db.get_value("Restaurant Table", table_no, "status")
+		# v7.2: compute the timer start once — the publish below must
+		# carry the SAME value the DB just stored.
+		new_since = existing_since if existing_status == "Occupied" and existing_since else now_datetime()
 		frappe.db.set_value(
 			"Restaurant Table",
 			table_no,
 			{
 				"status": "Occupied",
 				"order_id": primary_kot,
-				"occupied_since": existing_since if existing_status == "Occupied" and existing_since else now_datetime(),
+				"occupied_since": new_since,
 				"guests": cint(order_data.get("guests", 1))
 			}
 		)
@@ -1370,6 +1375,7 @@ def create_kot(order_data):
 				"table": table_no,
 				"status": "Occupied",
 				"order_id": primary_kot,
+				"occupied_since": str(new_since),
 			}
 		)
 
@@ -1826,6 +1832,7 @@ def submit_pos_invoice(order_data, payments):
 				"table": resolved_table,
 				"status": "Available",
 				"order_id": None,
+				"occupied_since": None,
 			}
 		)
 
@@ -2035,6 +2042,7 @@ def discard_draft_order(invoice_name, table=None):
 					"table": table,
 					"status": "Available",
 					"order_id": None,
+					"occupied_since": None,
 				}
 			)
 
@@ -3643,7 +3651,7 @@ def hold_order(order_data, reason=None):
 				"occupied_since": now_datetime(),
 			}
 		)
-		frappe.publish_realtime("fpos_table_status_changed", {"table": table_no, "status": "Occupied", "order_id": held.name})
+		frappe.publish_realtime("fpos_table_status_changed", {"table": table_no, "status": "Occupied", "order_id": held.name, "occupied_since": str(now_datetime())})
 
 	# Comprehensive Audit Log for Order Held
 	try:
@@ -3702,8 +3710,12 @@ def resume_held_order(held_order_id):
 	if doc.table and frappe.db.exists("Restaurant Table", doc.table):
 		current_status = frappe.db.get_value("Restaurant Table", doc.table, "status")
 		if current_status == "Available":
-			frappe.db.set_value("Restaurant Table", doc.table, "status", "Occupied")
-			frappe.publish_realtime("fpos_table_status_changed", {"table": doc.table, "status": "Occupied"})
+			# v7.2: a resumed held order re-starts the table timer — the
+			# old code set Occupied without occupied_since, so the floor
+			# showed Reserved with no time running.
+			resume_since = frappe.db.get_value("Restaurant Table", doc.table, "occupied_since") or now_datetime()
+			frappe.db.set_value("Restaurant Table", doc.table, {"status": "Occupied", "occupied_since": resume_since})
+			frappe.publish_realtime("fpos_table_status_changed", {"table": doc.table, "status": "Occupied", "occupied_since": str(resume_since)})
 			table_status = "Occupied"
 		else:
 			table_status = current_status
@@ -3762,7 +3774,7 @@ def discard_held_order(held_order_id, reason=None):
 					"occupied_since": None,
 				}
 			)
-			frappe.publish_realtime("fpos_table_status_changed", {"table": doc.table, "status": "Available", "order_id": None})
+			frappe.publish_realtime("fpos_table_status_changed", {"table": doc.table, "status": "Available", "order_id": None, "occupied_since": None})
 
 	# Comprehensive Audit Log for Order Discarded
 	try:
@@ -3827,7 +3839,7 @@ def release_table_if_no_order(table):
 		}
 	)
 	frappe.db.commit()
-	frappe.publish_realtime("fpos_table_status_changed", {"table": table, "status": "Available", "order_id": None})
+	frappe.publish_realtime("fpos_table_status_changed", {"table": table, "status": "Available", "order_id": None, "occupied_since": None})
 	return {"success": True, "table": table, "status": "Available"}
 
 

@@ -822,3 +822,93 @@ clear-cache + restart, then a full bench pass (the 16 issues above, esp.
 closing-page Back on both routes, T7/T8 appearing, day times surviving a
 fresh load, FKOT-2026-00002 reappearing in Pending, settle showing one
 dialog). Manager PIN untouched (still 1234). Nothing settled/deleted.
+
+## v7.2 — Table lifecycle, Available-only chips, tables floor redesign (2026-11-17 00:08 PKT, user feedback + 3 live screenshots)
+
+User asked for 3 things after testing v7.1 live (screenshots: POS top bar
+back + 5-col grid + 8 tables in the dialog — v7.1 confirmed live):
+
+1. **Table lifecycle + live status + bigger dialog.** When an AVAILABLE
+   table is selected and the order is CONFIRMED, the table starts its
+   timer and moves to RESERVED; when the customer pays via a Pending
+   invoice, it becomes Available again; the user sees LIVE which tables
+   are Reserved vs Available, with time running; the "Select Table for
+   Dine-In" dialog is bigger and nicer.
+   - The STORED status stays "Occupied" (server logic, KDS and merge code
+     all key on it) — the user-facing label is now "Reserved" everywhere
+     via one shared helper `_table_display()` (food_pos.js): Occupied →
+     "Reserved" (amber), Available → green, Cleaning → blue. Floor,
+     dialog, daily-report pending-tables rows and realtime updates all
+     use it, so the label can never disagree again.
+   - Confirm → Occupied + timer was ALREADY correct at source
+     (`create_kot` sets Occupied + `occupied_since`, never restarts the
+     timer for the same order). v7.2 wires the client side: confirm
+     success marks the table Reserved in memory at once (from
+     `msg.table`/`msg.occupied_since`) so the strip/floor flip
+     immediately, no reload wait.
+   - Settle → Available was ALREADY correct at source
+     (`submit_pos_invoice` frees the table + clears `occupied_since` +
+     guests on every settle path — direct Pay, Pending Settle, KDS
+     Settle all go through it). v7.2 adds an explicit
+     `refresh_tables_live()` after the receipt so the strip/floor flip
+     back at once.
+   - LIVE updates: new `refresh_tables_live()` (re-fetch +
+     diff-gated re-render, only when something changed — no flicker, no
+     "Loading tables..." flash) runs on the 5s kitchen poll and as the
+     realtime backstop; the `fpos_table_status_changed` realtime event
+     now carries `occupied_since` on EVERY publish (create_kot, settle,
+     hold, resume-held, merge, discard, void, force-free, release) so
+     the timer is exact without a re-fetch. `resume_held_order` also
+     (re)starts the timer now — it used to set Occupied with no
+     `occupied_since`, so a resumed table showed Reserved with no time
+     running. The 1s tick now scans the whole document, so dialog
+     timers tick too (the dialog lives outside `.fpos-wrapper`).
+   - Dialog: `fpos-table-dialog` class, ~880px wide (a (0,4,0) selector
+     beats the v6.0 480px width and the 580px custom-dialog cap),
+     scrollable body, hall sections (Main Hall / Family Hall), larger
+     cards (180px min), live counts in the header ("8 tables • 6
+     Available • 2 Reserved"), Reserved cards disabled (amber, timer,
+     Free Table PIN button kept) — tapping one with an active tab
+     switches to it, otherwise it refuses with "Table T6 is Reserved —
+     please pick an Available table."
+2. **Bottom chips strip: Available tables only, POS screen only.**
+   `render_table_chips()` rewritten: no more walk-in/draft order chips
+   anywhere, no staff avatars — only Available-table chips (green dot,
+   "T1 • 4 seats • Available", tap starts a Dine-In order). Gated twice:
+   the function returns early off the POS view AND `set_view` toggles
+   the bar (`toggle(name === "pos")`), so Home/Tables/Pending/
+   Attendance/Report/closing/payment never show it. Zero Available
+   tables → the strip hides itself.
+3. **Tables floor redesigned.** The old 3-col rule with a 980px cap
+   (which left a big empty right side — the v7.0 "narrow floor" fix
+   never actually removed it) is beaten by a later v7.2 rule: 4 cards
+   per row on desktop, 3 ≤1279px, 2 ≤900px, 1 ≤560px, full width. Header
+   reads live counts ("8 tables • 6 Available • 2 Reserved") plus count
+   pills (✓ 6 Available, 🕐 2 Reserved, 8 Tables). Reserved cards keep
+   the wooden look with an amber Reserved pill and a PROMINENT live
+   timer (16px, amber pill, HH:MM:SS) + seats + guests + KOT. Available
+   cards never show a guest count (the stale "Guests: 1" on the live
+   T6 was old data from before v7.1 cleared guests on settle; the
+   display now hides it whenever the table is Available). Legend is
+   Available / Reserved / Cleaning. Floor rendering split into
+   `_render_tables_floor()` so live refresh re-renders without the
+   loading flash.
+
+**Verify:** `node --check` OK, `py_compile` OK,
+`scratch/v5_sanity.py` **246/246 PASS** (19 new v7.2 checks; 4 older
+checks updated to the new expectations — chips strip, floor grid,
+timer class, doubled-T mechanism), `scratch/v5_seed_test.py` **9/9
+PASS**, `window.open` count 0 in page JS. Screenshots rendered from
+the real `food_pos.css` with headless Chromium and visually checked
+in `../ui-screenshots/v7.2/`: `1-pos-chips.png` (Available-only green
+chips T1/T2/T3/T5/T7, no walk-in chips), `2-table-dialog.png` (880px
+dialog, hall sections, T4/T6 Reserved with timers 24:16 / 00:42 +
+Free Table), `3-tables-floor.png` (4-col full-width grid, count pills,
+T4/T6 Reserved with big timers, Available cards show seats only).
+NOT verified live: needs pull + build + clear-cache + restart, then a
+live dine-in order — select an Available table → Confirm → check it
+flips to Reserved with the timer running → settle from Pending → check
+it flips back to Available; check the chips strip shows only on the
+POS screen. Manager PIN untouched (still 1234). Nothing
+settled/deleted. Zip: `foodpos-v7.2-tables.zip` (322K, same 102 files
+as v7.1). NOT pushed to GitHub (user did not ask for a push).

@@ -482,3 +482,38 @@ correctly in the screenshots).
   Back on tables/closing on both routes (Accounts and Home); 8 tables
   present; day times survive a fresh load; T6 shows no guests after
   settle. Manager PIN untouched (1234). Nothing settled/deleted.
+
+## v7.2 — Table lifecycle, Available-only chips, tables floor redesign (2026-11-17 00:08 PKT)
+
+- User feedback (3 live screenshots, v7.1 confirmed live): (1) Available
+  table selected + order confirmed → timer starts, table goes to
+  Reserved; paid via Pending invoice → Available again; live Reserved
+  vs Available visible with running time; Select Table dialog bigger
+  and nicer. (2) Remove the Walk-in Customer chips from the footer on
+  EVERY screen; only the menu screen shows chips, only for LIVE
+  Available tables, nicely designed. (3) Tables floor layout is not
+  good — nicer grid, live Reserved/Available counts, live running
+  timer on reserved tables.
+- What was already correct (verified, not re-broken): `create_kot`
+  marks the table Occupied + `occupied_since` at Confirm (never
+  restarts the timer); `submit_pos_invoice` frees the table +
+  `occupied_since` + guests on every settle path. v7.2 wires the
+  client side around those two anchors (in-memory flip at Confirm,
+  `refresh_tables_live()` after settle, `occupied_since` in every
+  realtime publish, `resume_held_order` timer fix).
+- Changes: `_table_display()` Reserved label helper (stored Occupied,
+  shown Reserved); `render_table_chips()` Available-only + POS-only
+  (gate in the function and in `set_view`); `refresh_tables_live()`
+  (5s poll + realtime, diff-gated); `_render_tables_floor()` split
+  out (no loading flash); floor 4-col full-width grid + live count
+  pills + prominent Reserved timers + no guests line on Available;
+  dialog 880px + hall sections + bigger cards + Reserved disabled
+  with timer; 1s tick document-wide so dialog timers tick.
+- Sanity **246/246 PASS** (19 new v7.2 checks), seed stub **9/9
+  PASS**, `window.open` 0. Screenshots visually checked in
+  `../ui-screenshots/v7.2/` (1-pos-chips, 2-table-dialog,
+  3-tables-floor). NOT verified live: pull + build + clear-cache +
+  restart, then a live dine-in order (select table → Confirm →
+  Reserved + timer → settle from Pending → Available again) and the
+  chips strip only on the POS screen. Manager PIN untouched (1234).
+  Nothing settled/deleted. Zip `foodpos-v7.2-tables.zip`, NOT pushed.

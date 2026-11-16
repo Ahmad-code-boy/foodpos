@@ -2819,3 +2819,64 @@ button.fpos-home-sync:hover { filter: brightness(0.97); }
 .fpos-pending-search .fpos-ic { color: #78716c; }
 .fpos-pending-body { max-width: none; margin: 0; width: 100%; display: flex; flex-direction: column; gap: 12px; }
 .fpos-pending-body .fpos-recent-card { margin: 0; }
+
+/* ══════════════════════════════════════════════════════════════════
+   v7.2 — table lifecycle (Reserved label + live timers), Available-only
+   chips strip (POS screen only), tables floor 4-col grid, bigger
+   Select Table dialog.
+   ══════════════════════════════════════════════════════════════════ */
+/* Floor: full width, 4 cards per row on desktop. The older 3-col rule
+   with a 980px cap (line ~2421) left a big empty right side on wide
+   screens — this later rule wins on specificity order. */
+.fpos-floor-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; max-width: none; }
+@media (max-width: 1279px) { .fpos-floor-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 900px) { .fpos-floor-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .fpos-floor-grid { grid-template-columns: 1fr; } }
+/* Live count pills under the floor header. */
+.fpos-floor-counts { display: flex; gap: 10px; flex-wrap: wrap; margin: 2px 0 8px; }
+.fpos-floor-count { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 800; padding: 6px 12px; border-radius: 999px; }
+.fpos-floor-count .fpos-ic { width: 15px; height: 15px; }
+.fpos-floor-count.available { background: #dcfce7; color: #166534; }
+.fpos-floor-count.reserved { background: #fef3c7; color: #92400e; }
+.fpos-floor-count.total { background: #f5efe4; color: #57534e; }
+/* Reserved dot on floor cards (amber, matching the Reserved pill). */
+.fpos-table-dot.reserved { background: #f59e0b; }
+/* Prominent live timer on Reserved floor cards. */
+.fpos-table-time-big { font-size: 16px; background: #fef3c7; border: 1px solid #fde68a; border-radius: 9px; padding: 5px 12px; margin-top: 4px; }
+/* Available-only chips: green-tinted, green avatar. */
+.fpos-table-chip-available { background: #f0fdf4; border-color: #bbf7d0; }
+.fpos-table-chip-available:hover { border-color: #22c55e; }
+.fpos-table-chip-available .fpos-table-chip-no { background: #22c55e; }
+.fpos-table-chip-available .fpos-table-chip-meta { color: #166534; }
+/* ── Bigger Select Table dialog ── */
+/* (0,4,0) beats the v6.0 .modal.show .modal-dialog 480px width and the
+   .fpos-custom-dialog 580px max-width cap, both (0,3,0). */
+.modal.show.fpos-table-dialog .modal-dialog { width: 880px; max-width: calc(100vw - 32px); }
+/* 8 bigger cards in 2 hall sections make a tall dialog — let the body
+   scroll inside the viewport instead of running off the bottom. */
+.fpos-table-dialog .modal-body { max-height: calc(100vh - 150px); overflow-y: auto; }
+.fpos-tbl-dialog-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.fpos-tbl-dialog-summary { font-size: 14px; color: #78716c; }
+.fpos-tbl-dialog-summary b.ok { color: #166534; }
+.fpos-tbl-dialog-summary b.busy { color: #b45309; }
+.fpos-tbl-dialog-legend { display: flex; gap: 14px; font-size: 12px; color: #57534e; }
+.fpos-tbl-dialog-legend .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; }
+.fpos-tbl-dialog-legend .dot.available { background: #22c55e; }
+.fpos-tbl-dialog-legend .dot.reserved { background: #f59e0b; }
+.fpos-tbl-dialog-legend .dot.cleaning { background: #3b82f6; }
+.fpos-tbl-section-title { font-size: 13px; font-weight: 800; color: #57534e; text-transform: uppercase; letter-spacing: .04em; margin: 16px 0 10px; }
+.fpos-table-dialog-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; }
+.fpos-tbl-card { border: 2px solid #eadfd2; background: #fff; border-radius: 14px; padding: 18px 12px 14px; text-align: center; cursor: pointer; position: relative; transition: all .2s ease; }
+.fpos-tbl-card:hover { border-color: #ea580c; box-shadow: 0 4px 14px rgba(41,37,36,.12); }
+.fpos-tbl-card.fpos-tbl-selected { border-color: #ea580c; box-shadow: 0 0 0 3px rgba(234,88,12,.18); }
+.fpos-tbl-card.fpos-tbl-reserved { background: #fffbeb; border-color: #fde68a; cursor: not-allowed; opacity: .92; }
+.fpos-tbl-card.fpos-tbl-reserved:hover { border-color: #f59e0b; }
+.fpos-tbl-dot { width: 12px; height: 12px; border-radius: 50%; margin: 0 auto 8px; }
+.fpos-tbl-name { font-weight: 800; font-size: 16px; color: #292524; }
+.fpos-tbl-seats { color: #78716c; font-size: 12px; }
+.fpos-tbl-status { font-size: 12px; font-weight: 800; margin-top: 5px; }
+.fpos-tbl-timer { font-size: 14px; color: #b45309; font-weight: 800; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.fpos-tbl-timer .fpos-ic { width: 14px; height: 14px; }
+.fpos-tbl-tab-badge { position: absolute; top: 6px; right: 8px; font-size: 10px; background: #e0f2fe; color: #0284c7; padding: 2px 6px; border-radius: 6px; font-weight: 700; }
+.fpos-tbl-empty { text-align: center; padding: 30px 10px; color: #78716c; }
+.fpos-table-dialog .fpos-card-free-btn { margin-top: 8px; font-size: 11px; padding: 3px 10px; border-radius: 6px; border: 1px solid #fca5a5; color: #b91c1c; background: #fff5f5; font-weight: 600; }

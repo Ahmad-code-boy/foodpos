@@ -2038,11 +2038,14 @@ foodpos.FoodPOS.Controller = class {
 		frappe.realtime.on("fpos_table_status_changed", (data) => {
 			if (!data || !data.table) return;
 
-			// 1. Update in-memory tables
+			// 1. Update in-memory tables (v7.2: occupied_since rides in the
+			// event now, so the timer is exact without a re-fetch).
 			const t = this.tables.find((x) => x.name === data.table || x.table_no === data.table);
 			if (t) {
 				t.status = data.status;
 				t.order_id = data.order_id || null;
+				if (data.occupied_since !== undefined) t.occupied_since = data.occupied_since;
+				if (data.status === "Available") { t.occupied_since = null; t.guests = 0; }
 			}
 
 			// 2. Dynamically update open table modal cards if present
@@ -2051,14 +2054,33 @@ foodpos.FoodPOS.Controller = class {
 				const status_colors = {
 					Available: "#22c55e",
 					Free: "#22c55e",
-					Occupied: "#ef4444",
+					Occupied: "#f59e0b",
 					Reserved: "#f59e0b",
 					Cleaning: "#3b82f6",
 				};
 				const color = status_colors[data.status] || "#a8a29e";
+				const disp = this._table_display(data.status);
 				card.find(".fpos-tbl-dot").css("background", color);
-				card.find(".fpos-tbl-status").text(data.status).css("color", color);
+				card.find(".fpos-tbl-status").text(disp.label).css("color", color);
+				// v7.2: keep the card's live timer in step with the flip.
+				let $timer = card.find(".fpos-tbl-timer");
+				if (data.status === "Occupied" || data.status === "Reserved") {
+					const since = data.occupied_since || (t && t.occupied_since) || "";
+					if ($timer.length) {
+						$timer.attr("data-since", since);
+						$timer.find(".fpos-table-time-val").text(this.format_elapsed(since));
+					} else if (since) {
+						card.find(".fpos-tbl-status").after(`<div class="fpos-tbl-timer" data-since="${since}">${fpos_icon("timer", "fpos-ic-sm")} <span class="fpos-table-time-val">${this.format_elapsed(since)}</span></div>`);
+					}
+				} else {
+					$timer.remove();
+				}
+				card.toggleClass("fpos-tbl-reserved", data.status === "Occupied" || data.status === "Reserved");
 			}
+
+			// 3. v7.2: re-render the live strip / floor from memory.
+			if (this.current_view === "pos") this.render_table_chips();
+			else if (this.current_view === "tables") this._render_tables_floor(this.tables);
 		});
 	}
 
@@ -2096,6 +2118,9 @@ foodpos.FoodPOS.Controller = class {
 				title: __("Select Table for Dine-In"),
 				size: "large",
 			});
+			// v7.2: wider dialog (~880px) — the stock "large" size is too
+			// narrow for 8 table cards with hall sections.
+			$(d.wrapper).addClass("fpos-table-dialog");
 
 		d.get_close_btn().on("click", () => {
 			// Round 8 Item 3: Closing the table selector without choosing a table
@@ -2108,119 +2133,122 @@ foodpos.FoodPOS.Controller = class {
 		});
 
 		const body = $(d.wrapper).find(".modal-body");
+		// v7.2: bigger, nicer dialog — hall sections, larger cards, live
+		// counts, Reserved cards disabled (with their running timer) so
+		// the cashier sees at a glance who is sitting where.
+		const _disp = (s) => this._table_display(s);
+		const _avail_n = this.tables.filter((t) => t.status === "Available").length;
+		const _resvd_n = this.tables.filter((t) => t.status === "Occupied" || t.status === "Reserved").length;
 		body.html(`
-			<div style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
-				<div style="font-size:13px;color:#78716c;">
-					${this.tables.length} tables &bull; Main Branch
-				</div>
-				<div style="display:flex;gap:12px;font-size:11px;">
-					<span style="display:flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;border-radius:50%;background:#22c55e;"></span> Available</span>
-					<span style="display:flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;border-radius:50%;background:#ef4444;"></span> Occupied</span>
+			<div class="fpos-tbl-dialog-head">
+				<div class="fpos-tbl-dialog-summary">${this.tables.length} ${__("tables")} &bull; <b class="ok">${_avail_n} ${__("Available")}</b> &bull; <b class="busy">${_resvd_n} ${__("Reserved")}</b> &bull; ${__("Main Branch")}</div>
+				<div class="fpos-tbl-dialog-legend">
+					<span><i class="dot available"></i> ${__("Available")}</span>
+					<span><i class="dot reserved"></i> ${__("Reserved")}</span>
+					<span><i class="dot cleaning"></i> ${__("Cleaning")}</span>
 				</div>
 			</div>
-			<div class="fpos-table-grid" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(130px, 1fr));gap:12px;padding:6px 0;"></div>
+			<div class="fpos-table-dialog-sections"></div>
 		`);
-
-		const grid = body.find(".fpos-table-grid");
-
+		const _host = body.find(".fpos-table-dialog-sections");
 		if (this.tables.length === 0) {
-			grid.html(`<div style="grid-column:1/-1;text-align:center;padding:30px 10px;color:#78716c;">${__("No tables found. Add Restaurant Tables in Desk.")}</div>`);
+			_host.html(`<div class="fpos-tbl-empty">${__("No tables found. Add Restaurant Tables in Desk.")}</div>`);
 		} else {
-			this.tables.forEach((t) => {
-				const is_occupied = t.status === "Occupied";
-				const status_colors = {
-					Available: "#22c55e",
-					Free: "#22c55e",
-					Occupied: "#ef4444",
-					Reserved: "#f59e0b",
-					Cleaning: "#3b82f6",
-				};
-				const color = status_colors[t.status] || "#a8a29e";
-				const has_tab = this.is_table_in_any_tab(t.name);
-				const display_name = t.table_no ? `Table ${t.table_no}` : t.name;
-
-				const card = $(`
-					<div class="fpos-tbl-card" data-table="${t.name}" style="border:2px solid ${t.name === this.selected_table ? "#ea580c" : "#eadfd2"};background:#fff;border-radius:10px;padding:12px;text-align:center;cursor:pointer;position:relative;transition:all .2s ease;">
-						<div class="fpos-tbl-dot" style="width:10px;height:10px;border-radius:50%;background:${color};margin:0 auto 6px;"></div>
-						<div style="font-weight:700;font-size:14px;color:#292524;">${display_name}</div>
-						<small style="color:#78716c;font-size:11px;">${t.capacity || 4} ${__("Seats")}</small>
-						<div class="fpos-tbl-status" style="font-size:10px;color:${color};font-weight:700;margin-top:4px;">${__(t.status)}</div>
-						${is_occupied && t.occupied_since ? `<div class="fpos-tbl-timer" data-since="${t.occupied_since}" style="font-size:11px;color:#b45309;font-weight:700;margin-top:2px;">${fpos_icon("timer", "fpos-ic-sm")} <span class="fpos-table-time-val">${this.format_elapsed(t.occupied_since)}</span></div>` : ""}
-						${has_tab ? `<span style="position:absolute;top:4px;right:6px;font-size:10px;background:#e0f2fe;color:#0284c7;padding:1px 5px;border-radius:6px;font-weight:700;">${__("Tab")}</span>` : ""}
-						${is_occupied ? `
-							<button class="btn btn-xs btn-default fpos-card-free-btn" data-table="${t.name}" style="margin-top:6px;font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #fca5a5;color:#b91c1c;background:#fff5f5;font-weight:600;">
-								${fpos_icon("checkCircle", "fpos-ic-sm")} Free Table
-							</button>
-						` : ""}
-					</div>
-				`);
-
-				// Card click: Select table or switch to its tab
-				card.on("click", (e) => {
-					if ($(e.target).hasClass("fpos-card-free-btn")) return;
-
-					table_selected = true;
-					const existing_tab_id = Object.keys(this.tabs).find((k) => this.tabs[k].table === t.name);
-					if (existing_tab_id && existing_tab_id !== this.active_tab_id) {
+			const _sections = [...new Set(this.tables.map((t) => t.section || __("Main Hall")))];
+			_sections.forEach((sec) => {
+				const $sec = $(`<div class="fpos-tbl-section"><div class="fpos-tbl-section-title">${sec}</div><div class="fpos-table-dialog-grid"></div></div>`);
+				const grid = $sec.find(".fpos-table-dialog-grid");
+				this.tables.filter((t) => (t.section || __("Main Hall")) === sec).forEach((t) => {
+					const disp = _disp(t.status);
+					const is_reserved = t.status === "Occupied" || t.status === "Reserved";
+					const color = { Available: "#22c55e", Free: "#22c55e", Occupied: "#f59e0b", Reserved: "#f59e0b", Cleaning: "#3b82f6" }[t.status] || "#a8a29e";
+					const has_tab = this.is_table_in_any_tab(t.name);
+					const display_name = t.table_no ? `Table ${t.table_no}` : t.name;
+					const card = $(`
+						<div class="fpos-tbl-card${is_reserved ? " fpos-tbl-reserved" : ""}${t.name === this.selected_table ? " fpos-tbl-selected" : ""}" data-table="${t.name}">
+							<div class="fpos-tbl-dot" style="background:${color};"></div>
+							<div class="fpos-tbl-name">${display_name}</div>
+							<small class="fpos-tbl-seats">${t.capacity || 4} ${__("Seats")}</small>
+							<div class="fpos-tbl-status" style="color:${color};">${disp.label}</div>
+							${is_reserved && t.occupied_since ? `<div class="fpos-tbl-timer" data-since="${t.occupied_since}">${fpos_icon("timer", "fpos-ic-sm")} <span class="fpos-table-time-val">${this.format_elapsed(t.occupied_since)}</span></div>` : ""}
+							${has_tab ? `<span class="fpos-tbl-tab-badge">${__("Tab")}</span>` : ""}
+							${is_reserved ? `
+								<button class="btn btn-xs btn-default fpos-card-free-btn" data-table="${t.name}">
+									${fpos_icon("checkCircle", "fpos-ic-sm")} Free Table
+								</button>
+							` : ""}
+						</div>
+					`);
+					// Card click: Available → select for this cart; Reserved
+					// → switch to its active tab if it has one, else refuse
+					// (a Reserved table cannot take a second order).
+					card.on("click", (e) => {
+						if ($(e.target).hasClass("fpos-card-free-btn")) return;
+						const existing_tab_id = Object.keys(this.tabs).find((k) => this.tabs[k].table === t.name);
+						if (is_reserved) {
+							if (existing_tab_id && existing_tab_id !== this.active_tab_id) {
+								d.hide();
+								this.switch_tab(existing_tab_id);
+								frappe.show_alert({ message: __("Switched to active Tab for {0}", [display_name]), indicator: "blue" });
+								return;
+							}
+							table_selected = false;
+							frappe.show_alert({ message: __("Table {0} is Reserved — please pick an Available table.", [display_name]), indicator: "orange" });
+							return;
+						}
+						table_selected = true;
+						if (existing_tab_id && existing_tab_id !== this.active_tab_id) {
+							d.hide();
+							this.switch_tab(existing_tab_id);
+							frappe.show_alert({ message: __("Switched to active Tab for {0}", [display_name]), indicator: "blue" });
+							return;
+						}
+						this.selected_table = t.name;
+						this.selected_table_no = t.table_no || t.name;
+						this.wrapper.find(".fpos-table-label").text(display_name);
+						const cur = this.tabs[this.active_tab_id];
+						if (cur) {
+							cur.table = t.name;
+							cur.table_no = this.selected_table_no;
+							cur.title = display_name;
+						}
+						this.update_order_type_ui();
+						this.update_cart_summary();
+						this.save_cart_backup();
+						this.render_tab_bar();
 						d.hide();
-						this.switch_tab(existing_tab_id);
-						frappe.show_alert({
-							message: __("Switched to active Tab for {0}", [display_name]),
-							indicator: "blue",
-						});
-						return;
-					}
-
-					this.selected_table = t.name;
-					this.selected_table_no = t.table_no || t.name;
-					this.wrapper.find(".fpos-table-label").text(display_name);
-
-					const cur = this.tabs[this.active_tab_id];
-					if (cur) {
-						cur.table = t.name;
-						cur.table_no = this.selected_table_no;
-						cur.title = display_name;
-					}
-
-					this.update_order_type_ui();
-					this.update_cart_summary();
-					this.save_cart_backup();
-					this.render_tab_bar();
-					d.hide();
-				});
-
-				// Free Table click: Manager PIN override
-				card.find(".fpos-card-free-btn").on("click", (e) => {
-					e.stopPropagation();
-					this.prompt_manager_pin({
-						action_type: "table_reset",
-						title: __("Force-Free Occupied Table"),
-						details: `Emergency unlock for ${display_name} to restore availability and prevent deadlock.`,
-						on_success: async (res) => {
-							frappe.dom.freeze(__("Unlocking table..."));
-							await frappe.call({
-								method: "foodpos.foodpos.page.food_pos.food_pos.force_free_table",
-								args: {
-									table: t.name,
-									manager_pin: "approved",
-									reason: "Manager PIN manual table release",
-								},
-							});
-							frappe.dom.unfreeze();
-							t.status = "Available";
-							t.order_id = null;
-							card.find(".fpos-tbl-dot").css("background", "#22c55e");
-							card.find(".fpos-tbl-status").text("Available").css("color", "#22c55e");
-							card.find(".fpos-card-free-btn").remove();
-							frappe.show_alert({
-								message: __("{0} freed and set to Available", [display_name]),
-								indicator: "green",
-							});
-						},
 					});
+					// Free Table click: Manager PIN override
+					card.find(".fpos-card-free-btn").on("click", (e) => {
+						e.stopPropagation();
+						this.prompt_manager_pin({
+							action_type: "table_reset",
+							title: __("Force-Free Occupied Table"),
+							details: `Emergency unlock for ${display_name} to restore availability and prevent deadlock.`,
+							on_success: async (res) => {
+								frappe.dom.freeze(__("Unlocking table..."));
+								await frappe.call({
+									method: "foodpos.foodpos.page.food_pos.food_pos.force_free_table",
+									args: { table: t.name, manager_pin: "approved", reason: "Manager PIN manual table release" },
+								});
+								frappe.dom.unfreeze();
+								t.status = "Available";
+								t.order_id = null;
+								t.occupied_since = null;
+								t.guests = 0;
+								card.removeClass("fpos-tbl-reserved");
+								card.find(".fpos-tbl-dot").css("background", "#22c55e");
+								card.find(".fpos-tbl-status").text("Available").css("color", "#22c55e");
+								card.find(".fpos-tbl-timer").remove();
+								card.find(".fpos-card-free-btn").remove();
+								this.render_table_chips();
+								frappe.show_alert({ message: __("{0} freed and set to Available", [display_name]), indicator: "green" });
+							},
+						});
+					});
+					grid.append(card);
 				});
-
-				grid.append(card);
+				_host.append($sec);
 			});
 		}
 
@@ -2252,70 +2280,46 @@ foodpos.FoodPOS.Controller = class {
 		this.wrapper.find(".fpos-pending-banner").removeClass("show").empty();
 	}
 
-	// v3: bottom occupied-table chips (image 4) — built from open order tabs.
+	// v7.2: the STORED status stays "Occupied" (server logic, KDS and the
+	// merge code all key on it), but the user always sees "Reserved" —
+	// an Occupied table is a table held for a confirmed order with its
+	// timer running. One helper so the floor, dialog, report and realtime
+	// updates can never disagree on the label again.
+	_table_display(status) {
+		const s = status || "Available";
+		if (s === "Occupied" || s === "Reserved") return { label: __("Reserved"), cls: "reserved", icon: "clock" };
+		if (s === "Cleaning") return { label: __("Cleaning"), cls: "cleaning", icon: "clock" };
+		return { label: __("Available"), cls: "available", icon: "checkCircle" };
+	}
+
+	// v7.2: bottom strip is now AVAILABLE TABLES ONLY, on the POS menu
+	// screen only. Walk-in/draft order chips are gone from every screen —
+	// the strip is a quick "free table" picker: green dot, table no.,
+	// seats, "Available". Tap starts a Dine-In order on that table
+	// (start_table_order). Zero available tables → the strip hides itself.
 	render_table_chips() {
 		const $bar = this.wrapper.find(".fpos-table-chips-bar");
 		if (!$bar.length) return;
-		// v4 CHILI bottom strip: staff avatars first, then ONE chip per OPEN order
-		// (tables AND walk-in/takeaway/delivery — the top tabs bar is gone, so this
-		// strip is the only order switcher).
-		// v7.1: ONE chip per table. A table's tabs are deduped — if two tabs
-		// somehow reference the same table (e.g. a stale empty tab left after
-		// a settle), the live one (confirmed / with items) wins and the empty
-		// one is dropped, so T6 can never appear twice in the strip.
-		const _chip_score = (t) => (t.order_confirmed ? 2 : 0) + ((t.cart_items || []).length ? 1 : 0);
-		const _kept = [];
-		const _idx_by_table = new Map();
-		for (const t of Object.values(this.tabs || {})) {
-			const key = t.table || (t.table_no ? `table:${t.table_no}` : null);
-			if (!key) { _kept.push(t); continue; }
-			if (_idx_by_table.has(key)) {
-				const i = _idx_by_table.get(key);
-				if (_chip_score(t) > _chip_score(_kept[i])) _kept[i] = t;
-			} else {
-				_idx_by_table.set(key, _kept.length);
-				_kept.push(t);
-			}
-		}
-		const tabs = _kept;
-		// v4: free tables join the strip too (CHILI shows T1/T2/T3 with "Available") —
-		// tapping one starts a fresh Dine-In order on that table. Capped at 8 so the
-		// strip stays a single scrollable row.
-		const occupied = new Set(tabs.map((t) => t.table).filter(Boolean));
-		const free = (this.tables || [])
-			.filter((t) => t.status !== "Occupied" && !occupied.has(t.name))
-			.slice(0, 8);
-		if (!tabs.length && !free.length) { $bar.hide().empty(); return; }
+		if (this.current_view !== "pos") { $bar.hide().empty(); return; }
 		// v7.1: table_no is already "T6" — prefixing another "T" made "TT6".
 		// Strip one leading T, then prefix, so the avatar always reads "T6".
 		const _short_no = (raw) => String(raw || "").replace(/^T/i, "");
-		const chips = tabs.map((t) => {
-			const items = (t.cart_items || []).length;
-			const no = t.table_no ? `T${_short_no(t.table_no)}` : (t.order_type === "Walk In" ? "W" : t.order_type === "Takeaway" ? "TA" : "D");
-			const meta = t.order_confirmed ? `${items} ${__("items")} → ${__("Kitchen")}` : (items ? `${items} ${__("items")} • ${__("Ordering")}` : __("Empty"));
-			return `
-			<button class="fpos-table-chip" data-tab-id="${t.id}">
-				<span class="fpos-table-chip-dot ${t.order_confirmed ? "kitchen" : "ordering"}"></span>
-				<span class="fpos-table-chip-no">${no}</span>
-				<span>${t.customer || __("Walk-in")}</span>
-				<span class="fpos-table-chip-meta">${meta}</span>
-			</button>`;
-		}).join("");
-		const free_chips = free.map((t) => {
+		const free = (this.tables || [])
+			.filter((t) => t.status === "Available")
+			.slice(0, 8);
+		if (!free.length) { $bar.hide().empty(); return; }
+		const chips = free.map((t) => {
 			const no = t.table_no || (t.name || "").split("-").pop();
+			const cap = Math.max(2, t.capacity || 4);
 			return `
 			<button class="fpos-table-chip fpos-table-chip-available" data-table-name="${t.name}">
 				<span class="fpos-table-chip-dot free"></span>
 				<span class="fpos-table-chip-no">T${_short_no(no)}</span>
 				<span>${__("Table")} ${no}</span>
-				<span class="fpos-table-chip-meta">${__("Available")}</span>
+				<span class="fpos-table-chip-meta">${cap} ${__("seats")} &bull; ${__("Available")}</span>
 			</button>`;
 		}).join("");
-		$bar.html(`
-			<span class="fpos-chips-staff" title="${__("Staff on shift")}">
-				<span class="fpos-chip-avatar fpos-chip-avatar-a">${fpos_icon("user", "fpos-ic-sm")}</span>
-				<span class="fpos-chip-avatar fpos-chip-avatar-b">${fpos_icon("user", "fpos-ic-sm")}</span>
-			</span>${chips}${free_chips}`);
+		$bar.html(chips);
 		$bar.show();
 	}
 
@@ -2392,7 +2396,18 @@ foodpos.FoodPOS.Controller = class {
 			// BILL RULE v3: payment is Pending and NO bill has been given yet.
 			this.payment_pending = true;
 			this.show_pending_banner(kot_name);
-			this.render_table_chips(); // v3: chip flips to "Kitchen • Pending"
+			// v7.2: mark the table Reserved in memory at once (the server
+			// already did it in create_kot) so the strip/floor flip
+			// immediately, with the timer the server just started.
+			if (msg.table) {
+				const _ct = (this.tables || []).find((x) => x.name === msg.table);
+				if (_ct) {
+					_ct.status = "Occupied";
+					_ct.occupied_since = msg.occupied_since || _ct.occupied_since || "";
+					if (kot_name) _ct.order_id = kot_name;
+				}
+			}
+			this.render_table_chips();
 			this.refresh_kitchen_badge();
 			this.render_tables_view();
 			// v7: a TABLE (dine-in) order auto-shows its KOT slip in the
@@ -3115,6 +3130,9 @@ foodpos.FoodPOS.Controller = class {
 
 			const receipt_data = res.message.receipt_data || res.message;
 			this.show_pos_slip(receipt_data, true);
+			// v7.2: the table was freed server-side on settle — refresh the
+			// live strip/floor so it flips back to Available at once.
+			this.refresh_tables_live();
 
 			// Immediately prepend to recent orders cache so Recent panel updates without reload
 			const resolved_order_type = receipt_data.order_type || receipt_data.custom_order_type || order_payload.order_type || "Takeaway";
@@ -4321,7 +4339,34 @@ foodpos.FoodPOS.Controller = class {
 			this.refresh_kitchen_badge();
 			this.refresh_held_badge();
 			this.refresh_exceptions_badge();
+			// v7.2: live table statuses — Reserved/Available flips and
+			// timers appear without a page reload.
+			this.refresh_tables_live();
 		}, 5000);
+	}
+
+	// v7.2: live table refresh — poll + realtime backstop. Re-fetches table
+	// statuses and re-renders the strip/floor ONLY when something actually
+	// changed, so there is no flicker and no "Loading tables..." flash.
+	async refresh_tables_live() {
+		if (!this.pos_profile || !this.is_online || this._refreshing_tables) return;
+		if (this.current_view !== "pos" && this.current_view !== "tables") return;
+		this._refreshing_tables = true;
+		try {
+			const res = await frappe.call({
+				method: "foodpos.foodpos.page.food_pos.food_pos.get_available_tables",
+				args: { pos_profile: this.pos_profile },
+				freeze: false, quiet: true, error: () => {},
+			});
+			const fresh = res.message || [];
+			const sig = (list) => JSON.stringify((list || []).map((t) => [t.name, t.status, t.occupied_since || "", t.order_id || "", t.guests || 0]));
+			if (sig(fresh) !== sig(this.tables || [])) {
+				this.tables = fresh;
+				if (this.current_view === "tables") this._render_tables_floor(fresh);
+				else if (this.current_view === "pos") this.render_table_chips();
+			}
+		} catch (e) {}
+		this._refreshing_tables = false;
 	}
 
 	async refresh_kitchen_badge() {
@@ -6294,7 +6339,10 @@ foodpos.FoodPOS.Controller = class {
 	start_home_timers() {
 		if (this._home_timer) return;
 		this._home_timer = setInterval(() => {
-			this.wrapper.find("[data-since]").each((_, el) => {
+			// v7.2: document-wide scan — the Select Table dialog lives
+			// outside this.wrapper (frappe modal), so its Reserved timers
+			// only tick if the scan covers the whole document.
+			$(document).find("[data-since]").each((_, el) => {
 				const $el = $(el);
 				// v7: update only the time text, never the whole element —
 				// the old .text() wiped the Lucide timer icon on the first tick.
@@ -6338,6 +6386,10 @@ foodpos.FoodPOS.Controller = class {
 		} else {
 			this.wrapper.find(".fpos-closing-page").hide().removeClass("active").empty();
 		}
+		// v7.2: the Available-tables strip lives on the POS menu screen
+		// only — Home, Tables, Pending, Attendance, Report, closing and
+		// payment never show it (render_table_chips gates the same way).
+		this.wrapper.find(".fpos-table-chips-bar").toggle(name === "pos");
 		this._sync_nav(name);
 		this.start_home_timers();
 		this._record_view(name);
@@ -6768,36 +6820,52 @@ foodpos.FoodPOS.Controller = class {
 			return;
 		}
 		this.tables = tables;
-		const sections = [...new Set(tables.map((t) => t.section || __("Main Hall")))];
-		const status_class = (s) => ({
-			"Available": "available", "Occupied": "occupied",
-			"Reserved": "reserved", "Cleaning": "cleaning",
-		})[s] || "available";
+		this._render_tables_floor(tables);
+		this.start_home_timers();
+	}
+
+	// v7.2: floor rendering split out of show_tables() so live refresh
+	// (5s poll + realtime events) can re-render WITHOUT the "Loading
+	// tables..." flash. Header shows live counts; Reserved cards carry a
+	// prominent ticking timer; Available cards never show a guest count
+	// (a freed table's stale "Guests: 1" was a live-site complaint).
+	_render_tables_floor(tables) {
+		const $view = this.wrapper.find(".fpos-tables-view");
+		if (!$view.length) return;
+		const list = tables || this.tables || [];
+		const avail = list.filter((t) => t.status === "Available").length;
+		const resvd = list.filter((t) => t.status === "Occupied" || t.status === "Reserved").length;
+		const sections = [...new Set(list.map((t) => t.section || __("Main Hall")))];
 		$view.html(`
 			<div class="fpos-floor">
 				<div class="fpos-floor-head">
 					<div>
 						<div class="fpos-floor-title">${__("Dine-In — Tables")}</div>
-						<div class="fpos-floor-sub">${tables.length} ${__("tables")} &bull; ${tables.filter((t) => t.status === "Occupied").length} ${__("occupied")} &bull; ${__("Main Branch")}</div>
+						<div class="fpos-floor-sub">${list.length} ${__("tables")} &bull; ${avail} ${__("Available")} &bull; ${resvd} ${__("Reserved")} &bull; ${__("Main Branch")}</div>
 					</div>
 					<div class="fpos-floor-actions">
 						<button class="fpos-btn fpos-floor-home">${fpos_icon("arrowLeft", "fpos-ic-sm")} ${__("Back")}</button>
 						<button class="fpos-btn fpos-floor-edit">${fpos_icon("settings", "fpos-ic-sm")} ${__("Edit Layout")}</button>
 					</div>
 				</div>
+				<div class="fpos-floor-counts">
+					<span class="fpos-floor-count available">${fpos_icon("checkCircle", "fpos-ic-sm")} ${avail} ${__("Available")}</span>
+					<span class="fpos-floor-count reserved">${fpos_icon("clock", "fpos-ic-sm")} ${resvd} ${__("Reserved")}</span>
+					<span class="fpos-floor-count total">${list.length} ${__("Tables")}</span>
+				</div>
 				${sections.map((sec) => `
 					<div class="fpos-floor-section">
 						<div class="fpos-floor-section-title">${sec}</div>
 						<div class="fpos-floor-grid">
-							${tables.filter((t) => (t.section || __("Main Hall")) === sec).map((t) => {
-								const occupied = t.status === "Occupied";
+							${list.filter((t) => (t.section || __("Main Hall")) === sec).map((t) => {
+								const disp = this._table_display(t.status);
+								const is_reserved = t.status === "Occupied" || t.status === "Reserved";
 								// v3: realistic round wooden table — chairs left/right (2-4 by
 								// capacity), pedestal under the top, status pill + dot, live timer.
 								const cap = Math.max(2, t.capacity || 4);
-								const pill_icon = t.status === "Available" ? "checkCircle" : t.status === "Occupied" ? "people" : t.status === "Reserved" ? "star" : "clock";
 								return `
-								<button class="fpos-table-card fpos-table-${status_class(t.status)}" data-table="${t.name}">
-									<span class="fpos-table-dot ${status_class(t.status)}"></span>
+								<button class="fpos-table-card fpos-table-${disp.cls}" data-table="${t.name}">
+									<span class="fpos-table-dot ${disp.cls}"></span>
 									<span class="fpos-table-scene">
 										<span class="fpos-chair fpos-chair-left"></span>
 										<span class="fpos-table-top">${t.table_no || t.name}</span>
@@ -6805,16 +6873,15 @@ foodpos.FoodPOS.Controller = class {
 										<span class="fpos-table-pedestal"></span>
 									</span>
 									<span class="fpos-table-num">${__("Table")} ${t.table_no || t.name}</span>
-									<span class="fpos-table-status-pill ${status_class(t.status)}">${fpos_icon(pill_icon)} ${__(t.status)}</span>
-									${occupied && t.occupied_since ? `<span class="fpos-table-time" data-since="${t.occupied_since}">${fpos_icon("timer", "fpos-ic-sm")} <span class="fpos-table-time-val">${this.format_elapsed(t.occupied_since)}</span></span>` : ""}
-									<span class="fpos-table-meta2">${cap} ${__("seats")}${t.guests ? ` &bull; ${__("Guests")}: ${t.guests}` : ""}${t.order_id ? ` &bull; ${t.order_id}` : ""}</span>
+									<span class="fpos-table-status-pill ${disp.cls}">${fpos_icon(disp.icon)} ${disp.label}</span>
+									${is_reserved && t.occupied_since ? `<span class="fpos-table-time fpos-table-time-big" data-since="${t.occupied_since}">${fpos_icon("timer", "fpos-ic-sm")} <span class="fpos-table-time-val">${this.format_elapsed(t.occupied_since)}</span></span>` : ""}
+									<span class="fpos-table-meta2">${cap} ${__("seats")}${is_reserved && t.guests ? ` &bull; ${__("Guests")}: ${t.guests}` : ""}${is_reserved && t.order_id ? ` &bull; ${t.order_id}` : ""}</span>
 								</button>`;
 							}).join("")}
 						</div>
 					</div>`).join("")}
 				<div class="fpos-floor-legend">
 					<span><i class="dot available"></i> ${__("Available")}</span>
-					<span><i class="dot occupied"></i> ${__("Occupied")}</span>
 					<span><i class="dot reserved"></i> ${__("Reserved")}</span>
 					<span><i class="dot cleaning"></i> ${__("Cleaning")}</span>
 				</div>
@@ -6827,7 +6894,6 @@ foodpos.FoodPOS.Controller = class {
 			const table = (this.tables || []).find((t) => t.name === name);
 			if (table) this.open_table_order(table);
 		});
-		this.start_home_timers();
 	}
 
 	// Light refresh of the tables view after a confirm/settle (no full reload).
@@ -7007,7 +7073,7 @@ foodpos.FoodPOS.Controller = class {
 						${(r.top_items || []).map((i) => `<div class="fpos-report-row"><span>${i.item_name} × ${i.qty}</span><span>${money(i.amount)}</span></div>`).join("") || `<div class="fpos-report-row">${__("No items sold yet.")}</div>`}
 						<div class="fpos-report-h" style="margin-top:16px;">${__("Pending Dine-In Payments")}</div>
 						${(r.pending_tables || []).length
-							? r.pending_tables.map((t) => `<div class="fpos-report-row"><span>${__("Table")} ${t.table} &bull; ${__(t.status)}${t.occupied_since ? ` &bull; <span data-since="${t.occupied_since}">⏱ <span class="fpos-table-time-val">${this.format_elapsed(t.occupied_since)}</span></span>` : ""}</span><span>${t.guests ? __("Guests") + ": " + t.guests : ""}</span></div>`).join("")
+							? r.pending_tables.map((t) => `<div class="fpos-report-row"><span>${__("Table")} ${t.table} &bull; ${this._table_display(t.status).label}${t.occupied_since ? ` &bull; <span data-since="${t.occupied_since}">⏱ <span class="fpos-table-time-val">${this.format_elapsed(t.occupied_since)}</span></span>` : ""}</span><span>${t.guests ? __("Guests") + ": " + t.guests : ""}</span></div>`).join("")
 							: `<div class="fpos-report-row">${__("No pending dine-in tables.")}</div>`}
 					</div>
 				</div>
