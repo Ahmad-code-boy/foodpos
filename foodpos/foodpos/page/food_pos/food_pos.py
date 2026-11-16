@@ -2128,11 +2128,14 @@ def get_shift_closing_details(pos_profile=None, pos_opening_entry=None):
 
 		si_cols = frappe.db.get_table_columns("Sales Invoice") or []
 		order_type_col = "custom_order_type" if "custom_order_type" in si_cols else "NULL as custom_order_type"
+		# v6.2: table columns feed the shared order-type fallback below.
+		table_col = "custom_table" if "custom_table" in si_cols else "NULL as custom_table"
+		rest_table_col = "custom_restaurant_table" if "custom_restaurant_table" in si_cols else "NULL as custom_restaurant_table"
 		query = f"""
 			SELECT
 				name, 'Sales Invoice' as doctype, posting_date, posting_time, customer, customer_name,
 				grand_total, net_total, total_qty, total_taxes_and_charges, discount_amount,
-				paid_amount, outstanding_amount, change_amount, account_for_change_amount, {order_type_col}
+				paid_amount, outstanding_amount, change_amount, account_for_change_amount, {order_type_col}, {table_col}, {rest_table_col}
 			FROM `tabSales Invoice`
 			WHERE {' AND '.join(si_conds)}
 			ORDER BY creation DESC
@@ -2161,12 +2164,15 @@ def get_shift_closing_details(pos_profile=None, pos_opening_entry=None):
 
 		psi_cols = frappe.db.get_table_columns("POS Invoice") or []
 		order_type_col = "custom_order_type" if "custom_order_type" in psi_cols else "NULL as custom_order_type"
+		# v6.2: table columns feed the shared order-type fallback below.
+		table_col = "custom_table" if "custom_table" in psi_cols else "NULL as custom_table"
+		rest_table_col = "custom_restaurant_table" if "custom_restaurant_table" in psi_cols else "NULL as custom_restaurant_table"
 
 		query = f"""
 			SELECT
 				name, 'POS Invoice' as doctype, posting_date, posting_time, customer, customer_name,
 				grand_total, net_total, total_qty, total_taxes_and_charges, discount_amount,
-				paid_amount, outstanding_amount, {order_type_col}
+				paid_amount, outstanding_amount, {order_type_col}, {table_col}, {rest_table_col}
 			FROM `tabPOS Invoice`
 			WHERE {' AND '.join(psi_conds)}
 			ORDER BY creation DESC
@@ -2247,9 +2253,14 @@ def get_shift_closing_details(pos_profile=None, pos_opening_entry=None):
 	total_outstanding = sum(flt(r.get("outstanding_amount", 0)) for r in invoice_records)
 
 	# Order types breakdown
+	# v6.2: same fallback as get_recent_pos_orders — a missing type is
+	# "Dine In" only when a table is set, else "Takeaway". The old
+	# hard-coded "Dine In" made the closing page disagree with Home
+	# for bills whose type was never stored.
 	order_types_map = {}
 	for r in invoice_records:
-		ot = r.get("custom_order_type") or "Dine In"
+		_tbl = r.get("custom_table") or r.get("custom_restaurant_table") or ""
+		ot = r.get("custom_order_type") or ("Dine In" if _tbl else "Takeaway")
 		if ot not in order_types_map:
 			order_types_map[ot] = {"order_type": ot, "count": 0, "amount": 0.0}
 		order_types_map[ot]["count"] += 1

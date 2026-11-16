@@ -5617,7 +5617,11 @@ foodpos.FoodPOS.Controller = class {
 
 	async show_closing_page() {
 		this.current_view = "closing";
-		this.wrapper.find(".fpos-body").hide();
+		// v6.2: hide EVERY top-level view, not just the POS body — the Home
+		// view's fixed bottom nav (.fpos-home-nav) stayed visible and covered
+		// the closing page's bottom "Close Day" button, so it could not be
+		// clicked with a mouse. hide_closing_page() restores the POS view.
+		this.wrapper.find(".fpos-body, .fpos-home-view, .fpos-tables-view, .fpos-attendance-view, .fpos-daily-report-view").hide();
 		const $closing = this.wrapper.find(".fpos-closing-page");
 		$closing.show().addClass("active").html(`
 			<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:65vh;gap:16px;">
@@ -5734,7 +5738,11 @@ foodpos.FoodPOS.Controller = class {
 		const invoices = data.invoices || [];
 		if (invoices.length > 0) {
 			inv_rows = invoices.map(inv => {
-				const ot_icon = fpos_icon(inv.custom_order_type === "Dine In" ? "table" : inv.custom_order_type === "Takeaway" ? "box" : "truck", "fpos-ic-sm");
+				// v6.2: same order-type fallback as the server (table -> Dine In,
+				// else Takeaway) so a bill's type matches Home and the
+				// "Where Orders Came From" breakdown above.
+				const ot = inv.custom_order_type || ((inv.custom_table || inv.custom_restaurant_table) ? "Dine In" : "Takeaway");
+				const ot_icon = fpos_icon(ot === "Dine In" ? "table" : ot === "Takeaway" ? "box" : "truck", "fpos-ic-sm");
 				const doc_route = inv.doctype === "POS Invoice" ? `/app/pos-invoice/${inv.name}` : `/app/sales-invoice/${inv.name}`;
 				const is_paid = flt(inv.outstanding_amount) <= 0.001;
 				const status_badge = is_paid
@@ -5748,7 +5756,7 @@ foodpos.FoodPOS.Controller = class {
 						</td>
 						<td style="padding: 10px 14px; color: #78716c; font-size: 12px;">${(inv.posting_time || "").substring(0, 5)}</td>
 						<td style="padding: 10px 14px; font-weight: 500; color: #292524;">${inv.customer_name || inv.customer || "Walk-in"}</td>
-						<td style="padding: 10px 14px; font-size: 12px; color: #57534e;">${ot_icon} ${inv.custom_order_type || "Dine In"}</td>
+						<td style="padding: 10px 14px; font-size: 12px; color: #57534e;">${ot_icon} ${ot}</td>
 						<td style="padding: 10px 14px; text-align: right; font-weight: 700; color: #292524;">${format_curr(inv.grand_total)}</td>
 						<td style="padding: 10px 14px; text-align: center;">${status_badge}</td>
 					</tr>

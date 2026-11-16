@@ -351,3 +351,22 @@ correctly in the screenshots).
 - **NOT verified live:** Day Open/Close on the bench (day is OPEN on
   pos.local right now — the new Open card appears after the next
   Close Day; Close Day still needs Manager PIN, same as before).
+
+## v6.2 — Closing page fixes (2026-11-16 21:35 PKT)
+
+- **What changed:** (1) `show_closing_page()` hides all top-level
+  views so the Home bottom nav cannot cover the "Close Day" button;
+  closing page bottom padding 60px -> 96px. (2) Order-type fallback
+  unified to the shared table-based rule (table -> Dine In, else
+  Takeaway) in `get_shift_closing_details` (both invoice branches)
+  and in the closing page's bills rows — Home and the closing page
+  now agree for bills whose type was never stored.
+- **Static checks:** `node --check` OK, `py_compile` OK,
+  `scratch/v5_sanity.py` **185/185 PASS** (4 new v6.2 checks),
+  `scratch/v5_seed_test.py` **9/9 PASS**.
+- **Visual check:** `../ui-screenshots/v6.2/1-closing-bottom.png`
+  rendered from the real `food_pos.css` — bottom action bar (Back to
+  POS / Print Z-Report / Close Day) fully visible with clear space
+  below, no nav overlapping it.
+- **NOT verified live:** needs pull + build + clear-cache + restart,
+  then open the closing page and click "Close Day" with the mouse.

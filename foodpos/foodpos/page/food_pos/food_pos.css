@@ -781,7 +781,9 @@
 	flex-direction: column;
 	overflow-y: auto;
 	background: #faf6f0;
-	padding: 24px 32px 60px;
+	/* v6.2: 96px bottom clearance so the bottom action bar never sits
+	   under any fixed element at the bottom of the viewport. */
+	padding: 24px 32px 96px;
 }
 .fpos-closing-page.active {
 	display: flex;

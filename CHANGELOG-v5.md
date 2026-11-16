@@ -458,3 +458,51 @@ and visually checked: `../ui-screenshots/v6.1/1-day-open.png`
 NOT verified live: the user must open/close the day on the bench
 (the day is currently OPEN on pos.local, so the Open card shows
 after the next close).
+
+## v6.2 — Closing page: Close Day button reachable + order-type labels agree (2026-11-16 21:35 PKT)
+
+Two findings from the live v6.1 loop test (2026-11-16 21:15-21:32 PKT),
+both fixed here. No new feature, no logic change to totals or the
+close flow itself.
+
+**1. "Close Day" button was covered by the fixed bottom nav (real bug):**
+- Root cause: `show_closing_page()` hid only `.fpos-body`. The Home
+  view (`.fpos-home-view`) is a top-level sibling, so its fixed bottom
+  nav (`.fpos-home-nav`, `position: fixed; bottom: 0; z-index: 50`)
+  stayed on screen over the closing page and covered the bottom
+  action bar — the "Close Day" button could not be clicked with a
+  mouse (the live test had to Tab-navigate 35+8 times to reach it).
+- Fix: `show_closing_page()` now hides EVERY top-level view
+  (`.fpos-body, .fpos-home-view, .fpos-tables-view,
+  .fpos-attendance-view, .fpos-daily-report-view`).
+  `hide_closing_page()` is unchanged — it restores only the POS view,
+  which matches its `current_view = "pos"`.
+- Safety net: `.fpos-closing-page` bottom padding 60px -> 96px, so the
+  action bar clears any fixed element at the viewport bottom.
+
+**2. Order-type labels disagreed (Dine In vs Takeaway):**
+- Root cause: two different fallbacks for a missing order type.
+  `get_shift_closing_details` hard-coded `or "Dine In"`, while
+  `get_recent_pos_orders` (Home) and three other places use
+  `"Dine In" if table else "Takeaway"`. The 4 test invoices have an
+  empty `custom_order_type` (created before the unconditional-persist
+  fix) and no table, so Home said "Takeaway" and the closing page
+  said "Dine In" for the same bills.
+- Fix: `get_shift_closing_details` now selects the table columns
+  (`custom_table`, `custom_restaurant_table`, NULL when the column
+  does not exist) on both the Sales Invoice and POS Invoice branches
+  and uses the shared rule in the order-types breakdown:
+  `custom_order_type or ("Dine In" if table else "Takeaway")`.
+  The closing page's "Today's Bills" rows use the same rule in the
+  client (`render_closing_page`), for both the icon and the label.
+  New orders store their real type ("Walk In" etc.) via the persist
+  fix, so the fallback only matters for old/empty rows; the 4 old
+  test bills now read "Takeaway" everywhere, consistently.
+
+**Verify:** sanity 185/185 PASS (4 new v6.2 checks), seed stub 9/9,
+`node --check` + `py_compile` OK. Closing page bottom rendered from
+the real CSS and visually checked: `../ui-screenshots/v6.2/1-closing-bottom.png`
+(action bar fully visible with clear space below). NOT verified live:
+the user must pull + build + clear-cache + restart, then open the
+closing page and tap "Close Day" with the mouse (no PIN change — the
+Manager PIN is still 1234 from the v6.1 test).
