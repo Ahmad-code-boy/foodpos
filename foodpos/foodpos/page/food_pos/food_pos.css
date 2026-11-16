@@ -2109,13 +2109,13 @@ button.fpos-home-sync:hover { filter: brightness(0.97); }
 .fpos-items-grid .fpos-item-card { min-height: 150px; }
 
 /* ── v2: tables floor plan ───────────────────────────────────────── */
-.fpos-tables-view, .fpos-attendance-view, .fpos-daily-report-view { max-width: 1100px; margin: 0 auto; padding: 20px 24px 90px; }
+.fpos-tables-view, .fpos-attendance-view, .fpos-daily-report-view { width: 100%; max-width: 1100px; margin: 0 auto; padding: 20px 24px 90px; }
 .fpos-floor-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
 .fpos-floor-title { font-size: 22px; font-weight: 800; color: #292524; }
 .fpos-floor-sub { font-size: 13px; color: #78716c; margin-top: 2px; }
 .fpos-floor-actions { display: flex; gap: 8px; }
 .fpos-floor-section-title { font-size: 14px; font-weight: 800; color: #57534e; margin: 18px 0 10px; }
-.fpos-floor-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
+.fpos-floor-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
 .fpos-table-card { position: relative; background: #fff; border: 2px solid #eadfd2; border-radius: 16px; padding: 14px 10px 12px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px; min-height: 132px; }
 .fpos-table-card:hover { box-shadow: 0 4px 14px rgba(41,37,36,.12); }
 .fpos-table-available { border-color: #22c55e; background: #ffedd5; }
@@ -2172,7 +2172,7 @@ button.fpos-home-sync:hover { filter: brightness(0.97); }
    Touch targets >= 44px. Radii 14-16px, soft shadows, 8px spacing.
    Icons are inline SVG (.fpos-ic) — emoji is never a UI icon in v3.
    ══════════════════════════════════════════════════════════════════ */
-.fpos-ic { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; vertical-align: -4px; }
+.fpos-ic { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; vertical-align: -4px; }
 .fpos-ic-sm { width: 16px; height: 16px; }
 .fpos-ic-lg { width: 28px; height: 28px; }
 .fpos-brand-icon .fpos-ic { width: 26px; height: 26px; color: #ea580c; }
@@ -2300,14 +2300,12 @@ button.fpos-home-sync:hover { filter: brightness(0.97); }
    has ONE navigation per axis: left icon sidebar, centre tile row,
    right order panel, bottom chips strip. No server/API changes. */
 
-/* App shell: one rounded white window on a pale green-grey frame. The
-   file is app-scoped so it cannot paint the Desk page itself — the
-   12px ring + margin give the same framed-window look inside the page. */
-.fpos-wrapper { width: calc(100vw - 24px); height: calc(100vh - 24px); margin: 12px; border-radius: 20px; box-shadow: 0 0 0 12px #e9f1ea, 0 24px 60px rgba(41,37,36,.14); overflow: hidden; position: relative; }
-/* v4: the home bottom nav was position:fixed to the viewport — with the framed
-   shell it would sit 12px below the shell's bottom edge, over the green frame.
-   Anchor it to the shell instead, with matching bottom corners. */
-.fpos-wrapper .fpos-home-nav { position: absolute; left: 0; right: 0; bottom: 0; border-radius: 0 0 20px 20px; }
+/* v7: TRUE FULL-VIEWPORT shell — no boxed frame. The v4 rounded window
+   (calc(100vw - 24px), 12px margin, 20px radius, green frame ring) is
+   gone: the app now fills the whole viewport edge to edge. The home
+   bottom nav is position:fixed to the viewport again (base rule at
+   .fpos-home-nav), as it was before the frame existed. */
+.fpos-wrapper { width: 100vw; height: 100vh; margin: 0; border-radius: 0; box-shadow: none; overflow: hidden; position: relative; }
 /* One header per view: off the POS screen the POS topbar hides — Home,
    Tables, Attendance and Report each have their own header + Home button.
    v6.3: needs !important — the "Zone 1" block below sets
@@ -2353,13 +2351,21 @@ button.fpos-home-sync:hover { filter: brightness(0.97); }
    .fpos-item-media — without flex:1 it shrink-to-fit into a narrow band. */
 .fpos-item-media > div { flex: 1; }
 .fpos-items-grid-wrapper { padding: 12px 20px 20px; }
-.fpos-items-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
-@media (max-width: 1150px) { .fpos-items-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* v7: EXACTLY 5 item cards per row on desktop (>=1280px); fewer on
+   smaller screens — 4 at ~1100px, 3 at ~900px, 2 on small screens. */
+.fpos-items-grid { grid-template-columns: repeat(5, minmax(0, 1fr)) !important; gap: 12px; }
+@media (max-width: 1279px) { .fpos-items-grid { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; } }
+@media (max-width: 900px) { .fpos-items-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; } }
+@media (max-width: 640px) { .fpos-items-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }
+/* v7: 5-col card sizing lives at the END of this file (after the v5
+   media rules) so the 88px media height wins over the v5 110px. */
 
 /* --- Right order panel: CHILI header --- */
-/* v4: the Zone-3 rule sets the panel to 360px !important — the !important here
-   wins it back to the CHILI ~300px, which also frees 60px for the centre column. */
-.fpos-right-panel { width: 300px !important; }
+/* v7: the cart panel is 360px wide on desktop, so item names, quantities,
+   prices and action buttons have breathing room. Scoped to desktop:
+   below 900px the responsive rules (320px / 100% stacked) must win, so
+   this is NOT a bare !important — it only applies at min-width 901px. */
+@media (min-width: 901px) { .fpos-right-panel { width: 360px !important; } }
 .fpos-cart-header-strip { display: flex; align-items: flex-start; gap: 8px; padding: 16px 16px 12px; }
 .fpos-order-head { flex: 1; min-width: 0; }
 .fpos-order-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
@@ -2414,7 +2420,7 @@ button.fpos-home-sync:hover { filter: brightness(0.97); }
 }
 
 /* ── v5: type + page ── */
-.fpos-wrapper { font-family: "Plus Jakarta Sans", Inter, system-ui, -apple-system, "Segoe UI", sans-serif; box-shadow: 0 0 0 12px #ede9df, 0 24px 60px rgba(41,37,36,.14); }
+.fpos-wrapper { font-family: "Plus Jakarta Sans", Inter, system-ui, -apple-system, "Segoe UI", sans-serif; }
 .fpos-home-title, .fpos-floor-title, .fpos-order-title { letter-spacing: -.02em; }
 .fpos-shift-label, .fpos-floor-section-title, .fpos-rc-label, .fpos-home-stat-label, .fpos-home-recent-title { letter-spacing: .08em; text-transform: uppercase; }
 .fpos-grand-total-val, .fpos-item-rate, .fpos-cart-row-amount, .fpos-table-time, .fpos-stepper-qty, .fpos-home-stat-value, .fpos-home-recent-amt, .fpos-subtotal-val, .fpos-tax-val, .fpos-discount-val { font-variant-numeric: tabular-nums; }
@@ -2733,3 +2739,52 @@ button.fpos-home-sync:hover { filter: brightness(0.97); }
 .fpos-shift-guide b { display: inline-block; width: 20px; height: 20px; line-height: 20px; text-align: center; background: #ea580c; color: #fff; border-radius: 50%; font-size: 11px; margin-right: 6px; }
 .fpos-shift-action-sub { font-size: 12px; color: #78716c; text-align: center; margin-top: 6px; }
 .fpos-day-open-btn, .fpos-day-close-btn { width: 100%; min-height: 56px; font-size: 16px; padding: 14px 22px; }
+
+/* ══════════════════════════════════════════════════════════════════
+   v7.0 — UI/UX overhaul. This block sits LAST so its rules win over
+   the earlier v3–v6 blocks at equal specificity.
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── v7: 5-col card sizing (1280–1599px band) ──
+   Cards are ~150px wide here: media shorter, title smaller, footer
+   stacks (rate on top, Add/stepper full-width below) so nothing
+   truncates or overflows. At >=1600px cards are wide again and the
+   normal row footer + 110px media return. */
+@media (min-width: 1280px) and (max-width: 1599px) {
+	.fpos-item-media, .fpos-item-photo { height: 88px; }
+	.fpos-item-details { padding: 8px 10px; gap: 4px; }
+	/* Titles wrap to 2 lines instead of truncating with an ellipsis. */
+	.fpos-item-title { font-size: 13px; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.25; min-height: 2.5em; }
+	.fpos-item-footer { flex-direction: column; align-items: stretch; gap: 6px; }
+	.fpos-add-dish-btn { width: 100%; min-height: 32px; font-size: 12px; }
+	.fpos-stepper { justify-content: center; }
+}
+
+/* ── v7: left icon nav rail redesign ──
+   Roomier items, smooth transitions, a clear orange bar on the left
+   edge of the active item (in addition to its orange fill), a hairline
+   divider above Logout, and a tighter badge. Alignment is strictly
+   centred; labels never wrap. */
+.fpos-pos-sidebar { width: 88px; padding: 14px 10px; gap: 6px; }
+.fpos-pos-nav-item { padding: 12px 4px; min-height: 60px; border-radius: 14px; transition: background .15s ease, color .15s ease, box-shadow .15s ease, transform .12s ease; }
+.fpos-pos-nav-item:active { transform: scale(.97); }
+.fpos-pos-nav-item .fpos-ic { width: 23px; height: 23px; }
+.fpos-pos-nav-item:hover { background: #ffedd5; color: #ea580c; }
+.fpos-pos-nav-item.active { background: #ea580c; color: #fff; box-shadow: 0 4px 12px rgba(234,88,12,.28); }
+.fpos-pos-nav-item.active::before { content: ""; position: absolute; left: -10px; top: 14px; bottom: 14px; width: 4px; border-radius: 0 4px 4px 0; background: #ea580c; }
+.fpos-pos-nav-item.fpos-pos-logout { margin-top: 8px; border-top: 1px solid #eadfd2; border-radius: 0 0 14px 14px; padding-top: 16px; }
+.fpos-pending-badge { top: 6px; right: 8px; }
+
+/* ── v7: Pending Payments FULL PAGE (replaces the v5.12 drawer) ── */
+.fpos-pending-view { display: none; flex: 1; flex-direction: column; overflow-y: auto; background: #faf6f0; padding: 24px 32px 96px; }
+.fpos-pending-view.active { display: flex; }
+.fpos-pending-head { display: flex; align-items: center; gap: 14px; max-width: 1100px; margin: 0 auto 16px; width: 100%; flex-wrap: wrap; }
+.fpos-pending-back { display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 14px; border: 1px solid #eadfd2; background: #fff; border-radius: 12px; font-size: 13px; font-weight: 800; color: #292524; cursor: pointer; }
+.fpos-pending-back:hover { border-color: #ea580c; color: #ea580c; }
+.fpos-pending-title { font-size: 20px; font-weight: 900; color: #292524; letter-spacing: -.02em; }
+.fpos-pending-search { flex: 1; min-width: 220px; display: flex; align-items: center; gap: 8px; height: 44px; background: #fff; border: 1px solid #eadfd2; border-radius: 12px; padding: 0 14px; }
+.fpos-pending-search:focus-within { border-color: #ea580c; box-shadow: 0 0 0 3px rgba(234,88,12,.12); }
+.fpos-pending-search input { flex: 1; min-width: 0; border: none !important; background: transparent !important; box-shadow: none !important; font-size: 14px; outline: none; }
+.fpos-pending-search .fpos-ic { color: #78716c; }
+.fpos-pending-body { max-width: 1100px; margin: 0 auto; width: 100%; display: flex; flex-direction: column; gap: 12px; }
+.fpos-pending-body .fpos-recent-card { margin: 0; }

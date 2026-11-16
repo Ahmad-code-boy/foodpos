@@ -19,8 +19,8 @@ changes nothing:
     Prices match the v5 preview menu. Veg flags use custom_is_vegetarian
     only when that custom field exists (v0.1.0 patch).
   * Branch "Main Branch" (needed — Restaurant Table.branch links to Branch).
-  * Restaurant Tables T1–T4 (Main Hall, 4 seats) + T5–T6 (Family Hall,
-    6 seats), all Available.
+  * Restaurant Tables T1–T4 (Main Hall, 4 seats) + T5–T8 (Family Hall,
+    6 seats), all Available. (v7: 8 tables, was 6.)
   * Food Kitchen Stations "Main Kitchen", "Pizza", "Grill", "Beverages"
     (v5.7 — Food KOT.kitchen_station is a Link to Food Kitchen Station,
     named "Main Branch-<station>"; without these docs Confirm to Kitchen
@@ -66,6 +66,9 @@ SEED_TABLES = (
 	("T4", "Main Hall", 4),
 	("T5", "Family Hall", 6),
 	("T6", "Family Hall", 6),
+	# v7: 8 tables initially (was 6).
+	("T7", "Family Hall", 6),
+	("T8", "Family Hall", 6),
 )
 
 # v5.7: every station _get_item_station can route to (see food_pos.py).

@@ -546,3 +546,155 @@ and visually checked: `../ui-screenshots/v6.3/1-home-no-topbar.png`
 right). NOT verified live: the user must pull + build + clear-cache +
 restart, then open Home — the top bar must be gone and the hero must
 show a pick card.
+
+## v7.0 — UI/UX overhaul + functional fixes (2026-11-16)
+
+Layout mapping (the brief swaps left/right vs the CHILI layout — sides
+were NOT swapped): the brief's "left sidebar (cart panel)" is our RIGHT
+order/cart panel (widened 300px → 360px); the brief's "right sidebar
+(navigation)" is our LEFT icon nav rail (redesigned). All v6.x behaviour
+is kept: v6.1 guided Day Open/Close, v6.2 closing-page fixes, v6.3
+top-bar hide, single branch, auto-KOT, bill only at settle, no tax,
+flat-Rs discount with the Rs 100 Manager-PIN cap, one-tab printing.
+
+**1. Opening flow + true full-viewport:**
+- (a) Verified, no change needed: the v6.1 guided "Open the Day" card
+  already prompts opening balances — one Rs input per profile payment
+  mode (Cash in the drawer first, autofocus), with 3 numbered steps,
+  before the day opens.
+- (b) The boxed frame is gone: `.fpos-wrapper` was `calc(100vw - 24px)`
+  × `calc(100vh - 24px)` with `margin: 12px`, `border-radius: 20px`
+  and a frame ring shadow — now `100vw` × `100vh`, `margin: 0`,
+  `radius: 0`, no shadow. The home bottom nav (`.fpos-home-nav`) was
+  absolute-anchored to the shell — the override is deleted and the
+  base `position: fixed; bottom: 0` rule governs again. Closing page,
+  drawers, print preview and top bar are unaffected (they are fixed
+  overlays / views inside the wrapper).
+
+**2. Premium icon library (real Lucide):**
+- All 40 UI keys in `FPOS_ICONS` (`food_pos.js:19`) now use the REAL
+  inner SVG markup copied from `lucide-static` v1.73.0 (installed via
+  npm into `/tmp/lucide`; 2,359 icons available) — 24×24 viewBox,
+  `stroke: currentColor`, `stroke-width: 2`, `fill: none`, round
+  caps/joins via the existing `.fpos-ic` CSS (stroke-width raised
+  1.8 → 2). No paths were hand-invented. Same keys, so every call
+  site keeps working; one new key added: `arrowLeft` (back buttons).
+  The food-photo fallbacks (`fpos-food-*` gradients + food SVGs on
+  item cards) are separate and untouched.
+
+**3. POS screen:**
+- Cart panel widened 300px → 360px on desktop only
+  (`@media (min-width: 901px)`), so the ≤900px/≤700px responsive
+  rules still win on small screens.
+- Item grid is EXACTLY 5 cards per row on desktop (≥1280px), 4 at
+  ≤1279px, 3 at ≤900px, 2 at ≤640px. Fix found during screenshot
+  verification: an old "Zone 3" rule set the grid with `!important`
+  (`repeat(auto-fill, minmax(180px, 1fr)) !important`), which beat
+  the new plain rule and rendered 4 columns — the v7 grid rules now
+  carry `!important` too and come later in the file, so they win.
+- 5-col card sizing (1280–1599px): media/photo 110px → 88px,
+  details padding 8px 10px, title 13px wrapping to 2 lines instead
+  of truncating (a second screenshot pass caught "Chicken Tikka
+  Piz…" being cut off — titles now wrap, `line-clamp: 2`), footer
+  stacks (rate on top, Add/stepper full-width below), Add button
+  32px/12px, stepper centred.
+- Left nav rail redesigned: 88px wide, 14px/10px padding, 6px gap,
+  60px items, 14px radius, smooth transitions, active = orange fill
+  + a 4px orange bar on the left edge (`::before`), hairline divider
+  above Logout, badge moved to top 6px / right 8px.
+
+**4. Tables:**
+- Seed 8 tables: `SEED_TABLES` in `foodpos/patches/v0_4_0/add_seed_data.py`
+  now T1–T8 (T7/T8 added, Family Hall, 6 seats). The on-demand path
+  in `get_available_tables` (`food_pos.py`) calls the same
+  `_ensure_tables()`, so it creates 8 too. Seed stub updated:
+  35 → 37 docs on run 1.
+- The cart panel's table/order chip now opens the FULL-PAGE tables
+  view (`set_view("tables")`) instead of the "Select Table for
+  Dine-In" dialog. Picking a table while a Dine-In cart is waiting
+  assigns that table to the cart (no new tab); tapping an occupied
+  table switches to its existing tab; otherwise a fresh Dine-In tab
+  is created as before.
+- Live occupied timer verified: it renders on table cards
+  (`.fpos-table-time` with `data-since` + `format_elapsed`, ticked
+  every 1s by `start_home_timers()`). One real bug fixed: the tick
+  rewrote the element's text with `"⏱ " + elapsed`, wiping the
+  timer icon on the first tick — it now updates only the
+  `.fpos-table-time-val` span (timer markups in the tables view,
+  the table selector and the report rows wrap the elapsed text in
+  that span).
+- Auto-KOT print on table booking: after a successful Confirm for a
+  dine-in/table order, the KOT slip auto-opens in the EXISTING
+  centered print-preview dialog (`open_kot_slip` — no new tab, no
+  print call from the opener; the cashier taps Print once). Live
+  KDS remains the kitchen ticket. Non-table orders keep the v5.10
+  behaviour (no auto slip). The customer bill is still printed ONLY
+  at settle, never at confirm.
+- Bonus fix found by the v7 screenshot: the tables floor rendered
+  narrow (~430px, centred) because `.fpos-tables-view` had
+  `max-width: 1100px; margin: 0 auto` with no width — as a flex item
+  in the column flex wrapper it shrink-wrapped to its content.
+  The shared rule for the tables/attendance/report views now has
+  `width: 100%`, and the floor grid is `repeat(auto-fill,
+  minmax(300px, 1fr))` so it stays 3 large cards per row on desktop
+  (the v3/v4 look), 2/1 on smaller screens.
+
+**5. Pending Invoices as a full page (not a drawer):**
+- The v5.12 Pending drawer is gone: `show_pending_drawer` /
+  `hide_pending_drawer` / `render_pending_kots` and the
+  `.fpos-pending-drawer` markup are removed (verified: 0 references
+  left). `set_view` now has a `pending` view
+  (`.fpos-pending-view` — header with Back, title, count pill and
+  search bar; body max-width 1100px, scrollable, 96px bottom
+  padding).
+- Sidebar Pending nav opens the page and stays highlighted (the
+  v5.12 re-activate-menu hack is gone); the live count badge is
+  kept (still driven by `update_kitchen_badge`).
+- The page lists all active/pending bills from the existing
+  `get_active_kitchen_kots` source (server pricing unchanged):
+  search filters by KOT/invoice number, table, or customer
+  (KOT name, order_id, table_no, customer); per-bill Preview
+  (existing `print_pending_bill` → centered preview, unpaid bill)
+  and Settle & Print Bill (existing `resume_kot_for_payment`) +
+  Print Bill actions; summary bar (N pending bills • Total Due);
+  empty state and "No bills match your search" state.
+
+**6. Back navigation + refresh persistence:**
+- Lightweight view history: `set_view` calls `_record_view(name)`
+  (`history.pushState({ fpos_view: name })` + `sessionStorage`
+  `fpos_current_view`), skipping when restoring or when the view is
+  unchanged; `_bind_view_history` adds a guarded `popstate`
+  listener that restores the exact previous view without pushing.
+  `show_closing_page` records "closing"; `hide_closing_page` was
+  rewritten to hide the closing page and call `set_view("pos")` —
+  this also fixes a latent bug where it showed `.fpos-body`
+  directly without restoring the `fpos-view-pos` class (so the top
+  bar would stay hidden after closing the page).
+- `go_back(fallback)`: `history.back()` when our stack has an
+  entry, else `show_home()` / `show_pos()`. Back buttons now use
+  it: tables/attendance/report "Home" buttons → "Back" with the
+  Lucide arrow-left icon → `go_back("home")`; closing-page
+  "Back to POS" → `go_back("pos")`; pending page Back →
+  `go_back("pos")`.
+- Refresh persistence: on init, after the day status loads, the
+  saved view is restored when the day is open (pos/tables/pending/
+  attendance/report/closing as applicable), otherwise Home is
+  always the first screen. Drawers/dialogs are not persisted.
+- Escape: closes popovers/drawers first, then on pending/closing
+  goes back to POS, on tables/attendance/report goes back to Home,
+  on pos/home does nothing. The old drawer-close call is gone.
+
+**Verify:** `node --check` OK, `py_compile` OK,
+`scratch/v5_sanity.py` **207/207 PASS** (18 new v7 checks),
+`scratch/v5_seed_test.py` **9/9 PASS** (37 docs run 1, 0 run 2).
+Screenshots rendered from the real `food_pos.css` with headless
+Chromium and visually checked in `../ui-screenshots/v7/`:
+`1-home-fullscreen.png` (no frame, no top bar, hero + Your Day +
+bottom nav pinned), `2-pos-5col.png` (probe-measured at 1280px:
+exactly 5 columns, card width 143px, media 88px, cart panel 361px),
+`3-tables-8.png` (8 tables, 3 large per row, timers 24:16 / 08:42),
+`4-pending-page.png` (search + 3 bill cards + Print/Settle).
+NOT verified live: needs pull + build + clear-cache + restart,
+then a full bench pass (open day → table order → Confirm shows the
+KOT preview → Pay → receipt; Pending page search/settle; refresh
+on the Pending page restores it; Back button on tables/closing).

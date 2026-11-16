@@ -389,3 +389,46 @@ correctly in the screenshots).
 - **NOT verified live:** needs pull + build + clear-cache + restart,
   then check Home (top bar gone, pick card shown) and the POS screen
   (top bar still there with search + Filters).
+
+## v7.0 — UI/UX overhaul + functional fixes (2026-11-16)
+
+- **What changed:** (1) True full-viewport: the boxed `.fpos-wrapper`
+  frame (24px margin, 20px radius, ring shadow) is removed; home
+  bottom nav is `position: fixed` again. v6.1 Day Open card already
+  prompts opening balances per payment mode — verified, no change.
+  (2) All 40 UI icons in `FPOS_ICONS` are real Lucide paths from
+  `lucide-static` v1.73.0 (npm, `/tmp/lucide`); food-photo fallbacks
+  untouched; new `arrowLeft` key for back buttons. (3) POS screen:
+  cart panel 300px → 360px (desktop only); item grid exactly 5 per
+  row at ≥1280px (4/3/2 below) with 88px media, 2-line wrapping
+  titles and a stacked footer; left nav rail redesigned (88px,
+  active orange fill + left bar, Logout divider). (4) Tables: seed
+  T1–T8 (stub 37 docs run 1); cart chip opens the full-page tables
+  view; table pick assigns to the waiting cart / switches to its
+  tab; occupied-timer icon no longer wiped by the 1s tick; table
+  Confirm auto-opens the KOT slip in the centered preview dialog
+  (non-table orders: no auto slip; bill still only at settle);
+  floor fixed to fill the page (was shrink-wrapped to ~430px) with
+  3 large cards per row. (5) Pending is a full page, not a drawer:
+  search by KOT/table/customer, per-bill Preview + Settle & Print
+  Bill + Print Bill, summary bar; drawer code fully removed.
+  (6) Back navigation: `history.pushState` + `popstate` restore +
+  `sessionStorage` view persistence (day open only, else Home);
+  `go_back()` on all back buttons; Escape navigates back;
+  `hide_closing_page` now restores the POS view class (latent bug).
+- **Static checks:** `node --check` OK, `py_compile` OK,
+  `scratch/v5_sanity.py` **207/207 PASS** (18 new v7 checks),
+  `scratch/v5_seed_test.py` **9/9 PASS**.
+- **Visual checks:** `../ui-screenshots/v7/1-home-fullscreen.png`,
+  `2-pos-5col.png`, `3-tables-8.png`, `4-pending-page.png` — all
+  rendered from the real `food_pos.css` at 1280×860 and visually
+  checked. Two defects were caught and fixed by these renders:
+  the old `!important` Zone-3 grid rule defeating the 5-col rule
+  (probe: cols=5, cardW=143, mediaH=88, panelW=361 at 1280px),
+  and long item titles truncating ("Chicken Tikka Piz…" → now
+  wraps to 2 lines).
+- **NOT verified live:** needs pull + build + clear-cache + restart,
+  then a full bench pass — Day Open card, table order → Confirm
+  auto-opens the KOT preview in one tab → Pay → receipt; Pending
+  page search + Settle; refresh on Pending/Tables restores the view;
+  Back on tables/closing; 8 tables present after migrate.

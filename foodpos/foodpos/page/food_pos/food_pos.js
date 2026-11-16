@@ -17,45 +17,52 @@ const FPOS_ORDER_TYPES = ["Walk In", "Dine In", "Takeaway", "Delivery"];
 // combo / plate) so item cards never fall back to a bare letter or emoji.
 // Usage: fpos_icon("home").
 const FPOS_ICONS = {
-	grid: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
-	menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
-	bell: '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>',
-	home: '<path d="M3 9.5 12 3l9 6.5V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22v-8h6v8"/>',
-	chef: '<path d="M4 17h16"/><path d="M12 9a8 8 0 0 1 8 8H4a8 8 0 0 1 8-8z"/><path d="M12 9V6"/><circle cx="12" cy="4.5" r="1.4"/>',
-	cloche: '<path d="M4 16.5a8 8 0 0 1 16 0z"/><path d="M2 19.5h20M12 8.5V7"/><circle cx="12" cy="5.5" r="1.2"/>',
-	table: '<ellipse cx="12" cy="8.5" rx="7.5" ry="3"/><path d="M12 11.5V20"/><path d="M7 20h10"/>',
-	calendar: '<rect x="3" y="4.5" width="18" height="17" rx="2.5"/><path d="M16 2.5v4M8 2.5v4M3 10h18"/>',
-	truck: '<rect x="1.5" y="4" width="14" height="12" rx="1"/><path d="M15.5 9h4l3.5 3.5V16h-7.5z"/><circle cx="6" cy="18.5" r="1.8"/><circle cx="18.5" cy="18.5" r="1.8"/>',
-	chart: '<path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/>',
-	settings: '<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/>',
-	filter: '<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"/><path d="M1 14h6M9 8h6M17 16h6"/>',
-	logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/>',
-	receipt: '<path d="M5 2h14v20l-2.3-1.4L14.4 22l-2.4-1.4L9.6 22 7.3 20.6 5 22z"/><path d="M9 7.5h6M9 11.5h6M9 15.5h4"/>',
-	clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>',
-	users: '<path d="M17 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9.5" cy="7.5" r="3.8"/><path d="M22 21v-2a4 4 0 0 0-3-3.8M15.5 4a3.8 3.8 0 0 1 0 7.5"/>',
-	user: '<circle cx="12" cy="8" r="4"/><path d="M4.5 21v-1a7.5 7.5 0 0 1 15 0v1"/>',
+	// ── v7: premium icon library — real Lucide icons (lucide-static
+	// v1.73.0, ISC). Inner SVG markup only; the .fpos-ic wrapper sets
+	// viewBox 24x24, stroke=currentColor, stroke-width 2, fill none.
+	// Keys are unchanged, so every fpos_icon(...) call site keeps working.
+	// Food-photo fallbacks (pizza, burger, ...) below are NOT Lucide
+	// and stay exactly as they were.
+	grid: '<rect width="7" height="7" x="3" y="3" rx="1"/> <rect width="7" height="7" x="14" y="3" rx="1"/> <rect width="7" height="7" x="14" y="14" rx="1"/> <rect width="7" height="7" x="3" y="14" rx="1"/>',
+	menu: '<path d="M4 5h16"/> <path d="M4 12h16"/> <path d="M4 19h16"/>',
+	bell: '<path d="M10.268 21a2 2 0 0 0 3.464 0"/> <path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/>',
+	home: '<path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/> <path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+	chef: '<path d="M10 11v5"/> <path d="M14 11v5"/> <path d="M6 12.65c0-.457-.316-.844-.727-1.041A4 4 0 017.52 4.034a1.53 1.53 0 001.367-.547 4 4 0 016.225 0 1.53 1.53 0 001.367.547 4 4 0 012.248 7.575c-.411.197-.727.584-.727 1.04V19a2 2 0 01-2 2H8a2 2 0 01-2-2z"/> <path d="M6 16h12"/>',
+	cloche: '<path d="M3 20a1 1 0 0 1-1-1v-1a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v1a1 1 0 0 1-1 1Z"/> <path d="M20 16a8 8 0 1 0-16 0"/> <path d="M12 4v4"/> <path d="M10 4h4"/>',
+	table: '<path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/> <path d="M7 2v20"/> <path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/>',
+	calendar: '<path d="M8 2v3"/> <path d="M16 2v3"/> <rect x="3" y="3" width="18" height="18" rx="2"/> <path d="M3 9h18"/>',
+	truck: '<path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/> <path d="M15 18H9"/> <path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"/> <circle cx="17" cy="18" r="2"/> <circle cx="7" cy="18" r="2"/>',
+	chart: '<path d="M3 3v16a2 2 0 0 0 2 2h16"/> <path d="M18 17V9"/> <path d="M13 17V5"/> <path d="M8 17v-3"/>',
+	settings: '<path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/> <circle cx="12" cy="12" r="3"/>',
+	filter: '<path d="M10 5H3"/> <path d="M12 19H3"/> <path d="M14 3v4"/> <path d="M16 17v4"/> <path d="M21 12h-9"/> <path d="M21 19h-5"/> <path d="M21 5h-7"/> <path d="M8 10v4"/> <path d="M8 12H3"/>',
+	logout: '<path d="m16 17 5-5-5-5"/> <path d="M21 12H9"/> <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>',
+	receipt: '<path d="M12 17V7"/> <path d="M16 8h-6a2 2 0 0 0 0 4h4a2 2 0 0 1 0 4H8"/> <path d="M4 3a1 1 0 0 1 1-1 1.3 1.3 0 0 1 .7.2l.933.6a1.3 1.3 0 0 0 1.4 0l.934-.6a1.3 1.3 0 0 1 1.4 0l.933.6a1.3 1.3 0 0 0 1.4 0l.933-.6a1.3 1.3 0 0 1 1.4 0l.934.6a1.3 1.3 0 0 0 1.4 0l.933-.6A1.3 1.3 0 0 1 19 2a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1 1.3 1.3 0 0 1-.7-.2l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.934.6a1.3 1.3 0 0 1-1.4 0l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-1.4 0l-.934-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-.7.2 1 1 0 0 1-1-1z"/>',
+	clock: '<circle cx="12" cy="12" r="10"/> <path d="M12 6v6l4 2"/>',
+	users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/> <path d="M16 3.128a4 4 0 0 1 0 7.744"/> <path d="M22 21v-2a4 4 0 0 0-3-3.87"/> <circle cx="9" cy="7" r="4"/>',
+	user: '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/> <circle cx="12" cy="7" r="4"/>',
 	check: '<path d="M20 6 9 17l-5-5"/>',
-	checkCircle: '<circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.5 2.5 4.5-5.5"/>',
-	star: '<path d="M12 2.5 14.9 8.6l6.6.9-4.8 4.6 1.2 6.6L12 17.6 6.1 20.7l1.2-6.6L2.5 9.5l6.6-.9z"/>',
-	people: '<path d="M17 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9.5" cy="7.5" r="3.8"/><path d="M22 21v-2a4 4 0 0 0-3-3.8M15.5 4a3.8 3.8 0 0 1 0 7.5"/>',
-	timer: '<circle cx="12" cy="13" r="8"/><path d="M12 9.5V13l2.5 1.5M10 2.5h4"/>',
-	pause: '<path d="M9 5v14M15 5v14"/>',
-	search: '<circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.5 16.5"/>',
-	plus: '<path d="M12 5v14M5 12h14"/>',
+	checkCircle: '<circle cx="12" cy="12" r="10"/> <path d="m16 9-5.5 5.5L8 12"/>',
+	star: '<path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"/>',
+	people: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/> <path d="M16 3.128a4 4 0 0 1 0 7.744"/> <path d="M22 21v-2a4 4 0 0 0-3-3.87"/> <circle cx="9" cy="7" r="4"/>',
+	timer: '<line x1="10" x2="14" y1="2" y2="2"/> <line x1="12" x2="15" y1="14" y2="11"/> <circle cx="12" cy="14" r="8"/>',
+	pause: '<rect x="14" y="3" width="5" height="18" rx="1"/> <rect x="5" y="3" width="5" height="18" rx="1"/>',
+	search: '<path d="m21 21-4.34-4.34"/> <circle cx="11" cy="11" r="8"/>',
+	plus: '<path d="M5 12h14"/> <path d="M12 5v14"/>',
 	minus: '<path d="M5 12h14"/>',
-	card: '<rect x="2" y="5" width="20" height="14" rx="2.5"/><path d="M2 10h20"/>',
-	cash: '<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.8"/><path d="M5.5 9.5h.01M18.5 14.5h.01"/>',
-	qr: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM21 14v.01M14 21v.01M21 18v3"/>',
-	cart: '<circle cx="9" cy="20.5" r="1.4"/><circle cx="18" cy="20.5" r="1.4"/><path d="M2 3h3l2.6 12.4a2 2 0 0 0 2 1.6h8.7a2 2 0 0 0 2-1.6L22 7H6"/>',
-	tag: '<path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L2 12V2h10l8.6 8.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.3"/>',
-	trash: '<path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>',
-	refresh: '<path d="M23 4v6h-6"/><path d="M20.5 15a9 9 0 1 1-1.6-9.4L23 10"/>',
-	alert: '<circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16.5h.01"/>',
-	pin: '<path d="M21 10c0 7-9 12.5-9 12.5S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>',
-	box: '<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/>',
-	x: '<path d="M18 6 6 18M6 6l12 12"/>',
-	printer: '<path d="M6 9V3h12v6"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="7" rx="1"/>',
-	edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+	card: '<rect width="20" height="14" x="2" y="5" rx="2"/> <line x1="2" x2="22" y1="10" y2="10"/> <path d="M6 14h2"/>',
+	cash: '<rect width="20" height="12" x="2" y="6" rx="2"/> <circle cx="12" cy="12" r="2"/> <path d="M6 12h.01M18 12h.01"/>',
+	qr: '<rect width="5" height="5" x="3" y="3" rx="1"/> <rect width="5" height="5" x="16" y="3" rx="1"/> <rect width="5" height="5" x="3" y="16" rx="1"/> <path d="M21 16h-3a2 2 0 0 0-2 2v3"/> <path d="M21 21v.01"/> <path d="M12 7v3a2 2 0 0 1-2 2H7"/> <path d="M3 12h.01"/> <path d="M12 3h.01"/> <path d="M12 16v.01"/> <path d="M16 12h1"/> <path d="M21 12v.01"/> <path d="M12 21v-1"/>',
+	cart: '<path d="m2.05 2.05 1.099-.028a1 1 0 0 1 1.008.815l2.69 14.347A1 1 0 0 0 7.83 18H18"/> <path d="M4.563 5h16.435a1 1 0 0 1 .981 1.204l-1.026 6.226A2 2 0 0 1 18.962 14H6.25"/> <circle cx="18" cy="20" r="2"/> <circle cx="8" cy="20" r="2"/>',
+	tag: '<path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/> <circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/>',
+	trash: '<path d="M10 11v6"/> <path d="M14 11v6"/> <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/> <path d="M3 6h18"/> <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
+	refresh: '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/> <path d="M21 3v5h-5"/> <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/> <path d="M8 16H3v5"/>',
+	alert: '<circle cx="12" cy="12" r="10"/> <line x1="12" x2="12" y1="8" y2="12"/> <line x1="12" x2="12.01" y1="16" y2="16"/>',
+	pin: '<path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/> <circle cx="12" cy="10" r="3"/>',
+	box: '<path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/> <path d="M12 22V12"/> <polyline points="3.29 7 12 12 20.71 7"/> <path d="m7.5 4.27 9 5.15"/>',
+	x: '<path d="M18 6 6 18"/> <path d="m6 6 12 12"/>',
+	printer: '<path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/> <path d="M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6"/> <rect x="6" y="14" width="12" height="8" rx="1"/>',
+	edit: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/> <path d="m15 5 4 4"/>',
+	arrowLeft: '<path d="m12 19-7-7 7-7"/> <path d="M19 12H5"/>',
 	// ── v5: food icons — used as the no-photo fallback inside item cards
 	// (rich gradient tile + large SVG) and on category tiles. Never emoji.
 	pizza: '<path d="M4.5 4.8 12 20.5 19.5 4.8A9 9 0 0 0 4.5 4.8z"/><path d="M12 20.5V9.5"/><circle cx="9" cy="8" r="1.1"/><circle cx="14.8" cy="7.2" r="1.1"/><circle cx="12" cy="13" r="1.1"/>',
@@ -383,7 +390,12 @@ foodpos.FoodPOS.Controller = class {
 			}
 
 			await this.load_data();
-			this.show_home(); // v2: Home / Day screen is the first screen.
+			// v7: a browser refresh keeps the user on their current screen
+			// — restore the saved view when the day is open (Home is the
+			// first screen only when there is nothing saved to restore).
+			const saved_view = this._saved_view();
+			if (saved_view) this._restore_view(saved_view);
+			else this.show_home(); // v2: Home / Day screen is the first screen.
 			await this.init_tabs();
 			this.setup_realtime_table_listener();
 			this.sync_offline_invoices();
@@ -847,6 +859,8 @@ foodpos.FoodPOS.Controller = class {
 				<div class="fpos-tables-view" style="display:none;"></div>
 				<div class="fpos-attendance-view" style="display:none;"></div>
 				<div class="fpos-daily-report-view" style="display:none;"></div>
+				<!-- v7: Pending Payments is a dedicated full page now, not a drawer. -->
+				<div class="fpos-pending-view" style="display:none;"></div>
 
 				<!-- Main Layout: Left Menu Area (Zone 3) + Right Cart (Zone 4) -->
 				<div class="fpos-body">
@@ -1014,19 +1028,6 @@ foodpos.FoodPOS.Controller = class {
 						<button type="button" class="btn btn-default btn-xs fpos-kds-station-btn" data-station="Beverages" style="font-weight:700;border-radius:6px;">${__("Beverages")}</button>
 					</div>
 					<div class="fpos-drawer-body fpos-kitchen-body"></div>
-				</div>
-
-				<!-- PENDING PAYMENTS DRAWER (v5.12: bills waiting to be paid) -->
-				<div class="fpos-drawer fpos-pending-drawer">
-					<div class="fpos-drawer-header">
-						<div class="fpos-drawer-title">
-							<span>${fpos_icon("receipt")}</span>
-							<span>${__("Pending Payments")}</span>
-							<span class="fpos-pending-count-pill" style="font-size:11px;background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:12px;font-weight:700;">0 pending</span>
-						</div>
-						<button class="fpos-drawer-close fpos-close-pending-drawer">&times;</button>
-					</div>
-					<div class="fpos-drawer-body fpos-pending-body"></div>
 				</div>
 
 				<!-- HELD ORDERS DRAWER -->
@@ -2139,7 +2140,7 @@ foodpos.FoodPOS.Controller = class {
 						<div style="font-weight:700;font-size:14px;color:#292524;">${display_name}</div>
 						<small style="color:#78716c;font-size:11px;">${t.capacity || 4} ${__("Seats")}</small>
 						<div class="fpos-tbl-status" style="font-size:10px;color:${color};font-weight:700;margin-top:4px;">${__(t.status)}</div>
-						${is_occupied && t.occupied_since ? `<div class="fpos-tbl-timer" data-since="${t.occupied_since}" style="font-size:11px;color:#b45309;font-weight:700;margin-top:2px;">⏱ ${this.format_elapsed(t.occupied_since)}</div>` : ""}
+						${is_occupied && t.occupied_since ? `<div class="fpos-tbl-timer" data-since="${t.occupied_since}" style="font-size:11px;color:#b45309;font-weight:700;margin-top:2px;">${fpos_icon("timer", "fpos-ic-sm")} <span class="fpos-table-time-val">${this.format_elapsed(t.occupied_since)}</span></div>` : ""}
 						${has_tab ? `<span style="position:absolute;top:4px;right:6px;font-size:10px;background:#e0f2fe;color:#0284c7;padding:1px 5px;border-radius:6px;font-weight:700;">${__("Tab")}</span>` : ""}
 						${is_occupied ? `
 							<button class="btn btn-xs btn-default fpos-card-free-btn" data-table="${t.name}" style="margin-top:6px;font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #fca5a5;color:#b91c1c;background:#fff5f5;font-weight:600;">
@@ -2368,12 +2369,22 @@ foodpos.FoodPOS.Controller = class {
 			this.render_table_chips(); // v3: chip flips to "Kitchen • Pending"
 			this.refresh_kitchen_badge();
 			this.render_tables_view();
-			// v5.10: NO auto slip/print on confirm. The live KDS screen IS
-			// the kitchen ticket. Opening a slip tab with a print dialog on
-			// confirm blocked the whole POS tab (no click worked until the
-			// dialog was dismissed) — that is what killed Pay in v5.9 even
-			// after the in-tab print fix. Paper slip: the Print button on the
-			// KOT card in the Live Kitchen Orders drawer (open_kot_slip).
+			// v7: a TABLE (dine-in) order auto-shows its KOT slip in the
+			// centered print-preview dialog — the cashier taps Print once
+			// and the kitchen gets the paper ticket. This is safe now
+			// because the preview is an in-page dialog: it never triggers
+			// the browser print function from the opener and never opens
+			// a new tab (the v5.9 freeze came from the print DIALOG
+			// blocking the POS tab). Non-table orders keep the v5.10
+			// behavior — no auto slip; the live KDS screen IS the kitchen
+			// ticket. The customer bill is still printed ONLY at settle,
+			// never here.
+			if (this.selected_table && kot_name) {
+				this.open_kot_slip({ kot_name, order_id: msg.order_id }, order_payload);
+			}
+			// v5.10: NO auto slip/print on confirm for non-table orders.
+			// Paper slip for those: the Print button on the KOT card in
+			// the Live Kitchen Orders drawer (open_kot_slip).
 		} catch (e) {
 			frappe.dom.unfreeze();
 			frappe.show_alert({ message: __("Failed to confirm order: {0}", [e.message]), indicator: "red" });
@@ -3811,14 +3822,28 @@ foodpos.FoodPOS.Controller = class {
 	// confirmed-but-unpaid order with its amount, ready to settle or to
 	// print the bill. The bill itself is only final at payment; the
 	// Print Bill slip is the unpaid check (PENDING PAYMENT, no paid amount).
-	async show_pending_drawer() {
-		const $drawer = this.wrapper.find(".fpos-pending-drawer");
-		const $overlay = this.wrapper.find(".fpos-drawer-overlay");
-		const $body = $drawer.find(".fpos-pending-body");
-
-		this.wrapper.find(".fpos-kitchen-drawer, .fpos-held-drawer").removeClass("active");
-		$overlay.addClass("active");
-		$drawer.addClass("active");
+	// ── v7: Pending Payments is a dedicated FULL PAGE (not a drawer).
+	// Every active/pending bill from get_active_kitchen_kots, with a search
+	// bar (KOT/invoice number, table, customer), per-bill Preview (the
+	// unpaid check, via the centered print preview) and Settle & Print Bill.
+	async show_pending_page() {
+		this.set_view("pending");
+		const $view = this.wrapper.find(".fpos-pending-view");
+		$view.html(`
+			<div class="fpos-pending-head">
+				<button class="fpos-pending-back">${fpos_icon("arrowLeft", "fpos-ic-sm")} ${__("Back")}</button>
+				<span class="fpos-pending-title">${__("Pending Payments")}</span>
+				<span class="fpos-pending-count-pill" style="font-size:11px;background:#fef3c7;color:#92400e;padding:4px 10px;border-radius:12px;font-weight:700;">0 pending</span>
+				<div class="fpos-pending-search">
+					${fpos_icon("search")}
+					<input class="fpos-pending-search-input" placeholder="${__("Search bill, table or customer...")}">
+				</div>
+			</div>
+			<div class="fpos-pending-body"></div>
+		`);
+		$view.find(".fpos-pending-back").on("click", () => this.go_back("pos"));
+		$view.find(".fpos-pending-search-input").on("input", () => this.render_pending_page(this.pending_kots || []));
+		const $body = $view.find(".fpos-pending-body");
 		$body.html(`
 			<div style="display:flex;justify-content:center;align-items:center;height:200px;flex-direction:column;gap:10px;">
 				<div class="fpos-spinner" style="width:32px;height:32px;border:3px solid #eadfd2;border-top-color:#ea580c;border-radius:50%;animation:fpos-spin .8s linear infinite;"></div>
@@ -3836,7 +3861,7 @@ foodpos.FoodPOS.Controller = class {
 			});
 			const kots = res.message || [];
 			this.pending_kots = kots;
-			this.render_pending_kots(kots);
+			this.render_pending_page(kots);
 			this.update_kitchen_badge(kots);
 		} catch (e) {
 			$body.html(`
@@ -3846,22 +3871,14 @@ foodpos.FoodPOS.Controller = class {
 					<button class="btn btn-default btn-xs fpos-retry-pending-btn" style="margin-top:10px;font-weight:700;">${fpos_icon("refresh", "fpos-ic-sm")} ${__("Retry")}</button>
 				</div>
 			`);
-			$body.find(".fpos-retry-pending-btn").on("click", () => this.show_pending_drawer());
+			$body.find(".fpos-retry-pending-btn").on("click", () => this.show_pending_page());
 		}
 	}
 
-	hide_pending_drawer() {
-		this.wrapper.find(".fpos-pending-drawer").removeClass("active");
-		this.wrapper.find(".fpos-drawer-overlay").removeClass("active");
-		$(".fpos-pending-drawer").removeClass("active");
-		$(".fpos-drawer-overlay").removeClass("active");
-		frappe.dom.unfreeze();
-		$(".modal-backdrop").remove();
-		$("body").removeClass("modal-open");
-	}
 
-	render_pending_kots(kots) {
+	render_pending_page(kots) {
 		const $body = this.wrapper.find(".fpos-pending-body");
+		if (!$body.length) return;
 		$body.empty();
 
 		if (!kots || kots.length === 0) {
@@ -3875,15 +3892,31 @@ foodpos.FoodPOS.Controller = class {
 			return;
 		}
 
-		const grand = kots.reduce((s, k) => s + flt(k.total || 0), 0);
+		// v7: search filters by KOT/invoice number, table, or customer.
+		const term = (this.wrapper.find(".fpos-pending-search-input").val() || "").toLowerCase().trim();
+		const shown_kots = term ? kots.filter((k) => [
+			k.name, k.order_id, k.table_no, k.customer,
+		].filter(Boolean).join(" ").toLowerCase().includes(term)) : kots;
+		if (!shown_kots.length) {
+			$body.html(`
+				<div style="text-align:center;padding:50px 20px;color:#a8a29e;">
+					<div style="margin-bottom:8px;color:#a8a29e;">${fpos_icon("search", "fpos-ic-lg")}</div>
+					<div style="font-weight:600;font-size:14px;color:#78716c;">${__("No bills match your search")}</div>
+					<p style="font-size:12px;margin-top:4px;">${__("Try a different bill number, table or customer name.")}</p>
+				</div>
+			`);
+			return;
+		}
+
+		const grand = shown_kots.reduce((s, k) => s + flt(k.total || 0), 0);
 		$body.append(`
 			<div style="display:flex;justify-content:space-between;align-items:center;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:10px 14px;">
-				<span style="font-size:13px;font-weight:700;color:#92400e;">${__("{0} pending bill(s)", [kots.length])}</span>
+				<span style="font-size:13px;font-weight:700;color:#92400e;">${__("{0} pending bill(s)", [shown_kots.length])}</span>
 				<span style="font-size:14px;font-weight:800;color:#92400e;">${__("Total Due")} ${this.format_money(grand)}</span>
 			</div>
 		`);
 
-		kots.forEach((kot) => {
+		shown_kots.forEach((kot) => {
 			const status_colors = {
 				Pending: { bg: "#fef9c3", text: "#854d0e" },
 				"In Progress": { bg: "#dbeafe", text: "#1d4ed8" },
@@ -3923,7 +3956,6 @@ foodpos.FoodPOS.Controller = class {
 			`);
 			card.find(".fpos-pending-settle-btn").on("click", async (e) => {
 				const kot_id = $(e.currentTarget).data("kot");
-				this.hide_pending_drawer();
 				await this.resume_kot_for_payment(kot_id);
 			});
 			card.find(".fpos-pending-print-btn").on("click", (e) => {
@@ -4988,6 +5020,8 @@ foodpos.FoodPOS.Controller = class {
 	// ─── 10. UI Event Handlers ───────────────────────────────────────────────
 
 	bind_ui_events() {
+		// v7: browser Back replays the previous view (bound once).
+		this._bind_view_history();
 		// Clean up any previously attached events on wrapper to ensure handlers are never duplicated on branch switch
 		this.wrapper.off();
 
@@ -5035,7 +5069,10 @@ foodpos.FoodPOS.Controller = class {
 			}
 		});
 
-		// Close popovers and drawers on Escape key
+		// Close popovers and drawers on Escape key; on a full page
+		// (Pending, Tables, Attendance, Report, Closing) Escape goes back
+		// to the previous screen instead. v7: the pending drawer is gone,
+		// so there is no pending-drawer close call any more.
 		$(document).off("keydown.fpos_popover").on("keydown.fpos_popover", (e) => {
 			if (e.key === "Escape" || e.keyCode === 27) {
 				this.wrapper.find(".fpos-filters-popover").hide();
@@ -5044,7 +5081,8 @@ foodpos.FoodPOS.Controller = class {
 				this.hide_kitchen_drawer();
 				this.hide_recent_orders_drawer();
 				this.hide_held_orders_drawer();
-				this.hide_pending_drawer();
+				if (["pending", "closing"].includes(this.current_view)) this.go_back("pos");
+				else if (["tables", "attendance", "report"].includes(this.current_view)) this.go_back("home");
 			}
 		});
 
@@ -5215,7 +5253,13 @@ foodpos.FoodPOS.Controller = class {
 
 		// Table selector click
 		this.wrapper.on("click", ".fpos-order-edit-btn, .fpos-topbar-order-chip", () => {
-			if (this.order_type === "Dine In") this.open_table_selector();
+			// v7: the cart panel's table/order chip opens the FULL-PAGE
+			// tables view (not the old table-picker dialog). Picking a
+			// table there assigns it to this cart (see open_table_order).
+			if (this.order_type === "Dine In") {
+				this._picking_table_for_cart = true;
+				this.show_tables();
+			}
 			else this.open_customer_dialog();
 		});
 		this.wrapper.on("click", ".fpos-topbar-menu-btn", () => {
@@ -5230,13 +5274,9 @@ foodpos.FoodPOS.Controller = class {
 			this.wrapper.find(".fpos-pos-nav-item").removeClass("active");
 			$(e.currentTarget).addClass("active");
 			if (key === "menu") this.show_pos();
-			else if (key === "pending") {
-				// v5.12: Pending Payments drawer — the POS view stays, so the
-				// Menu nav item stays highlighted, not Pending.
-				this.show_pending_drawer();
-				this.wrapper.find(".fpos-pos-nav-item").removeClass("active");
-				this.wrapper.find('.fpos-pos-nav-item[data-nav="menu"]').addClass("active");
-			}
+			// v7: Pending is a real full-page view now, so its nav item
+			// stays highlighted like every other view (no more drawer).
+			else if (key === "pending") this.show_pending_page();
 			else if (key === "tables" || key === "reservation") this.show_tables();
 			else if (key === "delivery") this.show_daily_report();
 			else if (key === "accounting") this.show_closing_page();
@@ -5305,8 +5345,6 @@ foodpos.FoodPOS.Controller = class {
 			this.show_kitchen_drawer();
 		});
 		this.wrapper.on("click", ".fpos-close-kitchen-drawer", () => this.hide_kitchen_drawer());
-		// v5.12: Pending Payments drawer close.
-		this.wrapper.on("click", ".fpos-close-pending-drawer", () => this.hide_pending_drawer());
 		$(document).off("click.fpos_close_kitchen").on("click.fpos_close_kitchen", ".fpos-close-kitchen-drawer", (e) => {
 			e.preventDefault();
 			e.stopPropagation();
@@ -5621,7 +5659,10 @@ foodpos.FoodPOS.Controller = class {
 		// view's fixed bottom nav (.fpos-home-nav) stayed visible and covered
 		// the closing page's bottom "Close Day" button, so it could not be
 		// clicked with a mouse. hide_closing_page() restores the POS view.
-		this.wrapper.find(".fpos-body, .fpos-home-view, .fpos-tables-view, .fpos-attendance-view, .fpos-daily-report-view").hide();
+		// v7: the pending page joins the hide list; the closing page also
+		// records a history entry so Back returns to the previous screen.
+		this.wrapper.find(".fpos-body, .fpos-home-view, .fpos-tables-view, .fpos-attendance-view, .fpos-daily-report-view, .fpos-pending-view").hide();
+		this._record_view("closing");
 		const $closing = this.wrapper.find(".fpos-closing-page");
 		$closing.show().addClass("active").html(`
 			<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:65vh;gap:16px;">
@@ -5650,9 +5691,11 @@ foodpos.FoodPOS.Controller = class {
 	}
 
 	hide_closing_page() {
-		this.current_view = "pos";
+		// v7: go through set_view so the POS topbar class (fpos-view-pos)
+		// is restored too — the old direct .show() left it off when the
+		// user came from Home, hiding the top bar on the POS screen.
 		this.wrapper.find(".fpos-closing-page").hide().removeClass("active").empty();
-		this.wrapper.find(".fpos-body").show();
+		this.set_view("pos");
 	}
 
 	render_closing_page(data) {
@@ -6008,9 +6051,10 @@ foodpos.FoodPOS.Controller = class {
 		const $page = this.wrapper.find(".fpos-closing-page");
 		const format_curr = (val) => this.format_money(val);
 
-		// Back to POS Register
+		// Back to POS Register — v7: goes back to the exact previous
+		// screen (history.back), falling back to the POS screen.
 		$page.on("click", ".fpos-back-to-pos-btn", () => {
-			this.hide_closing_page();
+			this.go_back("pos");
 		});
 
 		// Realtime Multi-Payment Variance Calculator
@@ -6224,7 +6268,11 @@ foodpos.FoodPOS.Controller = class {
 		this._home_timer = setInterval(() => {
 			this.wrapper.find("[data-since]").each((_, el) => {
 				const $el = $(el);
-				$el.text("⏱ " + this.format_elapsed($el.attr("data-since")));
+				// v7: update only the time text, never the whole element —
+				// the old .text() wiped the Lucide timer icon on the first tick.
+				const $val = $el.find(".fpos-table-time-val").first();
+				if ($val.length) $val.text(this.format_elapsed($el.attr("data-since")));
+				else $el.text("⏱ " + this.format_elapsed($el.attr("data-since")));
 			});
 			const $day = this.wrapper.find("#fpos-day-elapsed");
 			if ($day.length && $day.attr("data-since")) {
@@ -6233,7 +6281,8 @@ foodpos.FoodPOS.Controller = class {
 		}, 1000);
 	}
 
-	// Show exactly one view: "home" | "pos" | "tables" | "attendance" | "report".
+	// Show exactly one view: "home" | "pos" | "tables" | "attendance" |
+	// "report" | "pending" (v7: Pending Payments is a full page now).
 	set_view(name) {
 		this.current_view = name;
 		// v4: each view has exactly one header — on Home/Tables/Attendance/Report
@@ -6244,8 +6293,71 @@ foodpos.FoodPOS.Controller = class {
 		show(".fpos-tables-view", name === "tables");
 		show(".fpos-attendance-view", name === "attendance");
 		show(".fpos-daily-report-view", name === "report");
+		show(".fpos-pending-view", name === "pending");
 		show(".fpos-body", name === "pos");
 		this.start_home_timers();
+		this._record_view(name);
+	}
+
+	// ── v7: view history + refresh persistence ──────────────────────────
+	// Every view change is recorded: sessionStorage keeps the current
+	// screen across a browser refresh, and history.pushState gives the
+	// browser Back button (and our in-app Back buttons) a real entry to
+	// return to. _restoring_view suppresses the push while a popstate or
+	// a refresh-restore is replaying a view.
+	_record_view(name) {
+		try { sessionStorage.setItem("fpos_current_view", name); } catch (e) {}
+		if (this._restoring_view) return;
+		if (this._last_view === name) return;
+		this._last_view = name;
+		this._history_pushes = (this._history_pushes || 0) + 1;
+		try { history.pushState({ fpos_view: name }, "", window.location.href); } catch (e) {}
+	}
+
+	_saved_view() {
+		// Only real screens are restorable; Home is the default anyway.
+		let v = null;
+		try { v = sessionStorage.getItem("fpos_current_view"); } catch (e) {}
+		return ["pos", "tables", "pending", "attendance", "report", "closing"].includes(v) ? v : null;
+	}
+
+	_restore_view(name) {
+		// Replay a view without pushing a new history entry. Used by the
+		// popstate handler and by the refresh restore in select_pos_profile.
+		this._restoring_view = true;
+		try {
+			if (name === "home") this.show_home();
+			else if (name === "pos") this.show_pos();
+			else if (name === "tables") this.show_tables();
+			else if (name === "pending") this.show_pending_page();
+			else if (name === "attendance") this.show_attendance();
+			else if (name === "report") this.show_daily_report();
+			else if (name === "closing") this.show_closing_page();
+			else this.show_home();
+		} finally {
+			this._restoring_view = false;
+		}
+	}
+
+	go_back(fallback = "home") {
+		// v7: Back returns to the exact previous screen. When this session
+		// pushed a history entry, the browser's own stack does the work
+		// (popstate replays the view); otherwise fall back to Home/POS.
+		if ((this._history_pushes || 0) > 0) { history.back(); return; }
+		if (fallback === "pos") this.show_pos();
+		else this.show_home();
+	}
+
+	_bind_view_history() {
+		// Bound once: the browser Back button replays the previous view.
+		if (this._popstate_bound) return;
+		this._popstate_bound = true;
+		window.addEventListener("popstate", (e) => {
+			const name = (e.state && e.state.fpos_view) || null;
+			if (!name) return; // before our first push — let the browser leave.
+			this._history_pushes = Math.max(0, (this._history_pushes || 0) - 1);
+			this._restore_view(name);
+		});
 	}
 
 
@@ -6581,7 +6693,7 @@ foodpos.FoodPOS.Controller = class {
 						<div class="fpos-floor-sub">${tables.length} ${__("tables")} &bull; ${tables.filter((t) => t.status === "Occupied").length} ${__("occupied")} &bull; ${__("Main Branch")}</div>
 					</div>
 					<div class="fpos-floor-actions">
-						<button class="fpos-btn fpos-floor-home">${fpos_icon("home", "fpos-ic-sm")} ${__("Home")}</button>
+						<button class="fpos-btn fpos-floor-home">${fpos_icon("arrowLeft", "fpos-ic-sm")} ${__("Back")}</button>
 						<button class="fpos-btn fpos-floor-edit">${fpos_icon("settings", "fpos-ic-sm")} ${__("Edit Layout")}</button>
 					</div>
 				</div>
@@ -6606,7 +6718,7 @@ foodpos.FoodPOS.Controller = class {
 									</span>
 									<span class="fpos-table-num">${__("Table")} ${t.table_no || t.name}</span>
 									<span class="fpos-table-status-pill ${status_class(t.status)}">${fpos_icon(pill_icon)} ${__(t.status)}</span>
-									${occupied && t.occupied_since ? `<span class="fpos-table-time" data-since="${t.occupied_since}">${fpos_icon("timer", "fpos-ic-sm")} ${this.format_elapsed(t.occupied_since)}</span>` : ""}
+									${occupied && t.occupied_since ? `<span class="fpos-table-time" data-since="${t.occupied_since}">${fpos_icon("timer", "fpos-ic-sm")} <span class="fpos-table-time-val">${this.format_elapsed(t.occupied_since)}</span></span>` : ""}
 									<span class="fpos-table-meta2">${cap} ${__("seats")}${t.guests ? ` &bull; ${__("Guests")}: ${t.guests}` : ""}${t.order_id ? ` &bull; ${t.order_id}` : ""}</span>
 								</button>`;
 							}).join("")}
@@ -6620,7 +6732,7 @@ foodpos.FoodPOS.Controller = class {
 				</div>
 			</div>
 		`);
-		$view.find(".fpos-floor-home").on("click", () => this.show_home());
+		$view.find(".fpos-floor-home").on("click", () => this.go_back("home"));
 		$view.find(".fpos-floor-edit").on("click", () => frappe.set_route("List", "Restaurant Table"));
 		$view.find(".fpos-table-card").on("click", (e) => {
 			const name = $(e.currentTarget).data("table");
@@ -6637,6 +6749,34 @@ foodpos.FoodPOS.Controller = class {
 
 	// Tap a table → open its order (or start a new Dine-In order on it).
 	open_table_order(table) {
+		// v7: a table that already has an active tab switches to that tab
+		// instead of opening a second one for the same table.
+		const existing_tab_id = Object.keys(this.tabs || {}).find((k) => this.tabs[k].table === table.name);
+		if (existing_tab_id && existing_tab_id !== this.active_tab_id) {
+			this.switch_tab(existing_tab_id);
+			this.show_pos();
+			return;
+		}
+		// v7: when the cashier came here from the cart panel's table chip
+		// (a Dine-In cart still waiting for a table), assign the table to
+		// THAT cart instead of opening a new tab.
+		const cur = (this.tabs && this.active_tab_id) ? this.tabs[this.active_tab_id] : null;
+		if (this._picking_table_for_cart && cur && cur.order_type === "Dine In" && !cur.table) {
+			this._picking_table_for_cart = false;
+			this.selected_table = table.name;
+			this.selected_table_no = table.table_no || "";
+			cur.table = table.name;
+			cur.table_no = this.selected_table_no;
+			cur.title = `Table ${this.selected_table_no || table.name}`;
+			this.wrapper.find(".fpos-table-label").text(cur.title);
+			this.update_order_type_ui();
+			this.update_cart_summary();
+			this.save_cart_backup();
+			this.render_tab_bar();
+			this.show_pos();
+			return;
+		}
+		this._picking_table_for_cart = false;
 		this.order_type = "Dine In";
 		this.selected_table = table.name;
 		this.selected_table_no = table.table_no || "";
@@ -6671,7 +6811,7 @@ foodpos.FoodPOS.Controller = class {
 						<div class="fpos-floor-title">${__("Staff Attendance")}</div>
 						<div class="fpos-floor-sub">${data.date || ""} &bull; ${rows.length} ${__("staff")} &bull; ${__("Main Branch")}</div>
 					</div>
-					<button class="fpos-btn fpos-att-home">${fpos_icon("home", "fpos-ic-sm")} ${__("Home")}</button>
+					<button class="fpos-btn fpos-att-home">${fpos_icon("arrowLeft", "fpos-ic-sm")} ${__("Back")}</button>
 				</div>
 				${data.note ? `<div class="fpos-att-note">${data.note}</div>` : ""}
 				<div class="fpos-att-mark">
@@ -6709,7 +6849,7 @@ foodpos.FoodPOS.Controller = class {
 				frappe.show_alert({ message: __("Could not save attendance: {0}", [e.message]), indicator: "red" });
 			}
 		};
-		$view.find(".fpos-att-home").on("click", () => this.show_home());
+		$view.find(".fpos-att-home").on("click", () => this.go_back("home"));
 		$view.find(".fpos-att-checkin").on("click", () => mark("check_in"));
 		$view.find(".fpos-att-checkout").on("click", () => mark("check_out"));
 		$view.find(".fpos-att-absent").on("click", () => mark("absent"));
@@ -6754,7 +6894,7 @@ foodpos.FoodPOS.Controller = class {
 						<div class="fpos-floor-title">${__("Daily Orders Report")}</div>
 						<div class="fpos-floor-sub">${r.date || ""} &bull; ${__("Main Branch")}</div>
 					</div>
-					<button class="fpos-btn fpos-report-home">${fpos_icon("home", "fpos-ic-sm")} ${__("Home")}</button>
+					<button class="fpos-btn fpos-report-home">${fpos_icon("arrowLeft", "fpos-ic-sm")} ${__("Back")}</button>
 				</div>
 				<div class="fpos-report-cards">
 					<div class="fpos-report-card"><div class="fpos-rc-label">${__("Total Orders")}</div><div class="fpos-rc-value">${r.total_orders || 0}</div></div>
@@ -6774,13 +6914,13 @@ foodpos.FoodPOS.Controller = class {
 						${(r.top_items || []).map((i) => `<div class="fpos-report-row"><span>${i.item_name} × ${i.qty}</span><span>${money(i.amount)}</span></div>`).join("") || `<div class="fpos-report-row">${__("No items sold yet.")}</div>`}
 						<div class="fpos-report-h" style="margin-top:16px;">${__("Pending Dine-In Payments")}</div>
 						${(r.pending_tables || []).length
-							? r.pending_tables.map((t) => `<div class="fpos-report-row"><span>${__("Table")} ${t.table} &bull; ${__(t.status)}${t.occupied_since ? ` &bull; <span data-since="${t.occupied_since}">⏱ ${this.format_elapsed(t.occupied_since)}</span>` : ""}</span><span>${t.guests ? __("Guests") + ": " + t.guests : ""}</span></div>`).join("")
+							? r.pending_tables.map((t) => `<div class="fpos-report-row"><span>${__("Table")} ${t.table} &bull; ${__(t.status)}${t.occupied_since ? ` &bull; <span data-since="${t.occupied_since}">⏱ <span class="fpos-table-time-val">${this.format_elapsed(t.occupied_since)}</span></span>` : ""}</span><span>${t.guests ? __("Guests") + ": " + t.guests : ""}</span></div>`).join("")
 							: `<div class="fpos-report-row">${__("No pending dine-in tables.")}</div>`}
 					</div>
 				</div>
 			</div>
 		`);
-		$view.find(".fpos-report-home").on("click", () => this.show_home());
+		$view.find(".fpos-report-home").on("click", () => this.go_back("home"));
 		this.start_home_timers();
 	}
 
