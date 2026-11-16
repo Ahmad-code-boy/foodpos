@@ -432,3 +432,53 @@ correctly in the screenshots).
   auto-opens the KOT preview in one tab → Pay → receipt; Pending
   page search + Settle; refresh on Pending/Tables restores the view;
   Back on tables/closing; 8 tables present after migrate.
+
+## v7.1 — Fix all 16 issues from the v7.0 live bench test (2026-11-16 23:27 PKT)
+
+- **Live test that drove this:** v7.0 on the bench, 2026-11-16 23:12-23:22
+  PKT (Administrator, ~1247px viewport). Test order: Table T6, 1x 7UP,
+  KOT FKOT-2026-00008, invoice BR1-2026-00007 Rs 120 Cash, paid 23:19.
+  16 issues found; user said "Han, sab 16 issues fix kar do".
+- **Fixes (root cause in one line each):** (1) Day times: `get_value`
+  shape bug (1-field list returns a scalar) + per-field cache fallback +
+  fields ensured on demand + localStorage fallback. (2) Chips: "T"+"T6"
+  double prefix; duplicate tab when the table's tab was already active;
+  strip now pinned by flex views. (3) CRITICAL: `set_view` never hid the
+  closing page — now it unmounts it for any other view, origin recorded,
+  Back restores the origin. (4) Tables top-up to 8 (was zero-only).
+  (5) 1100px caps removed (home/tables/report/pending). (6) Top bar:
+  `fpos-view-pos` was toggled on the wrong element (`.page-content` not
+  `.fpos-wrapper`); 5-col breakpoint 1280px -> 1024px; cat tiles keep
+  natural width, row scrolls. (7) Rail moved out of `.fpos-body` into
+  shared `.fpos-main-row`. (8) `_sync_nav` from `set_view` on every
+  navigation. (9) Home paints a loading skeleton before its server calls.
+  (10) 7UP Fanta photo VERIFIED not a code bug — the Item's own `image`
+  field is rendered; fix the 7UP Item image in Desk. No code change.
+  (11) Dine-in as Takeaway: v0.1.0 custom fields missing on pos.local, so
+  nothing was stored — fields now ensured on demand + KOT type/table
+  copied into the invoice (page + api module). (12) FKOT-2026-00002:
+  "Served" KOTs were excluded from the active list — now included, with a
+  teal pill on Pending + KDS. (13) Settle now clears `guests: 0`.
+  (14) Settle shows ONE dialog — auto print-preview + Auto Print Slip
+  checkbox removed. (15) Print preview: no blur + 120ms fade; closing
+  page `overflow-x: hidden`; one bottom action row. (16) Pending search
+  persists in sessionStorage.
+- **Static checks:** `node --check` OK, `py_compile` OK,
+  `scratch/v5_sanity.py` **227/227 PASS** (20 new v7.1 checks),
+  `scratch/v5_seed_test.py` **9/9 PASS**, `window.open` count 0.
+- **Visual checks:** `../ui-screenshots/v7.1/1-home.png`,
+  `2-pos-5col.png` (1247px: top bar visible, exactly 5/row, full cat
+  labels), `3-tables-8.png`, `4-pending-page.png`,
+  `5-closing-page.png` — all rendered from the real `food_pos.css` and
+  visually checked. One harness note: the static POS shot truncates long
+  item titles ("Chicken Tikk…") — that is the 2-line card clamp in the
+  static mock at 1247px, not a v7.1 change; the live test reported item
+  names untruncated.
+- **NOT verified live:** needs pull + build + clear-cache + restart, then
+  a full bench pass — Day Open card, table order -> Confirm auto-opens
+  the KOT preview in one tab -> Pay -> ONE receipt dialog; Pending page
+  search + Settle (FKOT-2026-00002 should reappear if it is Served and
+  unsettled); refresh on Pending/Tables restores the view + search text;
+  Back on tables/closing on both routes (Accounts and Home); 8 tables
+  present; day times survive a fresh load; T6 shows no guests after
+  settle. Manager PIN untouched (1234). Nothing settled/deleted.

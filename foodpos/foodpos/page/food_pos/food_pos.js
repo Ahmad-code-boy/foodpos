@@ -162,7 +162,6 @@ foodpos.FoodPOS.Controller = class {
 		this.kitchen_station_filter = "All";
 		this.payment_tendered = 0;
 		this.selected_payment_mode = "Cash";
-		this.auto_print_slip = false;
 		this.kitchen_poll_interval = null;
 
 		// Offline & Sync
@@ -853,17 +852,11 @@ foodpos.FoodPOS.Controller = class {
 				</header>
 
 				<!-- v4 CHILI: no top order strip — open orders live in the bottom table-chips bar. -->
-				<!-- v2: Home / Tables / Attendance / Daily Report views. Only one
-				     view is visible at a time; show_home/show_pos/... toggle them. -->
-				<div class="fpos-home-view"></div>
-				<div class="fpos-tables-view" style="display:none;"></div>
-				<div class="fpos-attendance-view" style="display:none;"></div>
-				<div class="fpos-daily-report-view" style="display:none;"></div>
-				<!-- v7: Pending Payments is a dedicated full page now, not a drawer. -->
-				<div class="fpos-pending-view" style="display:none;"></div>
-
-				<!-- Main Layout: Left Menu Area (Zone 3) + Right Cart (Zone 4) -->
-				<div class="fpos-body">
+				<!-- v7.1: the left icon rail lives OUTSIDE .fpos-body now, in the
+				     shared .fpos-main-row, so it stays visible on Tables,
+				     Pending, closing, Attendance and Report too — before it
+				     vanished with the POS body on every other view. -->
+				<div class="fpos-main-row">
 					<!-- v3: left icon sidebar (image 4 concept) — every item goes somewhere real -->
 					<nav class="fpos-pos-sidebar" aria-label="${__("POS sections")}">
 						<button class="fpos-pos-nav-item active" data-nav="menu" title="${__("Menu")}">${fpos_icon("grid")}<span class="fpos-pos-nav-label">${__("Menu")}</span></button>
@@ -876,6 +869,17 @@ foodpos.FoodPOS.Controller = class {
 						<span class="fpos-pos-nav-spacer"></span>
 						<button class="fpos-pos-nav-item fpos-pos-logout" data-nav="logout" title="${__("Logout")}">${fpos_icon("logout")}<span class="fpos-pos-nav-label">${__("Logout")}</span></button>
 					</nav>
+					<!-- v2: Home / Tables / Attendance / Daily Report views. Only one
+					     view is visible at a time; show_home/show_pos/... toggle them. -->
+					<div class="fpos-home-view"></div>
+					<div class="fpos-tables-view" style="display:none;"></div>
+					<div class="fpos-attendance-view" style="display:none;"></div>
+					<div class="fpos-daily-report-view" style="display:none;"></div>
+					<!-- v7: Pending Payments is a dedicated full page now, not a drawer. -->
+					<div class="fpos-pending-view" style="display:none;"></div>
+
+					<!-- Main Layout: Left Menu Area (Zone 3) + Right Cart (Zone 4) -->
+					<div class="fpos-body">
 					<!-- Zone 3: Menu Area (Filter Bar + Items Grid) -->
 					<div class="fpos-left-panel">
 						<div class="fpos-menu-main">
@@ -986,14 +990,15 @@ foodpos.FoodPOS.Controller = class {
 					</div>
 				</div>
 
+					<!-- FULL-PAGE REGISTER CLOSING & DAILY SALES DASHBOARD -->
+					<div class="fpos-closing-page" style="display:none;"></div>
+				</div><!-- /fpos-main-row -->
+
 				<!-- v3: occupied-table chips (image 4 concept) — filled by render_table_chips() -->
 				<div class="fpos-table-chips-bar" style="display:none;"></div>
 
 				<!-- FULL-PAGE SLIDE-IN PAYMENT & CHECKOUT PAGE (Transitions Left to Right) -->
 				<div class="fpos-payment-page"></div>
-
-				<!-- FULL-PAGE REGISTER CLOSING & DAILY SALES DASHBOARD -->
-				<div class="fpos-closing-page" style="display:none;"></div>
 
 				<!-- DRAWER OVERLAY -->
 				<div class="fpos-drawer-overlay"></div>
@@ -2254,7 +2259,25 @@ foodpos.FoodPOS.Controller = class {
 		// v4 CHILI bottom strip: staff avatars first, then ONE chip per OPEN order
 		// (tables AND walk-in/takeaway/delivery — the top tabs bar is gone, so this
 		// strip is the only order switcher).
-		const tabs = Object.values(this.tabs || {});
+		// v7.1: ONE chip per table. A table's tabs are deduped — if two tabs
+		// somehow reference the same table (e.g. a stale empty tab left after
+		// a settle), the live one (confirmed / with items) wins and the empty
+		// one is dropped, so T6 can never appear twice in the strip.
+		const _chip_score = (t) => (t.order_confirmed ? 2 : 0) + ((t.cart_items || []).length ? 1 : 0);
+		const _kept = [];
+		const _idx_by_table = new Map();
+		for (const t of Object.values(this.tabs || {})) {
+			const key = t.table || (t.table_no ? `table:${t.table_no}` : null);
+			if (!key) { _kept.push(t); continue; }
+			if (_idx_by_table.has(key)) {
+				const i = _idx_by_table.get(key);
+				if (_chip_score(t) > _chip_score(_kept[i])) _kept[i] = t;
+			} else {
+				_idx_by_table.set(key, _kept.length);
+				_kept.push(t);
+			}
+		}
+		const tabs = _kept;
 		// v4: free tables join the strip too (CHILI shows T1/T2/T3 with "Available") —
 		// tapping one starts a fresh Dine-In order on that table. Capped at 8 so the
 		// strip stays a single scrollable row.
@@ -2263,9 +2286,12 @@ foodpos.FoodPOS.Controller = class {
 			.filter((t) => t.status !== "Occupied" && !occupied.has(t.name))
 			.slice(0, 8);
 		if (!tabs.length && !free.length) { $bar.hide().empty(); return; }
+		// v7.1: table_no is already "T6" — prefixing another "T" made "TT6".
+		// Strip one leading T, then prefix, so the avatar always reads "T6".
+		const _short_no = (raw) => String(raw || "").replace(/^T/i, "");
 		const chips = tabs.map((t) => {
 			const items = (t.cart_items || []).length;
-			const no = t.table_no ? `T${t.table_no}` : (t.order_type === "Walk In" ? "W" : t.order_type === "Takeaway" ? "TA" : "D");
+			const no = t.table_no ? `T${_short_no(t.table_no)}` : (t.order_type === "Walk In" ? "W" : t.order_type === "Takeaway" ? "TA" : "D");
 			const meta = t.order_confirmed ? `${items} ${__("items")} → ${__("Kitchen")}` : (items ? `${items} ${__("items")} • ${__("Ordering")}` : __("Empty"));
 			return `
 			<button class="fpos-table-chip" data-tab-id="${t.id}">
@@ -2276,11 +2302,11 @@ foodpos.FoodPOS.Controller = class {
 			</button>`;
 		}).join("");
 		const free_chips = free.map((t) => {
-			const no = t.table_no || t.name;
+			const no = t.table_no || (t.name || "").split("-").pop();
 			return `
 			<button class="fpos-table-chip fpos-table-chip-available" data-table-name="${t.name}">
 				<span class="fpos-table-chip-dot free"></span>
-				<span class="fpos-table-chip-no">T${no}</span>
+				<span class="fpos-table-chip-no">T${_short_no(no)}</span>
 				<span>${__("Table")} ${no}</span>
 				<span class="fpos-table-chip-meta">${__("Available")}</span>
 			</button>`;
@@ -2811,11 +2837,6 @@ foodpos.FoodPOS.Controller = class {
 							<span class="fpos-pay-change-icon" style="color:#ea580c;">${fpos_icon("cash")}</span>
 						</div>
 
-						<!-- Customer POS Slip Toggle -->
-						<div style="display:flex;align-items:center;gap:8px;margin-top:6px;font-size:13px;color:#57534e;">
-							<input type="checkbox" id="fpos-auto-print-slip" ${this.auto_print_slip ? "checked" : ""} style="width:16px;height:16px;accent-color:#ea580c;cursor:pointer;" />
-							<label for="fpos-auto-print-slip" style="margin:0;cursor:pointer;font-weight:600;">${__("Generate & Print POS Slip on Settlement")}</label>
-						</div>
 
 						<!-- Complete Order & Settle Button -->
 						<button class="btn btn-success fpos-confirm-payment-btn" style="background:#22c55e;border:none;font-size:15px;font-weight:800;padding:14px;border-radius:12px;margin-top:10px;box-shadow:0 4px 12px rgba(34,197,94,0.3);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
@@ -3006,10 +3027,6 @@ foodpos.FoodPOS.Controller = class {
 			calculate_totals();
 		});
 
-		// Auto Print Slip Checkbox
-		$page.find("#fpos-auto-print-slip").on("change", (e) => {
-			this.auto_print_slip = $(e.target).is(":checked");
-		});
 
 		// Return to Order
 		$page.find(".fpos-pay-back-btn").on("click", () => {
@@ -3143,10 +3160,6 @@ foodpos.FoodPOS.Controller = class {
 
 			this.render_tab_bar();
 
-			// Reset auto print slip checkbox to unchecked after each settle
-			this.auto_print_slip = false;
-			this.wrapper.find("#fpos-auto-print-slip").prop("checked", false);
-			$("#fpos-auto-print-slip").prop("checked", false);
 
 			// Invalidate kitchen drawer cache and refresh if drawer is currently open
 			this.active_kots = [];
@@ -3407,13 +3420,12 @@ foodpos.FoodPOS.Controller = class {
 			this.print_pos_slip(receipt_data);
 		});
 
-		// Defer auto-print to next tick so receipt modal is fully interactive and listeners are active
-		if (this.auto_print_slip) {
-			this.auto_print_slip = false;
-			setTimeout(() => {
-				this.print_pos_slip(receipt_data);
-			}, 100);
-		}
+		// v7.1: NO auto print-preview on settle. The receipt modal already
+		// carries the green "Payment Successful" banner, and opening the
+		// print preview on top of it stacked two dialogs (live bug: the
+		// "Receipt" preview had to be closed, then the success panel still
+		// needed its own "Next Order (Close)"). Printing stays one tap
+		// away via the receipt's own "Print Slip" button.
 	}
 
 	// ─── v5.11: one-tab print preview ─────────────────────────────
@@ -3836,13 +3848,23 @@ foodpos.FoodPOS.Controller = class {
 				<span class="fpos-pending-count-pill" style="font-size:11px;background:#fef3c7;color:#92400e;padding:4px 10px;border-radius:12px;font-weight:700;">0 pending</span>
 				<div class="fpos-pending-search">
 					${fpos_icon("search")}
-					<input class="fpos-pending-search-input" placeholder="${__("Search bill, table or customer...")}">
+					<input class="fpos-pending-search-input" placeholder="${__("Search bill, table or customer...")}" value="${this._pending_search || ""}">
 				</div>
 			</div>
 			<div class="fpos-pending-body"></div>
 		`);
 		$view.find(".fpos-pending-back").on("click", () => this.go_back("pos"));
-		$view.find(".fpos-pending-search-input").on("input", () => this.render_pending_page(this.pending_kots || []));
+		// v7.1: the search text survives a browser refresh — the page
+		// itself is restored (v7), but the text used to reset. Persist it
+		// in sessionStorage and re-apply it when the page rebuilds.
+		try { this._pending_search = sessionStorage.getItem("fpos_pending_search") || ""; } catch (e) { this._pending_search = ""; }
+		const $search = $view.find(".fpos-pending-search-input");
+		if (this._pending_search) $search.val(this._pending_search);
+		$search.on("input", () => {
+			this._pending_search = $search.val() || "";
+			try { sessionStorage.setItem("fpos_pending_search", this._pending_search); } catch (e) {}
+			this.render_pending_page(this.pending_kots || []);
+		});
 		const $body = $view.find(".fpos-pending-body");
 		$body.html(`
 			<div style="display:flex;justify-content:center;align-items:center;height:200px;flex-direction:column;gap:10px;">
@@ -3921,6 +3943,9 @@ foodpos.FoodPOS.Controller = class {
 				Pending: { bg: "#fef9c3", text: "#854d0e" },
 				"In Progress": { bg: "#dbeafe", text: "#1d4ed8" },
 				Ready: { bg: "#dcfce7", text: "#166534" },
+				// v7.1: Served KOTs are still unpaid — they now appear here
+				// (server filter fixed), with their own pill colour.
+				Served: { bg: "#cffafe", text: "#155e75" },
 			};
 			const sc = status_colors[kot.status] || { bg: "#f5efe4", text: "#57534e" };
 			const items = kot.items || [];
@@ -4038,6 +4063,8 @@ foodpos.FoodPOS.Controller = class {
 				Pending: { bg: "#fef9c3", text: "#854d0e", border: "#facc15" },
 				"In Progress": { bg: "#dbeafe", text: "#1d4ed8", border: "#60a5fa" },
 				Ready: { bg: "#dcfce7", text: "#166534", border: "#4ade80" },
+				// v7.1: Served stays in the active list until settled.
+				Served: { bg: "#cffafe", text: "#155e75", border: "#22d3ee" },
 			};
 			const sc = status_colors[kot.status] || { bg: "#f5efe4", text: "#57534e", border: "#d8cbb8" };
 
@@ -5263,7 +5290,9 @@ foodpos.FoodPOS.Controller = class {
 			else this.open_customer_dialog();
 		});
 		this.wrapper.on("click", ".fpos-topbar-menu-btn", () => {
-			this.wrapper.toggleClass("fpos-sidebar-collapsed");
+			// v7.1: like fpos-view-pos, this class belongs on .fpos-wrapper
+			// (the CSS reads .fpos-wrapper.fpos-sidebar-collapsed).
+			this.wrapper.find(".fpos-wrapper").toggleClass("fpos-sidebar-collapsed");
 		});
 
 		// Customer picker click
@@ -5654,17 +5683,21 @@ foodpos.FoodPOS.Controller = class {
 	}
 
 	async show_closing_page() {
-		this.current_view = "closing";
-		// v6.2: hide EVERY top-level view, not just the POS body — the Home
-		// view's fixed bottom nav (.fpos-home-nav) stayed visible and covered
-		// the closing page's bottom "Close Day" button, so it could not be
-		// clicked with a mouse. hide_closing_page() restores the POS view.
-		// v7: the pending page joins the hide list; the closing page also
-		// records a history entry so Back returns to the previous screen.
-		this.wrapper.find(".fpos-body, .fpos-home-view, .fpos-tables-view, .fpos-attendance-view, .fpos-daily-report-view, .fpos-pending-view").hide();
-		this._record_view("closing");
+		// v7.1: remember where the user came from — "Back" returns there
+		// (POS from the Accounts rail, Home from Close Day) and the button
+		// label says so. Re-entering via browser Back/refresh keeps the
+		// first origin instead of overwriting it with "closing".
+		if (this.current_view && this.current_view !== "closing") {
+			this._closing_return_view = this.current_view;
+		}
+		// v7.1: go through set_view — it hides every other view AND shows
+		// the closing page, and records the history entry so Back returns
+		// to the previous screen. (v6.2 hid the views with a manual .hide()
+		// list, but leaving happened through history/popstate → set_view,
+		// which never hid the closing page — the stacked-screens bug.)
+		this.set_view("closing");
 		const $closing = this.wrapper.find(".fpos-closing-page");
-		$closing.show().addClass("active").html(`
+		$closing.html(`
 			<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:65vh;gap:16px;">
 				<div class="fpos-spinner" style="width:44px;height:44px;border:3px solid #eadfd2;border-top-color:#ea580c;border-radius:50%;animation:fpos-spin .8s linear infinite;"></div>
 				<div style="color:#57534e;font-size:16px;font-weight:700;">${__("Getting today's sales ready...")}</div>
@@ -5691,11 +5724,14 @@ foodpos.FoodPOS.Controller = class {
 	}
 
 	hide_closing_page() {
-		// v7: go through set_view so the POS topbar class (fpos-view-pos)
-		// is restored too — the old direct .show() left it off when the
-		// user came from Home, hiding the top bar on the POS screen.
-		this.wrapper.find(".fpos-closing-page").hide().removeClass("active").empty();
-		this.set_view("pos");
+		// v7.1: leave for the recorded origin view (POS from Accounts,
+		// Home from Close Day, or wherever the rail opened it from).
+		// _restore_view replays that view without pushing a new history
+		// entry, and set_view unmounts the closing page — so "Back" can
+		// never leave the closing page stacked under the next screen.
+		const back = this._closing_return_view || "pos";
+		this._closing_return_view = null;
+		this._restore_view(back);
 	}
 
 	render_closing_page(data) {
@@ -5809,15 +5845,16 @@ foodpos.FoodPOS.Controller = class {
 			inv_rows = `<tr><td colspan="6" style="text-align:center;padding:24px;color:#a8a29e;">${__("No invoices generated in this shift")}</td></tr>`;
 		}
 
+		// v7.1: the Back button says where it actually goes — "Back to Home"
+		// when the closing page was opened from Home, else "Back to POS".
+		const back_label = this._closing_return_view === "home" ? __("Back to Home") : __("Back to POS");
 		$page.html(`
 			<div style="max-width: 1200px; margin: 0 auto; width: 100%; display: flex; flex-direction: column; gap: 24px;">
-				<!-- Top Header Navigation -->
+				<!-- Top Header Navigation — v7.1: title + meta only. The action
+				     buttons (Back / Print Z-Report / Close Day) live in ONE row
+				     at the bottom now; the top duplicates are removed. -->
 				<div style="display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 16px 24px; border-radius: 12px; border: 1px solid #eadfd2; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
 					<div style="display: flex; align-items: center; gap: 14px;">
-						<button class="btn btn-default fpos-back-to-pos-btn" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700; border-radius: 8px;">
-							<span>←</span>
-							<span>${__("Back to POS")}</span>
-						</button>
 						<div>
 							<h3 style="margin: 0; font-size: 18px; font-weight: 800; color: #292524; display: flex; align-items: center; gap: 8px;">
 								<span>${fpos_icon("chart", "fpos-ic-sm")}</span> ${__("Close the Day")}
@@ -5832,17 +5869,6 @@ foodpos.FoodPOS.Controller = class {
 								${__("Opening Shift")}: <b style="color: #0369a1;">${data.opening_entry || this.pos_opening || __("Active")}</b>
 							</div>
 						</div>
-					</div>
-
-					<div style="display: flex; gap: 10px;">
-						<button class="btn btn-default fpos-print-closing-btn" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600; border-radius: 8px;">
-							<span>${fpos_icon("printer", "fpos-ic-sm")}</span>
-							<span>${__("Print Z-Report")}</span>
-						</button>
-						<button class="btn btn-danger fpos-exit-desk-btn" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 800; border-radius: 8px;">
-							<span>${fpos_icon("checkCircle", "fpos-ic-sm")}</span>
-							<span>${__("Close Day")}</span>
-						</button>
 					</div>
 				</div>
 
@@ -5891,8 +5917,8 @@ foodpos.FoodPOS.Controller = class {
 				<div style="display: grid; grid-template-columns: 3fr 2fr; gap: 20px;">
 					<!-- Multi-Payment Reconciliation Tool -->
 					<div style="background: #fff; border-radius: 12px; border: 1px solid #eadfd2; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.03); display: flex; flex-direction: column; gap: 14px;">
-						<div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f5efe4; padding-bottom: 12px;">
-							<div>
+						<div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f5efe4; padding-bottom: 12px; gap: 12px;">
+							<div style="min-width: 0;">
 								<div style="font-size: 15px; font-weight: 800; color: #292524; display: flex; align-items: center; gap: 8px;">
 									<span>${fpos_icon("cash", "fpos-ic-sm")}</span> ${__("Count the Cash")}
 								</div>
@@ -5900,7 +5926,7 @@ foodpos.FoodPOS.Controller = class {
 									${__("Type what you counted in the drawer. Green means it matches the expected amount.")}
 								</div>
 							</div>
-							<span style="font-size: 11px; background: #eff6ff; color: #1d4ed8; font-weight: 700; padding: 4px 10px; border-radius: 6px;">
+							<span style="flex-shrink: 0; font-size: 11px; background: #eff6ff; color: #1d4ed8; font-weight: 700; padding: 4px 10px; border-radius: 6px;">
 								${__("Opening Entry")}: <b>${data.opening_entry || this.pos_opening || __("Active")}</b>
 							</span>
 						</div>
@@ -6029,7 +6055,7 @@ foodpos.FoodPOS.Controller = class {
 				<!-- Bottom Sticky Action Bar -->
 				<div style="display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 16px 24px; border-radius: 12px; border: 1px solid #eadfd2; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 24px;">
 					<button class="btn btn-default fpos-back-to-pos-btn" style="font-weight: 700; border-radius: 8px; padding: 8px 18px;">
-						<span>← ${__("Back to POS")}</span>
+						<span>← ${back_label}</span>
 					</button>
 
 					<div style="display: flex; gap: 12px;">
@@ -6051,10 +6077,12 @@ foodpos.FoodPOS.Controller = class {
 		const $page = this.wrapper.find(".fpos-closing-page");
 		const format_curr = (val) => this.format_money(val);
 
-		// Back to POS Register — v7: goes back to the exact previous
-		// screen (history.back), falling back to the POS screen.
+		// Back — v7.1: hide_closing_page() returns to the view the user
+		// came from (recorded in show_closing_page). history.back() was
+		// wrong here: from Home it went to Home while the button said
+		// "Back to POS", and it never unmounted the closing page.
 		$page.on("click", ".fpos-back-to-pos-btn", () => {
-			this.go_back("pos");
+			this.hide_closing_page();
 		});
 
 		// Realtime Multi-Payment Variance Calculator
@@ -6287,7 +6315,12 @@ foodpos.FoodPOS.Controller = class {
 		this.current_view = name;
 		// v4: each view has exactly one header — on Home/Tables/Attendance/Report
 		// the POS topbar hides (those views have their own header + Home button).
-		this.wrapper.toggleClass("fpos-view-pos", name === "pos");
+		// v7.1: the class MUST land on .fpos-wrapper — the CSS hide rule
+		// (.fpos-wrapper:not(.fpos-view-pos) .fpos-topbar) checks THAT
+		// element. v7.0 toggled it on the outer .page-content wrapper, so
+		// the rule always won and the top bar was hidden on the POS screen
+		// too (live bug: no search/Filters on POS at all).
+		this.wrapper.find(".fpos-wrapper").toggleClass("fpos-view-pos", name === "pos");
 		const show = (sel, on) => this.wrapper.find(sel).toggle(!!on);
 		show(".fpos-home-view", name === "home");
 		show(".fpos-tables-view", name === "tables");
@@ -6295,8 +6328,31 @@ foodpos.FoodPOS.Controller = class {
 		show(".fpos-daily-report-view", name === "report");
 		show(".fpos-pending-view", name === "pending");
 		show(".fpos-body", name === "pos");
+		// v7.1: the closing page is a view too — any other view must unmount
+		// it, or the two screens stack (live bug: after "Back to POS" the
+		// POS grid rendered ON TOP of the closing page, cleared only by a
+		// full reload, because only hide_closing_page() ever hid it and the
+		// Back buttons go through history/popstate instead).
+		if (name === "closing") {
+			this.wrapper.find(".fpos-closing-page").show().addClass("active");
+		} else {
+			this.wrapper.find(".fpos-closing-page").hide().removeClass("active").empty();
+		}
+		this._sync_nav(name);
 		this.start_home_timers();
 		this._record_view(name);
+	}
+
+	// v7.1: the rail highlight follows the CURRENT view on every navigation
+	// (sidebar clicks, home tiles, browser Back/popstate, programmatic
+	// show_*). Before, only the click handler set it, so it lagged one
+	// step behind — e.g. "Tables" stayed orange while viewing the Menu.
+	_sync_nav(name) {
+		const map = { pos: "menu", tables: "tables", pending: "pending", closing: "accounting", report: "delivery" };
+		const key = map[name] || null;
+		const $items = this.wrapper.find(".fpos-pos-nav-item");
+		$items.removeClass("active");
+		if (key) $items.filter(`[data-nav="${key}"]`).addClass("active");
 	}
 
 	// ── v7: view history + refresh persistence ──────────────────────────
@@ -6384,6 +6440,18 @@ foodpos.FoodPOS.Controller = class {
 	async show_home() {
 		this.set_view("home");
 		const $home = this.wrapper.find(".fpos-home-view");
+		// v7.1: paint a loading state synchronously — after a browser
+		// refresh the home view has never rendered, and the two server
+		// calls below take a moment; without this the screen was blank
+		// white for seconds (live bug on Back from Tables after reload).
+		$home.html(`
+			<div class="fpos-home">
+				<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:60vh;gap:16px;">
+					<div class="fpos-spinner" style="width:44px;height:44px;border:3px solid #eadfd2;border-top-color:#ea580c;border-radius:50%;animation:fpos-spin .8s linear infinite;"></div>
+					<div style="color:#57534e;font-size:16px;font-weight:700;">${__("Loading...")}</div>
+				</div>
+			</div>
+		`);
 		let day = { day_open: !!this.pos_opening, day_start_time: "", day_end_time: "", period_start_date: "" };
 		try {
 			const res = await frappe.call({
@@ -6392,6 +6460,21 @@ foodpos.FoodPOS.Controller = class {
 			});
 			day = Object.assign(day, res.message || {});
 		} catch (e) { console.warn("get_day_status failed:", e); }
+		// v7.1: day times can come back empty even though the user saved
+		// them — the server cache (fpos_day_times:*) is wiped by
+		// `bench clear-cache`, and the v0.3.0 custom fields never landed on
+		// sites where migrate never ran. Fall back to the last times THIS
+		// browser saved for this opening entry, so a fresh load never
+		// shows "--:--" for times the user already set.
+		if ((!day.day_start_time || !day.day_end_time) && day.pos_opening_entry) {
+			try {
+				const saved = JSON.parse(localStorage.getItem(`fpos_day_times:${day.pos_opening_entry}`) || "null");
+				if (saved) {
+					day.day_start_time = day.day_start_time || saved.day_start_time || "";
+					day.day_end_time = day.day_end_time || saved.day_end_time || "";
+				}
+			} catch (e) {}
+		}
 		if (day.pos_opening_entry) this.pos_opening = day.pos_opening_entry;
 		this.day_open = !!day.day_open;
 		this.day_open_time = day.period_start_date || "";
@@ -6586,6 +6669,11 @@ foodpos.FoodPOS.Controller = class {
 					method: "foodpos.foodpos.page.food_pos.food_pos.set_day_times",
 					args: { pos_profile: this.pos_profile, day_start_time: start, day_end_time: end },
 				});
+				// v7.1: keep a browser copy keyed by opening entry — the
+			// server cache can be wiped by clear-cache (see show_home).
+				try {
+					if (this.pos_opening) localStorage.setItem(`fpos_day_times:${this.pos_opening}`, JSON.stringify({ day_start_time: start, day_end_time: end }));
+				} catch (e) {}
 				frappe.show_alert({ message: __("Day times saved."), indicator: "green" });
 			} catch (e) {
 				frappe.show_alert({ message: __("Could not save day times: {0}", [e.message]), indicator: "red" });
@@ -6752,8 +6840,13 @@ foodpos.FoodPOS.Controller = class {
 		// v7: a table that already has an active tab switches to that tab
 		// instead of opening a second one for the same table.
 		const existing_tab_id = Object.keys(this.tabs || {}).find((k) => this.tabs[k].table === table.name);
-		if (existing_tab_id && existing_tab_id !== this.active_tab_id) {
-			this.switch_tab(existing_tab_id);
+		if (existing_tab_id) {
+			// v7.1: a table that already has a tab never gets a second one —
+			// tapping its floor card again used to create a duplicate tab
+			// (the stale "Empty" T6 chip in the bottom strip) when the tab
+			// was already active, because the old check skipped only
+			// non-active tabs.
+			if (existing_tab_id !== this.active_tab_id) this.switch_tab(existing_tab_id);
 			this.show_pos();
 			return;
 		}

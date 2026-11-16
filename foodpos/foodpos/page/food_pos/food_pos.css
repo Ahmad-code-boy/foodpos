@@ -130,6 +130,21 @@
 
 /* Body / Views */
 .fpos-body  { display: flex; flex: 1; overflow: hidden; min-height: 0; }
+
+/* v7.1: shared row holding the icon rail + every view + the closing page.
+   The rail lives here (not inside .fpos-body), so it stays visible on
+   Tables, Pending, closing, Attendance and Report too. Every view is a
+   flex child that stretches, so the bottom table-chips bar sits pinned
+   at the viewport bottom instead of floating mid-page after short
+   content. */
+.fpos-main-row { display: flex; flex: 1; min-height: 0; min-width: 0; width: 100%; }
+.fpos-main-row > .fpos-home-view,
+.fpos-main-row > .fpos-tables-view,
+.fpos-main-row > .fpos-attendance-view,
+.fpos-main-row > .fpos-daily-report-view,
+.fpos-main-row > .fpos-pending-view,
+.fpos-main-row > .fpos-closing-page { flex: 1; min-width: 0; min-height: 0; }
+.fpos-table-chips-bar { flex-shrink: 0; }
 .fpos-view  { display: none; flex: 1; overflow: hidden; }
 .fpos-view.active { display: flex; }
 
@@ -780,6 +795,10 @@
 	flex: 1;
 	flex-direction: column;
 	overflow-y: auto;
+	/* v7.1: overflow-x was auto (computed from overflow-y:auto) — a
+	   first-render overflow clipped the "Count the Cash" intro's first
+	   letters ("pe what you counted…"). Hide it outright. */
+	overflow-x: hidden;
 	background: #faf6f0;
 	/* v6.2: 96px bottom clearance so the bottom action bar never sits
 	   under any fixed element at the bottom of the viewport. */
@@ -2064,7 +2083,8 @@
 /* ── v2: Home / Day Open-Close screen ─────────────────────────────── */
 .fpos-home-btn { background: #fff; border: 1px solid #eadfd2; border-radius: 8px; padding: 6px 12px; font-size: 13px; font-weight: 600; color: #292524; cursor: pointer; }
 .fpos-home-btn:hover { background: #ffedd5; border-color: var(--fpos-primary); }
-.fpos-home { max-width: 1100px; margin: 0 auto; padding: 20px 24px 90px; }
+/* v7.1: full-viewport width like the POS screen — no more centred 1100px column with wide cream margins left/right. */
+.fpos-home { max-width: none; width: 100%; margin: 0; padding: 20px 24px 90px; }
 .fpos-home-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
 .fpos-home-title { font-size: 26px; font-weight: 800; color: #292524; }
 .fpos-home-sub { font-size: 13px; color: #78716c; margin-top: 2px; }
@@ -2109,7 +2129,8 @@ button.fpos-home-sync:hover { filter: brightness(0.97); }
 .fpos-items-grid .fpos-item-card { min-height: 150px; }
 
 /* ── v2: tables floor plan ───────────────────────────────────────── */
-.fpos-tables-view, .fpos-attendance-view, .fpos-daily-report-view { width: 100%; max-width: 1100px; margin: 0 auto; padding: 20px 24px 90px; }
+/* v7.1: full width, like Home — the 1100px cap boxed these pages too. */
+.fpos-tables-view, .fpos-attendance-view, .fpos-daily-report-view { width: 100%; max-width: none; margin: 0; padding: 20px 24px 90px; }
 .fpos-floor-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
 .fpos-floor-title { font-size: 22px; font-weight: 800; color: #292524; }
 .fpos-floor-sub { font-size: 13px; color: #78716c; margin-top: 2px; }
@@ -2345,16 +2366,21 @@ button.fpos-home-sync:hover { filter: brightness(0.97); }
    row shrinking, so on a 1280px screen the centre column overflowed into the
    right panel and clipped the "Table 4" title. The !important here wins it back. */
 .fpos-cat-row .fpos-cat-tiles { flex: 1 1 auto !important; min-width: 0; padding: 0; gap: 8px; }
-.fpos-cat-tile { flex: 1 1 0; min-width: 0; padding: 10px 8px !important; }
-.fpos-cat-tile-name { white-space: nowrap; font-size: 13px !important; overflow: hidden; text-overflow: ellipsis; }
+/* v7.1: tiles keep their natural width — the old flex:1 1 0 squeezed 8
+   tiles into the row and ellipsised every label ("Sandwi…", "Drinks &…").
+   The row already scrolls horizontally (.fpos-cat-tiles overflow-x:auto),
+   so every label reads in full now. */
+.fpos-cat-tile { flex: 0 0 auto; min-width: 0; padding: 10px 12px !important; }
+.fpos-cat-tile-name { white-space: nowrap; font-size: 13px !important; }
 /* v4: an item without a photo renders a placeholder <div> inside the flex
    .fpos-item-media — without flex:1 it shrink-to-fit into a narrow band. */
 .fpos-item-media > div { flex: 1; }
 .fpos-items-grid-wrapper { padding: 12px 20px 20px; }
-/* v7: EXACTLY 5 item cards per row on desktop (>=1280px); fewer on
-   smaller screens — 4 at ~1100px, 3 at ~900px, 2 on small screens. */
+/* v7: EXACTLY 5 item cards per row on desktop; fewer on smaller screens.
+   v7.1: 5 columns stay down to 1024px — a normal laptop (~1247px) showed
+   only 4 before, because the 4-col step started at 1279px. */
 .fpos-items-grid { grid-template-columns: repeat(5, minmax(0, 1fr)) !important; gap: 12px; }
-@media (max-width: 1279px) { .fpos-items-grid { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; } }
+@media (max-width: 1023px) { .fpos-items-grid { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; } }
 @media (max-width: 900px) { .fpos-items-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; } }
 @media (max-width: 640px) { .fpos-items-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }
 /* v7: 5-col card sizing lives at the END of this file (after the v5
@@ -2598,9 +2624,14 @@ button.fpos-home-sync:hover { filter: brightness(0.97); }
 .fpos-print-preview-overlay {
 	position: fixed; inset: 0; z-index: 9999;
 	display: flex; align-items: center; justify-content: center;
-	background: rgba(41, 37, 36, .55); backdrop-filter: blur(2px);
+	/* v7.1: no backdrop blur (it made the dialog fade in very slowly on
+	   the live bench — dimmed page, dialog barely visible, then it
+	   appeared). Plain dim + a fast explicit 120ms fade instead. */
+	background: rgba(41, 37, 36, .55);
 	padding: 20px;
+	animation: fpos-fade-in .12s ease-out;
 }
+@keyframes fpos-fade-in { from { opacity: 0; } to { opacity: 1; } }
 .fpos-print-preview {
 	background: #f7f5f0; border-radius: 18px;
 	width: 480px; max-width: 100%; max-height: calc(100vh - 40px);
@@ -2778,7 +2809,7 @@ button.fpos-home-sync:hover { filter: brightness(0.97); }
 /* ── v7: Pending Payments FULL PAGE (replaces the v5.12 drawer) ── */
 .fpos-pending-view { display: none; flex: 1; flex-direction: column; overflow-y: auto; background: #faf6f0; padding: 24px 32px 96px; }
 .fpos-pending-view.active { display: flex; }
-.fpos-pending-head { display: flex; align-items: center; gap: 14px; max-width: 1100px; margin: 0 auto 16px; width: 100%; flex-wrap: wrap; }
+.fpos-pending-head { display: flex; align-items: center; gap: 14px; max-width: none; margin: 0 0 16px; width: 100%; flex-wrap: wrap; }
 .fpos-pending-back { display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 14px; border: 1px solid #eadfd2; background: #fff; border-radius: 12px; font-size: 13px; font-weight: 800; color: #292524; cursor: pointer; }
 .fpos-pending-back:hover { border-color: #ea580c; color: #ea580c; }
 .fpos-pending-title { font-size: 20px; font-weight: 900; color: #292524; letter-spacing: -.02em; }
@@ -2786,5 +2817,5 @@ button.fpos-home-sync:hover { filter: brightness(0.97); }
 .fpos-pending-search:focus-within { border-color: #ea580c; box-shadow: 0 0 0 3px rgba(234,88,12,.12); }
 .fpos-pending-search input { flex: 1; min-width: 0; border: none !important; background: transparent !important; box-shadow: none !important; font-size: 14px; outline: none; }
 .fpos-pending-search .fpos-ic { color: #78716c; }
-.fpos-pending-body { max-width: 1100px; margin: 0 auto; width: 100%; display: flex; flex-direction: column; gap: 12px; }
+.fpos-pending-body { max-width: none; margin: 0; width: 100%; display: flex; flex-direction: column; gap: 12px; }
 .fpos-pending-body .fpos-recent-card { margin: 0; }

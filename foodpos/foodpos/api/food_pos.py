@@ -387,6 +387,16 @@ def create_pos_invoice(order, payments):
 
     # ── Determine invoice doctype ────────────────────────────────────────
     invoice_doctype = _get_invoice_doctype(profile)
+
+    # v7.1: heal the invoice fields first (same fix as the page module's
+    # submit_pos_invoice) — on sites whose v0.1.0 patch never ran, the
+    # has_field() guards below silently skipped storing order type/table,
+    # so a Dine-In order read back as "Takeaway".
+    try:
+        from foodpos.foodpos.page.food_pos.food_pos import _ensure_invoice_custom_fields
+        _ensure_invoice_custom_fields(invoice_doctype)
+    except Exception:
+        pass
     opening_name = None
     if invoice_doctype == "POS Invoice":
         try:
@@ -418,6 +428,22 @@ def create_pos_invoice(order, payments):
         if dt == "POS Invoice" and opening:
             doc.pos_opening_entry = opening
 
+        # v7.1: when the invoice settles a KOT, the KOT is the source of
+        # truth for order type + table — copy them when the caller did not
+        # send them, so a Dine-In order is stored as "Dine In".
+        kot_ref = order.get("linked_kot_id") or order.get("kot_id")
+        if kot_ref and (not order.get("order_type") or not order.get("table")):
+            try:
+                kot_name = str(kot_ref).split(",")[0].strip()
+                kot_vals = frappe.db.get_value("Food KOT", kot_name, ["order_type", "table"])
+                if kot_vals:
+                    kot_type, kot_table = kot_vals
+                    if kot_type and not order.get("order_type"):
+                        order["order_type"] = kot_type
+                    if kot_table and not order.get("table"):
+                        order["table"] = kot_table
+            except Exception:
+                pass
         order_type = order.get("order_type", "Dine In")
         if order_type == "Delivery":
             phone = str(order.get("phone") or order.get("contact_phone") or "").strip()

@@ -48,6 +48,55 @@ def _format_time_hh_mm(val):
 	return s
 
 
+# v7.1: on-demand Custom Field ensure. The v0.1.0 / v0.3.0 migrate patches
+# never ran on some live sites (pos.local evidence: no custom_branch column,
+# no seed tables after a "successful" migrate), so the has_field() guards
+# below silently skipped storing order type / table / day times — a Dine-In
+# order then read back as "Takeaway" and saved day times vanished. Creating
+# the fields on demand (same definitions as the patches) heals those sites
+# the first time the live path runs; on patched sites this is a no-op.
+def _ensure_custom_fields(dt, defs):
+	"""Create the given Custom Fields on `dt` if any are missing."""
+	try:
+		for field_def in defs:
+			if frappe.db.exists("Custom Field", {"dt": dt, "fieldname": field_def["fieldname"]}):
+				continue
+			cf = frappe.get_doc({"doctype": "Custom Field", "dt": dt, **field_def})
+			cf.flags.ignore_permissions = True
+			cf.insert()
+		frappe.db.commit()
+	except Exception:
+		frappe.db.rollback()
+
+
+def _ensure_invoice_custom_fields(doctype):
+	"""Ensure the FoodPOS invoice fields exist on an invoice doctype.
+
+	Same definitions as patch v0.1.0, except custom_order_type also allows
+	"Walk In" (v5.8 added that order type to the KOT/Held Order but the
+	invoice field options were never updated).
+	"""
+	_ensure_custom_fields(doctype, (
+		{"fieldname": "custom_order_type", "label": "Order Type", "fieldtype": "Select",
+		 "options": "Walk In\nDine In\nTakeaway\nDelivery", "insert_after": "is_pos"},
+		{"fieldname": "custom_table", "label": "Table", "fieldtype": "Data",
+		 "insert_after": "custom_order_type"},
+		{"fieldname": "custom_order_note", "label": "Order Note", "fieldtype": "Small Text",
+		 "insert_after": "custom_table"},
+	))
+
+
+def _ensure_day_time_fields():
+	"""Ensure the Day Start/End time fields exist on POS Opening Entry
+	(same definitions as patch v0.3.0)."""
+	_ensure_custom_fields("POS Opening Entry", (
+		{"fieldname": "custom_fpos_day_start_time", "label": "Day Start Time",
+		 "fieldtype": "Time", "insert_after": "period_start_date"},
+		{"fieldname": "custom_fpos_day_end_time", "label": "Day End Time",
+		 "fieldtype": "Time", "insert_after": "custom_fpos_day_start_time"},
+	))
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # 1. POS Profile & Initialization
 # ──────────────────────────────────────────────────────────────────────────────
@@ -498,19 +547,20 @@ def get_available_tables(section=None, branch=None, pos_profile=None):
 		)
 
 	tables = _fetch()
-	# v5.9: if the site has NO tables at all, the v0.4.0 seed patch never
-	# ran (migrate skipped, or run on another site) — create the same demo
-	# tables on demand, exactly like the v5.7 station ensure. Idempotent:
-	# only when zero Restaurant Tables exist; never touches real data.
-	if not tables:
-		try:
-			if frappe.db.count("Restaurant Table") == 0:
-				from foodpos.patches.v0_4_0.add_seed_data import _ensure_tables
-				_ensure_tables()
-				frappe.db.commit()
-				tables = _fetch()
-		except Exception:
-			pass
+	# v7.1: top-up, not just zero-fill. The v7.0 seed has 8 tables but the
+	# seed patch only runs on a fresh migrate; a site that already had 6
+	# (pos.local) never got T7/T8 because the old ensure only fired when
+	# the count was 0. _ensure_tables() is idempotent — it creates only
+	# the missing ones — so run it whenever fewer than the 8 seed tables
+	# exist. Never deletes or renumbers existing tables.
+	try:
+		from foodpos.patches.v0_4_0.add_seed_data import SEED_TABLES, _ensure_tables
+		if frappe.db.count("Restaurant Table") < len(SEED_TABLES):
+			_ensure_tables()
+			frappe.db.commit()
+			tables = _fetch()
+	except Exception:
+		pass
 	return tables
 
 
@@ -1498,6 +1548,12 @@ def submit_pos_invoice(order_data, payments):
 	# Determine doctype dynamically from POS Settings
 	inv_doctype = get_pos_invoice_doctype()
 
+	# v7.1: heal the invoice fields first (see _ensure_invoice_custom_fields).
+	# On sites whose v0.1.0 patch never ran, custom_order_type/custom_table
+	# do not exist, so the has_field() guards below silently skipped storing
+	# them — a Dine-In order then read back as "Takeaway" everywhere.
+	_ensure_invoice_custom_fields(inv_doctype)
+
 	company = profile_data["company"]
 	raw_cust = order_data.get("customer") or order_data.get("customer_name")
 	if raw_cust and frappe.db.exists("Customer", raw_cust):
@@ -1547,6 +1603,23 @@ def submit_pos_invoice(order_data, payments):
 		# Truthful cashier attribution: owner is the actual authenticated cashier session user
 		doc.owner = frappe.session.user or "Administrator"
 
+		# v7.1: when the invoice settles a KOT, the KOT is the source of
+		# truth for order type + table — copy them when the client did not
+		# send them (any resume/sync path), so a Dine-In order is stored
+		# as "Dine In" instead of falling back to "Takeaway".
+		kot_ref = order_data.get("linked_kot_id") or order_data.get("kot_id")
+		if kot_ref and (not order_data.get("order_type") or not order_data.get("table")):
+			try:
+				kot_name = str(kot_ref).split(",")[0].strip()
+				kot_vals = frappe.db.get_value("Food KOT", kot_name, ["order_type", "table"])
+				if kot_vals:
+					kot_type, kot_table = kot_vals
+					if kot_type and not order_data.get("order_type"):
+						order_data["order_type"] = kot_type
+					if kot_table and not order_data.get("table"):
+						order_data["table"] = kot_table
+			except Exception:
+				pass
 		order_type = order_data.get("order_type") or ("Dine In" if order_data.get("table") else "Takeaway")
 		# Delivery validation
 		if order_type == "Delivery":
@@ -1741,6 +1814,10 @@ def submit_pos_invoice(order_data, payments):
 				"status": "Available",
 				"order_id": None,
 				"occupied_since": None,
+				# v7.1: clear the guest count too — force_free_table already
+				# sets guests: 0, but the settle path did not, so an Available
+				# table kept showing "Guests: 1" after payment.
+				"guests": 0,
 			}
 		)
 		frappe.publish_realtime(
@@ -2923,13 +3000,18 @@ def get_invoice_slip_data(invoice_name, doctype=None):
 @frappe.whitelist()
 def get_active_kitchen_kots(pos_profile=None, branch=None, station=None):
 	"""
-	Fetch all active Kitchen Order Tickets (Pending, In Progress, Ready)
+	Fetch all active Kitchen Order Tickets (Pending, In Progress, Ready, Served)
 	with items, remaining cooking items, table number, order type, and elapsed time.
 	Supports filtering by POS profile and kitchen station. (v2: no branch.)
 	Excludes settled, invoiced, voided, or cancelled tickets.
+	v7.1: "Served" joins the list — a KOT the kitchen marked Served (food
+	delivered) is still UNPAID until it is settled, so hiding it made it
+	vanish from both the KDS drawer and the Pending page (live: FKOT-2026-00002
+	was nowhere to be found). The same function feeds both views, so one
+	fix covers both.
 	"""
 	filters = {
-		"status": ["in", ["Pending", "In Progress", "Ready"]],
+		"status": ["in", ["Pending", "In Progress", "Ready", "Served"]],
 		"is_settled": ["in", [0, None]],
 		"sales_invoice": ["in", [None, ""]],
 		"is_voided": ["in", [0, None]],
@@ -3845,6 +3927,9 @@ def _day_times_from_opening(opening_name):
 	by patch v0.3.0). Before that patch has run (``bench migrate``), the
 	cache fallback below is used so the home screen still works.
 	"""
+	# v7.1: heal the fields first (see _ensure_day_time_fields) so a site
+	# whose migrate never ran can actually store the times.
+	_ensure_day_time_fields()
 	day_start = day_end = None
 	try:
 		meta = frappe.get_meta("POS Opening Entry")
@@ -3854,17 +3939,27 @@ def _day_times_from_opening(opening_name):
 		if meta.has_field("custom_fpos_day_end_time"):
 			fields.append("custom_fpos_day_end_time")
 		if fields:
+			# v7.1: get_value with a ONE-field list returns a scalar, not a
+			# tuple — the old vals[0]/vals[1] indexing read characters of
+			# the time string instead. Map by field name, and normalise
+			# Time values ("11:43:00") to HH:MM for the <input type="time">.
 			vals = frappe.db.get_value("POS Opening Entry", opening_name, fields)
-			if vals:
-				day_start = str(vals[0]) if len(vals) > 0 and vals[0] else None
-				day_end = str(vals[1]) if len(vals) > 1 and vals[1] else None
+			if not isinstance(vals, (list, tuple)):
+				vals = (vals,) if fields else ()
+			by_field = dict(zip(fields, vals))
+			day_start = _format_time_hh_mm(by_field.get("custom_fpos_day_start_time")) or None
+			day_end = _format_time_hh_mm(by_field.get("custom_fpos_day_end_time")) or None
 	except Exception:
 		pass
-	if not day_start and not day_end:
+	# v7.1: per-field cache fallback — the old code only fell back when
+	# BOTH values were empty, so one saved time could mask the other.
+	if not day_start or not day_end:
 		try:
 			cached = frappe.cache().get_value(f"fpos_day_times:{opening_name}") or {}
-			day_start = cached.get("day_start_time")
-			day_end = cached.get("day_end_time")
+			if not day_start:
+				day_start = _format_time_hh_mm(cached.get("day_start_time")) or None
+			if not day_end:
+				day_end = _format_time_hh_mm(cached.get("day_end_time")) or None
 		except Exception:
 			pass
 	return day_start, day_end
@@ -3914,6 +4009,10 @@ def set_day_times(pos_profile=None, day_start_time=None, day_end_time=None):
 	if not openings:
 		frappe.throw(_("Open the day first — there is no open shift to attach times to."))
 	entry_name = openings[0].get("name")
+	# v7.1: heal the fields first so the set_value below can land on sites
+	# whose migrate never ran (otherwise the times only ever lived in
+	# cache, which `bench clear-cache` wipes).
+	_ensure_day_time_fields()
 	stored_in = "cache"
 	try:
 		meta = frappe.get_meta("POS Opening Entry")

@@ -698,3 +698,127 @@ NOT verified live: needs pull + build + clear-cache + restart,
 then a full bench pass (open day → table order → Confirm shows the
 KOT preview → Pay → receipt; Pending page search/settle; refresh
 on the Pending page restores it; Back button on tables/closing).
+
+## v7.1 — Fix all 16 issues from the v7.0 live bench test (2026-11-16 23:27 PKT)
+
+Live test of v7.0 (2026-11-16 23:12-23:22 PKT, Administrator, ~1247px
+viewport; test order Table T6, 1x 7UP, KOT FKOT-2026-00008, invoice
+BR1-2026-00007 Rs 120 Cash) found 16 issues. All fixed here; user said
+"Han, sab 16 issues fix kar do". No push, no zip sent — kept ready locally.
+
+- **#1 Home day times empty on first load:** two causes. (a) Server
+  `_day_times_from_opening` read `frappe.db.get_value(..., fields)` with a
+  1-field list, which returns a scalar — the old `vals[0]`/`vals[1]`
+  indexing read characters of the time string; now maps by field name and
+  normalises Time values ("11:43:00") to HH:MM via `_format_time_hh_mm`;
+  cache fallback is now per-field (was only when BOTH were empty). (b) The
+  v0.3.0 custom fields never landed on sites whose migrate never ran, so
+  times only ever lived in cache, which `bench clear-cache` wipes — new
+  shared `_ensure_custom_fields` / `_ensure_day_time_fields` creates them
+  on demand (same definitions as the patches). Client keeps a localStorage
+  copy per opening entry as a third layer, so a fresh load never shows
+  "--:--" for times already set.
+- **#2 Bottom table-chips strip:** (a) avatar read "TT6" — `table_no` is
+  already "T6" and the code prefixed another "T"; now strips one leading
+  T before prefixing. (b) T6 appeared twice — `open_table_order` created
+  a second tab when the table's tab was already active, and the strip had
+  no dedupe; now any existing tab is reused, and `render_table_chips`
+  dedupes by table (confirmed/with-items tab wins). (c) Strip clipped and
+  floated mid-page — view containers now `flex: 1` inside the new
+  `.fpos-main-row`, chips bar `flex-shrink: 0` (it already scrolled
+  horizontally).
+- **#3 CRITICAL — closing page never unmounted:** `set_view` never hid the
+  closing page element, and Back went through history/popstate, so the POS
+  grid rendered ON TOP of the closing page (only a reload cleared it).
+  Now `set_view` hides+empties `.fpos-closing-page` for every non-closing
+  view; `show_closing_page` goes through `set_view("closing")` and records
+  the origin view (`_closing_return_view`); the Back button calls
+  `hide_closing_page()`, which restores the recorded origin (POS from
+  Accounts, Home from Close Day) and the button label says so ("Back to
+  Home" / "Back to POS").
+- **#4 Only 6 tables:** `get_available_tables` only created tables when
+  the count was 0; now it tops up whenever fewer than the 8 seed tables
+  exist (`_ensure_tables()` is idempotent — creates only the missing T7/T8,
+  never deletes or renumbers).
+- **#5 Home boxed column:** removed the 1100px `max-width` + `margin: auto`
+  caps on `.fpos-home`, the tables/attendance/report views, and the pending
+  head/body — all stretch full-viewport width like the POS screen.
+- **#6 POS top bar missing + 4-col grid + clipped categories:** root cause
+  of the missing top bar — `set_view` toggled `fpos-view-pos` on the outer
+  `.page-content` wrapper, but the CSS hide rule checks `.fpos-wrapper`
+  itself, so after v6.3 added `!important` the hide rule always won; the
+  class is now toggled on `.fpos-wrapper` (same fix for the hamburger
+  collapse class). 5-col breakpoint lowered: 5 columns now stay down to
+  1024px (was 1280px), so a ~1247px laptop shows 5. Category tiles are
+  `flex: 0 0 auto` with full labels — the row scrolls instead of
+  ellipsising ("Sandwi…", "Drinks &…" gone).
+- **#7 Rail missing off the POS screen:** the nav rail lived inside
+  `.fpos-body`, hidden on every other view. `render_layout` now puts the
+  rail in a shared `.fpos-main-row` (flex row) with the nav + all views +
+  closing page, so the rail stays visible on Home, Tables, Pending,
+  closing, Attendance and Report.
+- **#8 Active highlight lagged one step:** only the click handler set it.
+  New central `_sync_nav(name)` runs from `set_view` on every navigation
+  (clicks, home tiles, browser Back/popstate, programmatic `show_*`).
+- **#9 Back from Tables blank-screened:** after a reload the home view had
+  never rendered and `show_home` awaited two server calls before painting
+  anything. It now paints a loading skeleton synchronously first.
+- **#10 7UP shows a Fanta photo — NOT a code bug, no code change:**
+  verified in code: `item_media_html` renders exactly the Item's own
+  `item.image` field (`item.image AS item_image` in `get_items`) and
+  `home_dish_photo_html` uses the matched item's own image — no cross-item
+  mapping anywhere. The 7UP Item in the user's ERPNext has a Fanta image
+  set; fix the image on the 7UP Item in Desk.
+- **#11 Dine-in recorded as Takeaway:** root cause — the v0.1.0 custom
+  fields never existed on pos.local, so the `has_field()` guards silently
+  skipped storing `custom_order_type`/`custom_table` and the display
+  fallback had no table to derive from (the receipt was right because it
+  is built from in-memory order data). Fixed at the source: new
+  `_ensure_invoice_custom_fields` creates the fields on demand (options
+  now include "Walk In", which v5.8 never added to the invoice field) and
+  runs at the start of `submit_pos_invoice` (page module) and
+  `create_pos_invoice` (api module, split-bill path); when an invoice
+  settles a KOT, the KOT's `order_type` + `table` are copied in when the
+  client did not send them.
+- **#12 FKOT-2026-00002 missing from Pending — REAL BUG, fixed:** Food KOT
+  status "Served" (food delivered, payment still pending) was excluded by
+  `get_active_kitchen_kots` (filter was Pending/In Progress/Ready only),
+  so a Served KOT vanished from both the KDS drawer and the Pending page
+  even though unsettled. "Served" is now in the filter (same function
+  feeds both views) with its own teal pill colour on both.
+- **#13 Table kept "Guests: 1" after freeing:** the settle path freed the
+  table but never cleared `guests` (force_free_table already did). Now
+  sets `guests: 0` on settle.
+- **#14 Two stacked dialogs at settle:** the receipt modal (already with
+  the green Payment Successful banner) auto-opened the print-preview
+  dialog on top of itself. Auto-open removed; the "Auto Print Slip"
+  checkbox, its handler and its reset code removed too. Settle shows ONE
+  dialog; printing stays one tap away via the receipt's "Print Slip".
+- **#15 Minor:** (a) print preview fades in fast now — `backdrop-filter:
+  blur(2px)` removed from the overlay, explicit 120ms `fpos-fade-in`
+  animation added. (b) "Count the Cash" intro clipped on first render —
+  `.fpos-closing-page` gets `overflow-x: hidden` plus `min-width: 0` on
+  the header's left block and `flex-shrink: 0` on the pill. (c) Closing
+  action buttons were duplicated top + bottom — top row removed, single
+  bottom row (Back / Print Z-Report / Close Day).
+- **#16 Pending search lost on refresh:** the search term now persists in
+  `sessionStorage` (`fpos_pending_search`) and is restored + re-applied
+  when the page rebuilds.
+
+**Verify:** `node --check` OK, `py_compile` OK on both changed .py files,
+`scratch/v5_sanity.py` **227/227 PASS** (20 new v7.1 checks),
+`scratch/v5_seed_test.py` **9/9 PASS**, `window.open` count 0 in page JS.
+Screenshots rendered from the real `food_pos.css` with headless Chromium
+and visually checked in `../ui-screenshots/v7.1/`: `1-home.png` (full-width
+hero, rail visible, day times 11:43 AM / 09:44 PM loaded),
+`2-pos-5col.png` (at 1247px: top bar with search + Filters visible,
+exactly 5 cards/row, "Sandwiches" / "Sides & Extras" / "Drinks &
+Beverages" / "Combo Deals" in full), `3-tables-8.png` (8 tables, rail
+with Tables active), `4-pending-page.png` (rail with Pending active,
+search "FKOT-2026-00003" kept, FKOT-2026-00002 listed),
+`5-closing-page.png` (rail with Accounts active, "Count the Cash" intro
+in full, ONE bottom action row). NOT verified live: needs pull + build +
+clear-cache + restart, then a full bench pass (the 16 issues above, esp.
+closing-page Back on both routes, T7/T8 appearing, day times surviving a
+fresh load, FKOT-2026-00002 reappearing in Pending, settle showing one
+dialog). Manager PIN untouched (still 1234). Nothing settled/deleted.
