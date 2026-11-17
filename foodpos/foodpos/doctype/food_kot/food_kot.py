@@ -7,6 +7,26 @@ from frappe.model.document import Document
 from frappe.utils import cint, now_datetime
 
 
+# Status order for a Food KOT. A move to an earlier status is only allowed for
+# the recall case (Held -> Pending). Cancelled is terminal.
+KOT_STATUS_ORDER = ["Pending", "In Progress", "Ready", "Served", "Held", "Cancelled"]
+KOT_ALLOWED_BACKWARD = {("Held", "Pending")}
+
+
+def check_status_change(old_status, new_status, kot_name=None):
+	"""Raise if a KOT may not move from old_status to new_status."""
+	if old_status == new_status:
+		return
+	if old_status == "Cancelled":
+		frappe.throw(_("KOT {0} is Cancelled and cannot be updated.").format(kot_name or ""))
+	new_idx = KOT_STATUS_ORDER.index(new_status) if new_status in KOT_STATUS_ORDER else -1
+	old_idx = KOT_STATUS_ORDER.index(old_status) if old_status in KOT_STATUS_ORDER else -1
+	if new_idx < old_idx and (old_status, new_status) not in KOT_ALLOWED_BACKWARD:
+		frappe.throw(
+			_("Cannot change KOT status from {0} to {1}.").format(_(old_status), _(new_status))
+		)
+
+
 class FoodKOT(Document):
 	# ── Lifecycle hooks ────────────────────────────────────────────────────────
 
@@ -151,33 +171,11 @@ class FoodKOT(Document):
 		Prevent backward status transitions on existing documents.
 		Cancelled is always terminal — cannot be un-cancelled here.
 		"""
-		_ORDER = ["Pending", "In Progress", "Ready", "Served", "Held", "Cancelled"]
-
 		if not self.is_new() and self.has_value_changed("status"):
 			old_status = self.get_doc_before_save() and self.get_doc_before_save().status
 			if not old_status:
 				return
-
-			# Cancelled is terminal
-			if old_status == "Cancelled":
-				frappe.throw(
-					_("KOT {0} is Cancelled and cannot be updated.").format(self.name)
-				)
-
-			new_idx = _ORDER.index(self.status) if self.status in _ORDER else -1
-			old_idx = _ORDER.index(old_status) if old_status in _ORDER else -1
-
-			# Allow Held ↔ Pending (recall) but not other backward moves
-			_ALLOWED_BACKWARD = {("Held", "Pending")}
-			if (
-				new_idx < old_idx
-				and (old_status, self.status) not in _ALLOWED_BACKWARD
-			):
-				frappe.throw(
-					_("Cannot change KOT status from {0} to {1}.").format(
-						_(old_status), _(self.status)
-					)
-				)
+			check_status_change(old_status, self.status, self.name)
 
 	def _auto_advance_status(self):
 		"""

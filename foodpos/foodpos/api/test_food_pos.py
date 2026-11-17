@@ -61,17 +61,25 @@ class TestFoodPosAPI(FrappeTestCase):
 		pass
 
 	def test_update_table_status(self):
-		from foodpos.foodpos.page.food_pos.food_pos import update_table_status
-		if frappe.db.exists("Restaurant Table", "Table 1"):
-			res = update_table_status("Table 1", "Occupied")
-			self.assertTrue(res.get("success"))
-			status = frappe.db.get_value("Restaurant Table", "Table 1", "status")
-			self.assertEqual(status, "Occupied")
+		# Covered in depth by foodpos.foodpos.services.test_pos_services; this
+		# checks the whitelisted endpoint the POS screens call.
+		from foodpos.foodpos.api.food_pos import update_table_status
 
-			res2 = update_table_status("Table 1", "Available")
-			self.assertTrue(res2.get("success"))
-			status2 = frappe.db.get_value("Restaurant Table", "Table 1", "status")
-			self.assertEqual(status2, "Available")
+		from foodpos.foodpos.single_branch import SINGLE_BRANCH
+
+		if not frappe.db.exists("Branch", SINGLE_BRANCH):
+			frappe.get_doc({"doctype": "Branch", "branch": SINGLE_BRANCH}).insert(ignore_permissions=True)
+		table = frappe.get_doc({
+			"doctype": "Restaurant Table", "branch": SINGLE_BRANCH, "table_no": "API-TEST-T1",
+			"section": "Test Floor", "capacity": 2, "status": "Available", "disabled": 0,
+		})
+		table.flags.ignore_permissions = True
+		table.insert()
+
+		self.assertTrue(update_table_status(table_name=table.name, status="Occupied")["success"])
+		self.assertEqual(frappe.db.get_value("Restaurant Table", table.name, "status"), "Occupied")
+		self.assertTrue(update_table_status(table_name=table.name, status="Available")["success"])
+		self.assertEqual(frappe.db.get_value("Restaurant Table", table.name, "status"), "Available")
 
 	def test_draft_tabs_workflow(self):
 		from foodpos.foodpos.page.food_pos.food_pos import (
@@ -120,19 +128,16 @@ class TestFoodPosAPI(FrappeTestCase):
 		self.assertIsInstance(res, list)
 
 	def test_create_opening_voucher(self):
-		from foodpos.foodpos.page.food_pos.food_pos import create_opening_voucher
-		# Verify signature and execution
-		pass
+		from foodpos.foodpos.api.food_pos import create_opening_voucher
+		self.assertTrue(callable(create_opening_voucher))
 
 	def test_get_shift_closing_details(self):
-		from foodpos.foodpos.page.food_pos.food_pos import get_shift_closing_details
-		# Verify signature and execution
-		pass
+		from foodpos.foodpos.api.food_pos import get_shift_closing_details
+		self.assertTrue(callable(get_shift_closing_details))
 
 	def test_create_and_submit_pos_closing_entry(self):
-		from foodpos.foodpos.page.food_pos.food_pos import create_and_submit_pos_closing_entry
-		# Verify signature and execution
-		pass
+		from foodpos.foodpos.api.food_pos import create_and_submit_pos_closing_entry
+		self.assertTrue(callable(create_and_submit_pos_closing_entry))
 
 	# ── Dashboard / reports ────────────────────────────────────────────────────
 

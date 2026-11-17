@@ -401,12 +401,6 @@ foodpos.FoodPOS.Controller = class {
 			this.start_kitchen_polling();
 			this.load_recent_orders();
 
-			// Auto-reconcile existing unpaid POS invoices in background
-			frappe.call({
-				method: "foodpos.foodpos.page.food_pos.food_pos.settle_unpaid_pos_invoices",
-				args: { pos_profile: this.pos_profile },
-				freeze: false,
-			});
 		} catch (err) {
 			console.error("Error loading POS profile:", err);
 			// Offline fallback

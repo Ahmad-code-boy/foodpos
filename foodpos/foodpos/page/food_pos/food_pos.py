@@ -19,6 +19,9 @@ from frappe.utils.password import get_decrypted_password
 # v2 single branch: one branch only. The old branch columns/fields are
 # kept for existing data, but nothing in v2 selects, filters, names or
 # PIN-scopes by branch any more.
+from foodpos.foodpos.services.access import require_pos_access, require_pos_manager
+from foodpos.foodpos.services.opening import open_shift
+from foodpos.foodpos.services.tables import broadcast, set_table_fields, set_table_status
 from foodpos.foodpos.single_branch import SINGLE_BRANCH, SINGLE_NAMING_SERIES, normalise_order_type
 
 
@@ -48,55 +51,6 @@ def _format_time_hh_mm(val):
 	return s
 
 
-# v7.1: on-demand Custom Field ensure. The v0.1.0 / v0.3.0 migrate patches
-# never ran on some live sites (pos.local evidence: no custom_branch column,
-# no seed tables after a "successful" migrate), so the has_field() guards
-# below silently skipped storing order type / table / day times — a Dine-In
-# order then read back as "Takeaway" and saved day times vanished. Creating
-# the fields on demand (same definitions as the patches) heals those sites
-# the first time the live path runs; on patched sites this is a no-op.
-def _ensure_custom_fields(dt, defs):
-	"""Create the given Custom Fields on `dt` if any are missing."""
-	try:
-		for field_def in defs:
-			if frappe.db.exists("Custom Field", {"dt": dt, "fieldname": field_def["fieldname"]}):
-				continue
-			cf = frappe.get_doc({"doctype": "Custom Field", "dt": dt, **field_def})
-			cf.flags.ignore_permissions = True
-			cf.insert()
-		frappe.db.commit()
-	except Exception:
-		frappe.db.rollback()
-
-
-def _ensure_invoice_custom_fields(doctype):
-	"""Ensure the FoodPOS invoice fields exist on an invoice doctype.
-
-	Same definitions as patch v0.1.0, except custom_order_type also allows
-	"Walk In" (v5.8 added that order type to the KOT/Held Order but the
-	invoice field options were never updated).
-	"""
-	_ensure_custom_fields(doctype, (
-		{"fieldname": "custom_order_type", "label": "Order Type", "fieldtype": "Select",
-		 "options": "Walk In\nDine In\nTakeaway\nDelivery", "insert_after": "is_pos"},
-		{"fieldname": "custom_table", "label": "Table", "fieldtype": "Data",
-		 "insert_after": "custom_order_type"},
-		{"fieldname": "custom_order_note", "label": "Order Note", "fieldtype": "Small Text",
-		 "insert_after": "custom_table"},
-	))
-
-
-def _ensure_day_time_fields():
-	"""Ensure the Day Start/End time fields exist on POS Opening Entry
-	(same definitions as patch v0.3.0)."""
-	_ensure_custom_fields("POS Opening Entry", (
-		{"fieldname": "custom_fpos_day_start_time", "label": "Day Start Time",
-		 "fieldtype": "Time", "insert_after": "period_start_date"},
-		{"fieldname": "custom_fpos_day_end_time", "label": "Day End Time",
-		 "fieldtype": "Time", "insert_after": "custom_fpos_day_start_time"},
-	))
-
-
 # ──────────────────────────────────────────────────────────────────────────────
 # 1. POS Profile & Initialization
 # ──────────────────────────────────────────────────────────────────────────────
@@ -109,6 +63,7 @@ def get_pos_profiles():
 	v2 single branch: Branch User Permissions are no longer applied —
 	there is only one branch, so every profile the user may use is listed.
 	"""
+	require_pos_access()
 	user = frappe.session.user
 	user_profiles = frappe.get_all(
 		"POS Profile User",
@@ -141,13 +96,13 @@ def get_pos_profiles():
 	)
 	for p in profiles:
 		p["branch"] = SINGLE_BRANCH  # v2: fixed; custom_branch is legacy data only.
-		open_shift = frappe.db.get_value(
+		open_shift_name = frappe.db.get_value(
 			"POS Opening Entry",
 			{"pos_profile": p["name"], "docstatus": 1, "pos_closing_entry": ["in", ["", None]], "status": "Open"},
 			"name"
 		)
-		p["has_open_shift"] = 1 if open_shift else 0
-		p["open_shift_name"] = open_shift or ""
+		p["has_open_shift"] = 1 if open_shift_name else 0
+		p["open_shift_name"] = open_shift_name or ""
 
 	# Sort: profiles with active open shifts first, then alphabetically
 	profiles.sort(key=lambda x: (-x.get("has_open_shift", 0), x.get("name", "")))
@@ -157,6 +112,7 @@ def get_pos_profiles():
 @frappe.whitelist()
 def check_opening_entry(user=None, pos_profile=None):
 	"""Return active open POS Opening Entry vouchers for the profile and/or user."""
+	require_pos_access()
 	if not _table_exists("tabPOS Opening Entry"):
 		return []
 
@@ -211,82 +167,9 @@ def check_opening_entry(user=None, pos_profile=None):
 
 @frappe.whitelist()
 def create_opening_voucher(pos_profile, company, balance_details):
-	"""Create and submit a POS Opening Entry with balance details."""
-	if not _table_exists("tabPOS Opening Entry"):
-		return {"name": None, "pos_profile": pos_profile, "company": company}
-
-	if isinstance(balance_details, str):
-		balance_details = json.loads(balance_details)
-
-	# Ensure balance_details has payment modes from profile if empty or partial
-	try:
-		profile_doc = frappe.get_cached_doc("POS Profile", pos_profile)
-		payment_rows = getattr(profile_doc, "payments", []) or []
-		if payment_rows:
-			caller_amounts = {
-				row.get("mode_of_payment"): flt(row.get("opening_amount", 0))
-				for row in (balance_details or [])
-				if row.get("mode_of_payment")
-			}
-			balance_details = [
-				{
-					"mode_of_payment": row.mode_of_payment,
-					"opening_amount": caller_amounts.get(row.mode_of_payment, 0),
-				}
-				for row in payment_rows
-			]
-	except Exception:
-		pass
-
-	if not balance_details:
-		balance_details = [{"mode_of_payment": "Cash", "opening_amount": 0}]
-
-	# Filter out empty rows
-	balance_details = [d for d in balance_details if d.get("mode_of_payment")]
-
-	# Check for ANY existing open entry for this profile
-	existing = check_opening_entry(pos_profile=pos_profile)
-	if existing:
-		entry = existing[0]
-		entry_date = getdate(entry.get("period_start_date"))
-		if entry_date == getdate():
-			return frappe.get_doc("POS Opening Entry", entry.name).as_dict()
-
-	user = frappe.session.user or "Administrator"
-	opening_user = user
-	# Check if current user is already assigned to another open POS profile
-	active_user_ope = frappe.db.get_value(
-		"POS Opening Entry",
-		{"user": opening_user, "status": "Open", "docstatus": 1, "pos_profile": ["!=", pos_profile]},
-		"name"
-	)
-	if active_user_ope:
-		profile_users = frappe.get_all("POS Profile User", filters={"parent": pos_profile}, pluck="user")
-		for candidate in profile_users:
-			if candidate != user:
-				candidate_busy = frappe.db.get_value(
-					"POS Opening Entry",
-					{"user": candidate, "status": "Open", "docstatus": 1},
-					"name"
-				)
-				if not candidate_busy:
-					opening_user = candidate
-					break
-
-	new_opening = frappe.get_doc({
-		"doctype": "POS Opening Entry",
-		"period_start_date": now_datetime().replace(microsecond=0),
-		"posting_date": getdate(),
-		"user": opening_user,
-		"pos_profile": pos_profile,
-		"company": company,
-	})
-	new_opening.set("balance_details", balance_details)
-	new_opening.flags.ignore_permissions = True
-	new_opening.insert()
-	new_opening.submit()
-	frappe.db.commit()
-	return new_opening.as_dict()
+	"""Open (or return today's open) POS Opening Entry for the profile."""
+	require_pos_access()
+	return open_shift(pos_profile, company, balance_details)
 
 
 def _get_default_pos_profile_for_user(user=None):
@@ -308,6 +191,7 @@ def get_pos_profile_data(pos_profile=None):
 	Fetch comprehensive POS profile configuration in a single call.
 	Includes tax templates, payment methods, currency, and default customer.
 	"""
+	require_pos_access()
 	if not pos_profile:
 		pos_profile = _get_default_pos_profile_for_user()
 
@@ -410,6 +294,7 @@ def get_items(pos_profile=None, item_group=None, search_term=None, start=0, page
 	Fetch items with pricing, actual stock quantity, and dietary tags.
 	Optimized for client-side caching & instant touch interactions.
 	"""
+	require_pos_access()
 	if not pos_profile:
 		pos_profile = _get_default_pos_profile_for_user()
 	if not pos_profile:
@@ -531,6 +416,7 @@ def get_available_tables(section=None, branch=None, pos_profile=None):
 	v2 single branch: the `branch` argument is accepted for backward
 	compatibility and ignored — all tables of the one branch are returned.
 	"""
+	require_pos_access()
 	if not frappe.db.exists("DocType", "Restaurant Table"):
 		return []
 
@@ -546,22 +432,7 @@ def get_available_tables(section=None, branch=None, pos_profile=None):
 			order_by="table_no asc, name asc"
 		)
 
-	tables = _fetch()
-	# v7.1: top-up, not just zero-fill. The v7.0 seed has 8 tables but the
-	# seed patch only runs on a fresh migrate; a site that already had 6
-	# (pos.local) never got T7/T8 because the old ensure only fired when
-	# the count was 0. _ensure_tables() is idempotent — it creates only
-	# the missing ones — so run it whenever fewer than the 8 seed tables
-	# exist. Never deletes or renumbers existing tables.
-	try:
-		from foodpos.patches.v0_4_0.add_seed_data import SEED_TABLES, _ensure_tables
-		if frappe.db.count("Restaurant Table") < len(SEED_TABLES):
-			_ensure_tables()
-			frappe.db.commit()
-			tables = _fetch()
-	except Exception:
-		pass
-	return tables
+	return _fetch()
 
 
 @frappe.whitelist()
@@ -570,6 +441,7 @@ def force_free_table(table, manager_pin, reason=None):
 	Manager override to emergency force-free an occupied table to prevent checkout deadlocks.
 	Validated with Manager PIN and logged to Food POS Audit Log.
 	"""
+	require_pos_access()
 	if not table:
 		frappe.throw(_("Table is required."))
 
@@ -581,29 +453,7 @@ def force_free_table(table, manager_pin, reason=None):
 		details=f"Emergency table free for {table}. Reason: {reason or 'Manager override'}"
 	)
 
-	frappe.db.set_value(
-		"Restaurant Table",
-		table,
-		{
-			"status": "Available",
-			"order_id": None,
-			"occupied_since": None,
-			"guests": 0,
-		}
-	)
-	frappe.db.commit()
-
-	frappe.publish_realtime(
-		"fpos_table_status_changed",
-		{
-			"table": table,
-			"status": "Available",
-			"order_id": None,
-			"occupied_since": None,
-		}
-	)
-
-	return {"success": True, "table": table, "status": "Available"}
+	return set_table_status(table, "Available", {"order_id": None, "occupied_since": None, "guests": 0})
 
 
 @frappe.whitelist()
@@ -611,6 +461,7 @@ def transfer_table(from_table, to_table, manager_pin=None, reason=None):
 	"""
 	Transfer an active order from one table to another.
 	"""
+	require_pos_access()
 	if not from_table or not to_table:
 		frappe.throw(_("Both source and destination tables are required."))
 
@@ -650,45 +501,17 @@ def transfer_table(from_table, to_table, manager_pin=None, reason=None):
 	from_doc.guests = 0
 	from_doc.save()
 
-	frappe.db.commit()
-
-	frappe.publish_realtime("fpos_table_status_changed", {"table": from_table, "status": "Available", "order_id": None, "occupied_since": None})
-	frappe.publish_realtime("fpos_table_status_changed", {"table": to_table, "status": "Occupied", "order_id": order_id, "occupied_since": occupied_since})
+	broadcast(from_doc)
+	broadcast(to_doc)
 
 	return {"success": True, "from_table": from_table, "to_table": to_table}
 
 
 @frappe.whitelist()
 def update_table_status(table, status):
-	"""
-	Update a restaurant table's status and broadcast via Frappe Realtime
-	so all connected cashiers and POS stations receive dynamic updates.
-	"""
-	if table and frappe.db.exists("Restaurant Table", table):
-		updates = {"status": status}
-		if status in ("Available", "Free"):
-			updates["status"] = "Available"
-			updates["order_id"] = None
-			updates["occupied_since"] = None
-		elif status == "Occupied":
-			if not frappe.db.get_value("Restaurant Table", table, "occupied_since"):
-				updates["occupied_since"] = now_datetime()
-
-		frappe.db.set_value("Restaurant Table", table, updates)
-		frappe.db.commit()
-
-		frappe.publish_realtime(
-			"fpos_table_status_changed",
-			{
-				"table": table,
-				"status": updates["status"],
-				"order_id": updates.get("order_id"),
-				"occupied_since": updates.get("occupied_since"),
-			}
-		)
-		return {"success": True, "table": table, "status": updates["status"]}
-
-	return {"success": False, "message": _("Table {0} not found").format(table)}
+	"""Update a restaurant table's status and broadcast it to all POS screens."""
+	require_pos_access()
+	return set_table_status(table, status)
 
 
 @frappe.whitelist()
@@ -702,6 +525,7 @@ def verify_manager_pin(pin, action_type, branch=None, cashier=None, order_id=Non
 	  - table_reset
 	Upon successful validation, creates a persistent audit log in Food POS Audit Log.
 	"""
+	require_pos_access()
 	if not pin:
 		frappe.throw(_("Manager PIN is required."))
 
@@ -813,6 +637,7 @@ def verify_manager_pin(pin, action_type, branch=None, cashier=None, order_id=Non
 @frappe.whitelist()
 def get_customers(search_term=""):
 	"""Search customers by name, mobile, or email."""
+	require_pos_access()
 	filters = []
 	if search_term:
 		filters = [
@@ -830,6 +655,7 @@ def get_customers(search_term=""):
 @frappe.whitelist()
 def create_customer(customer_name, mobile_no=None, email_id=None):
 	"""Quick creation of a new customer from the POS cart."""
+	require_pos_access()
 	if not customer_name:
 		frappe.throw(_("Customer Name is required."))
 
@@ -846,9 +672,7 @@ def create_customer(customer_name, mobile_no=None, email_id=None):
 	if email_id:
 		cust.email_id = email_id
 
-	cust.flags.ignore_permissions = True
 	cust.insert()
-	frappe.db.commit()
 
 	return {
 		"name": cust.name,
@@ -1167,11 +991,16 @@ def _link_kots_to_invoice(inv, order_data, branch_val, pos_profile_name, order_t
 			if not (pos_order_id and other_order and str(other_order) == pos_order_id):
 				frappe.log_error(f"Invoice {inv.name} already linked to KOT {existing_kot} from another order, skipping duplicate link", "Food POS KOT Link Guard")
 				continue
-		frappe.db.set_value(
-			"Food KOT", k_name,
-			{"status": "Served", "sales_invoice": inv.name, "is_settled": 1, "docstatus": 1},
-			update_modified=False,
-		)
+		# Link and submit through the KOT controller. Submitting runs on_submit,
+		# which only accepts a Served KOT, so the ledger lock is enforced.
+		kot = frappe.get_doc("Food KOT", k_name)
+		kot.status = "Served"
+		kot.sales_invoice = inv.name
+		kot.is_settled = 1
+		kot.flags.ignore_permissions = True  # system link made while settling the invoice
+		kot.save()
+		if kot.docstatus == 0:
+			kot.submit()
 		linked_names.append(k_name)
 		try:
 			audit = frappe.new_doc("Food POS Audit Log")
@@ -1194,6 +1023,7 @@ def _link_kots_to_invoice(inv, order_data, branch_val, pos_profile_name, order_t
 
 @frappe.whitelist()
 def _get_item_station(item, branch_val):
+	require_pos_access()
 	txt = (str(item.get("item_name", "")) + " " + str(item.get("item_code", "")) + " " + str(item.get("item_group", ""))).lower()
 	if "pizza" in txt:
 		base_station = "Pizza"
@@ -1254,6 +1084,7 @@ def create_kot(order_data):
 	without requiring payment settlement. Automatically marks the assigned table as
 	Occupied for Dine-In orders.
 	"""
+	require_pos_access()
 	if isinstance(order_data, str):
 		order_data = json.loads(order_data)
 
@@ -1317,7 +1148,6 @@ def create_kot(order_data):
 						})
 						_added = True
 				if _added:
-					reused.flags.ignore_permissions = True
 					reused.save()
 				reused_kot_names.add(reused.name)
 				created_kots.append(reused)
@@ -1345,7 +1175,6 @@ def create_kot(order_data):
 				"is_done": 0
 			})
 
-		kot.flags.ignore_permissions = True
 		kot.save()
 		created_kots.append(kot)
 
@@ -1359,16 +1188,12 @@ def create_kot(order_data):
 		# v7.2: compute the timer start once — the publish below must
 		# carry the SAME value the DB just stored.
 		new_since = existing_since if existing_status == "Occupied" and existing_since else now_datetime()
-		frappe.db.set_value(
-			"Restaurant Table",
-			table_no,
-			{
+		set_table_fields(table_no, {
 				"status": "Occupied",
 				"order_id": primary_kot,
 				"occupied_since": new_since,
 				"guests": cint(order_data.get("guests", 1))
-			}
-		)
+			})
 		frappe.publish_realtime(
 			"fpos_table_status_changed",
 			{
@@ -1376,8 +1201,9 @@ def create_kot(order_data):
 				"status": "Occupied",
 				"order_id": primary_kot,
 				"occupied_since": str(new_since),
-			}
-		)
+			},
+		after_commit=True,
+	)
 
 	for kot_doc in created_kots:
 		if kot_doc.name in reused_kot_names:
@@ -1395,7 +1221,6 @@ def create_kot(order_data):
 		except Exception:
 			pass
 
-	frappe.db.commit()
 	kot_names = [k.name for k in created_kots]
 	return {
 		"success": True,
@@ -1412,112 +1237,11 @@ def create_kot(order_data):
 # 6. Invoicing & Checkout (POS Invoice / Sales Invoice)
 # ──────────────────────────────────────────────────────────────────────────────
 
-def _close_stale_opening_entry(entry_name):
-	"""
-	Close a stale (previous-day) POS Opening Entry so it no longer blocks
-	new invoice submissions via ERPNext's date validation.
-	"""
-	try:
-		if _table_exists("tabPOS Closing Entry"):
-			oe = frappe.get_doc("POS Opening Entry", entry_name)
-			create_and_submit_pos_closing_entry(
-				pos_profile=oe.pos_profile,
-				pos_opening_entry=entry_name,
-				payments=[],
-				closing_notes=_("Auto-closed stale shift from previous date.")
-			)
-		else:
-			frappe.db.set_value("POS Opening Entry", entry_name, "status", "Closed", update_modified=False)
-			frappe.db.commit()
-	except Exception:
-		frappe.log_error(frappe.get_traceback(), f"Auto-close stale POS Opening Entry failed: {entry_name}")
-		try:
-			frappe.db.set_value("POS Opening Entry", entry_name, "status", "Closed", update_modified=False)
-			frappe.db.commit()
-		except Exception:
-			pass
 
 
 def _get_or_create_pos_opening_entry(pos_profile, company):
-	"""
-	Ensure an open POS Opening Entry exists for this POS Profile.
-	If an existing entry is from a previous day (stale), auto-close it and
-	create a fresh one for today so ERPNext's date validation never blocks
-	invoice submission.
-	Handles multi-user cashier assignments without conflict.
-	"""
-	if not _table_exists("tabPOS Opening Entry"):
-		return None
-
-	user = frappe.session.user or "Administrator"
-	today = getdate()
-
-	# Check if an open entry already exists for this profile
-	open_entries = frappe.db.get_all(
-		"POS Opening Entry",
-		filters={"pos_profile": pos_profile, "docstatus": 1, "status": "Open"},
-		fields=["name", "user", "period_start_date"],
-		order_by="period_start_date desc",
-	)
-	if open_entries:
-		return open_entries[0].name
-
-	# If user is currently assigned to another open POS profile, pick an unassigned user for this profile
-	opening_user = user
-	active_user_ope = frappe.db.get_value(
-		"POS Opening Entry",
-		{"user": opening_user, "status": "Open", "docstatus": 1, "pos_profile": ["!=", pos_profile]},
-		"name"
-	)
-	if active_user_ope:
-		profile_users = frappe.get_all("POS Profile User", filters={"parent": pos_profile}, pluck="user")
-		assigned_user = None
-		for candidate in profile_users:
-			if candidate != opening_user:
-				candidate_busy = frappe.db.get_value(
-					"POS Opening Entry",
-					{"user": candidate, "status": "Open", "docstatus": 1},
-					"name"
-				)
-				if not candidate_busy:
-					assigned_user = candidate
-					break
-		if assigned_user:
-			opening_user = assigned_user
-
-	# Create a fresh POS Opening Entry for today
-	try:
-		profile_doc = frappe.get_cached_doc("POS Profile", pos_profile)
-		balance_details = []
-		for row in (getattr(profile_doc, "payments", []) or []):
-			balance_details.append({
-				"mode_of_payment": row.mode_of_payment,
-				"opening_amount": 0.0,
-			})
-		if not balance_details:
-			balance_details = [{"mode_of_payment": "Cash", "opening_amount": 0.0}]
-
-		opening = frappe.get_doc({
-			"doctype": "POS Opening Entry",
-			"period_start_date": now_datetime(),
-			"posting_date": today,
-			"user": opening_user,
-			"pos_profile": pos_profile,
-			"company": company,
-			"balance_details": balance_details,
-		})
-		opening.flags.ignore_permissions = True
-		opening.insert()
-		opening.submit()
-		frappe.db.commit()
-		return opening.name
-	except Exception:
-		frappe.log_error(frappe.get_traceback(), f"Auto-create POS Opening Entry failed for {pos_profile}")
-		if hasattr(frappe, "clear_messages"):
-			frappe.clear_messages()
-		if hasattr(frappe.local, "message_log"):
-			frappe.local.message_log = []
-		return None
+	"""Name of today's open shift for the profile; opens one if needed. Raises on failure."""
+	return open_shift(pos_profile, company, None)["name"]
 
 
 def get_pos_invoice_doctype():
@@ -1542,6 +1266,7 @@ def submit_pos_invoice(order_data, payments):
 	Generate, calculate taxes, and submit an ERPNext POS Invoice (or Sales Invoice fallback).
 	Frees up the table into Available status and cancels pending KOTs.
 	"""
+	require_pos_access()
 	if isinstance(order_data, str):
 		order_data = json.loads(order_data)
 	if isinstance(payments, str):
@@ -1553,12 +1278,6 @@ def submit_pos_invoice(order_data, payments):
 
 	# Determine doctype dynamically from POS Settings
 	inv_doctype = get_pos_invoice_doctype()
-
-	# v7.1: heal the invoice fields first (see _ensure_invoice_custom_fields).
-	# On sites whose v0.1.0 patch never ran, custom_order_type/custom_table
-	# do not exist, so the has_field() guards below silently skipped storing
-	# them — a Dine-In order then read back as "Takeaway" everywhere.
-	_ensure_invoice_custom_fields(inv_doctype)
 
 	company = profile_data["company"]
 	raw_cust = order_data.get("customer") or order_data.get("customer_name")
@@ -1706,7 +1425,6 @@ def submit_pos_invoice(order_data, payments):
 			doc.discount_amount = disc_amt
 
 		# First set missing values & calculate totals before populating payments
-		doc.flags.ignore_permissions = True
 		doc.set_missing_values(for_validate=True)
 		doc.calculate_taxes_and_totals()
 
@@ -1813,10 +1531,7 @@ def submit_pos_invoice(order_data, payments):
 				resolved_table = matched
 
 	if resolved_table:
-		frappe.db.set_value(
-			"Restaurant Table",
-			resolved_table,
-			{
+		set_table_fields(resolved_table, {
 				"status": "Available",
 				"order_id": None,
 				"occupied_since": None,
@@ -1824,8 +1539,7 @@ def submit_pos_invoice(order_data, payments):
 				# sets guests: 0, but the settle path did not, so an Available
 				# table kept showing "Guests: 1" after payment.
 				"guests": 0,
-			}
-		)
+			})
 		frappe.publish_realtime(
 			"fpos_table_status_changed",
 			{
@@ -1833,8 +1547,9 @@ def submit_pos_invoice(order_data, payments):
 				"status": "Available",
 				"order_id": None,
 				"occupied_since": None,
-			}
-		)
+			},
+		after_commit=True,
+	)
 
 	# Link and reconcile KOTs with this settled invoice — Round 23 fix.
 	# ONLY this order's KOTs (matched by order_id, items checked). The old
@@ -1864,7 +1579,6 @@ def submit_pos_invoice(order_data, payments):
 	except Exception as e:
 		frappe.log_error(f"Audit log failed for order settlement: {e}", "Food POS Audit Log")
 
-	frappe.db.commit()
 
 	slip_items = []
 	for it in getattr(inv, "items", []):
@@ -1926,6 +1640,7 @@ def save_draft_order(order_data=None):
 	Guarantees no phantom draft Sales Invoices or POS Invoices are written to database
 	on cart edits, item additions, or order type switches.
 	"""
+	require_pos_access()
 	return {
 		"success": True,
 		"draft_invoice_name": None,
@@ -1939,6 +1654,7 @@ def get_active_draft_tabs(pos_profile=None):
 	Retrieve all draft POS or Sales Invoices (docstatus = 0) for active cashier / POS Profile.
 	Returns detailed tab structures including items, customer, table, and order type.
 	"""
+	require_pos_access()
 	inv_doctype = get_pos_invoice_doctype()
 	if not _table_exists(f"tab{inv_doctype}"):
 		return []
@@ -1988,6 +1704,7 @@ def discard_draft_order(invoice_name, table=None):
 	Discard a draft POS or Sales Invoice, free its table if no other active orders exist,
 	and notify connected clients.
 	"""
+	require_pos_access()
 	if not invoice_name:
 		return {"success": False, "message": "No invoice specified"}
 
@@ -1997,7 +1714,7 @@ def discard_draft_order(invoice_name, table=None):
 			if not table and hasattr(inv, "custom_table"):
 				table = inv.custom_table
 			if inv.docstatus == 0:
-				frappe.delete_doc(dt, invoice_name, ignore_permissions=True)
+				frappe.delete_doc(dt, invoice_name)
 			break
 
 	if table and frappe.db.exists("Restaurant Table", table):
@@ -2027,15 +1744,11 @@ def discard_draft_order(invoice_name, table=None):
 			)
 
 		if not other_drafts and not other_kots:
-			frappe.db.set_value(
-				"Restaurant Table",
-				table,
-				{
+			set_table_fields(table, {
 					"status": "Available",
 					"order_id": None,
 					"occupied_since": None,
-				}
-			)
+				})
 			frappe.publish_realtime(
 				"fpos_table_status_changed",
 				{
@@ -2043,83 +1756,75 @@ def discard_draft_order(invoice_name, table=None):
 					"status": "Available",
 					"order_id": None,
 					"occupied_since": None,
-				}
-			)
+				},
+			after_commit=True,
+		)
 
-	frappe.db.commit()
 	return {"success": True}
 
 
-@frappe.whitelist()
-def settle_unpaid_pos_invoices(pos_profile=None):
-	"""
-	Reconcile submitted POS Sales Invoices that are currently marked 'Unpaid'
-	and update their status and outstanding amount to 'Paid'.
-	"""
-	conds = ["docstatus = 1", "is_pos = 1", "(status = 'Unpaid' OR outstanding_amount > 0)"]
-	params = {}
+def _unpaid_pos_invoice_rows(pos_profile=None):
+	filters = {"docstatus": 1, "is_pos": 1, "outstanding_amount": [">", 0]}
 	if pos_profile:
-		conds.append("pos_profile = %(p)s")
-		params["p"] = pos_profile
-
-	invoices = frappe.db.sql(
-		f"""
-		SELECT name, company, grand_total, base_grand_total, paid_amount, pos_profile
-		FROM `tabSales Invoice`
-		WHERE {' AND '.join(conds)}
-		""",
-		params,
-		as_dict=True
+		filters["pos_profile"] = pos_profile
+	return frappe.get_all(
+		"Sales Invoice",
+		filters=filters,
+		fields=["name", "customer", "posting_date", "company", "grand_total", "outstanding_amount"],
+		order_by="posting_date asc, name asc",
 	)
 
-	updated = []
-	for inv in invoices:
+
+@frappe.whitelist()
+def get_unpaid_pos_invoices(pos_profile=None):
+	"""Read-only: POS invoices with an outstanding balance."""
+	require_pos_access()
+	return _unpaid_pos_invoice_rows(pos_profile)
+
+
+@frappe.whitelist()
+def settle_unpaid_pos_invoices(pos_profile=None, invoices=None):
+	"""Manager action: record a Cash Payment Entry for each outstanding POS invoice.
+
+	Uses ERPNext's Payment Entry flow, so the receipt posts to the ledger.
+	Each invoice runs in its own savepoint; a failed invoice is rolled back and
+	reported without affecting the others.
+	"""
+	require_pos_access()
+	require_pos_manager()
+	from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
+
+	if isinstance(invoices, str):
+		invoices = frappe.parse_json(invoices)
+	rows = _unpaid_pos_invoice_rows(pos_profile)
+	if invoices:
+		wanted = set(invoices)
+		rows = [r for r in rows if r.name in wanted]
+
+	settled, failed = [], []
+	for row in rows:
+		savepoint = "settle_unpaid_pos"
+		frappe.db.savepoint(savepoint)
 		try:
-			company = inv.company
-			default_cash = frappe.get_cached_value("Company", company, "default_cash_account")
-
-			existing_payments = frappe.db.get_all(
-				"Sales Invoice Payment",
-				filters={"parent": inv.name},
-				fields=["name", "mode_of_payment", "amount", "account"]
-			)
-			if not existing_payments:
-				frappe.db.sql(
-					"""
-					INSERT INTO `tabSales Invoice Payment`
-					(name, parent, parenttype, parentfield, mode_of_payment, amount, base_amount, account, idx)
-					VALUES (%(name)s, %(parent)s, 'Sales Invoice', 'payments', 'Cash', %(amt)s, %(amt)s, %(acc)s, 1)
-					""",
-					{
-						"name": frappe.generate_hash(length=10),
-						"parent": inv.name,
-						"amt": inv.grand_total,
-						"acc": default_cash
-					}
-				)
-			else:
-				for p in existing_payments:
-					if not p.account:
-						acc = frappe.db.get_value("Mode of Payment Account", {"parent": p.mode_of_payment, "company": company}, "default_account") or default_cash
-						frappe.db.set_value("Sales Invoice Payment", p.name, "account", acc)
-
-			frappe.db.set_value(
+			cash_account = frappe.get_cached_value("Company", row.company, "default_cash_account")
+			if not cash_account:
+				frappe.throw(_("Company {0} has no default cash account.").format(row.company))
+			payment = get_payment_entry(
 				"Sales Invoice",
-				inv.name,
-				{
-					"paid_amount": inv.grand_total,
-					"base_paid_amount": inv.base_grand_total,
-					"outstanding_amount": 0.0,
-					"status": "Paid",
-				},
-				update_modified=False
+				row.name,
+				party_amount=row.outstanding_amount,
+				bank_account=cash_account,
 			)
-			updated.append(inv.name)
-		except Exception as e:
-			frappe.log_error(frappe.get_traceback(), f"Failed to settle unpaid invoice {inv.name}")
+			payment.mode_of_payment = "Cash"
+			payment.insert()
+			payment.submit()
+			settled.append({"invoice": row.name, "payment_entry": payment.name})
+		except Exception:
+			frappe.db.rollback(save_point=savepoint)
+			frappe.log_error(frappe.get_traceback(), f"Failed to settle unpaid POS invoice {row.name}")
+			failed.append(row.name)
 
-	frappe.db.commit()
-	return {"updated_count": len(updated), "invoices": updated}
+	return {"settled": settled, "failed": failed}
 
 
 @frappe.whitelist()
@@ -2128,6 +1833,7 @@ def get_shift_closing_details(pos_profile=None, pos_opening_entry=None):
 	Returns complete shift summary, invoices, taxes, and payment reconciliation
 	for closing the current active POS Opening Entry in Frappe/ERPNext v16.
 	"""
+	require_pos_access()
 	user = frappe.session.user or "Administrator"
 	pos_profile_name = pos_profile or _get_default_pos_profile_for_user(user)
 	profile_data = get_pos_profile_data(pos_profile_name) if pos_profile_name else {}
@@ -2408,6 +2114,7 @@ def get_shift_closing_details(pos_profile=None, pos_opening_entry=None):
 @frappe.whitelist()
 def get_today_closing_details(pos_profile=None, pos_opening_entry=None):
 	"""Compatibility alias for get_shift_closing_details."""
+	require_pos_access()
 	return get_shift_closing_details(pos_profile=pos_profile, pos_opening_entry=pos_opening_entry)
 
 
@@ -2421,12 +2128,11 @@ def create_and_submit_pos_closing_entry(pos_profile, pos_opening_entry, payments
 	  - Posts General Ledger accounting transactions
 	  - Marks POS Opening Entry status as Closed
 	"""
+	require_pos_access()
 	if not _table_exists("tabPOS Closing Entry"):
-		# Fallback if POS Closing Entry doctype does not exist
-		if _table_exists("tabPOS Opening Entry") and pos_opening_entry:
-			frappe.db.set_value("POS Opening Entry", pos_opening_entry, "status", "Closed", update_modified=False)
-			frappe.db.commit()
-		return {"success": True, "message": _("Shift closed (POS Closing Entry doctype not installed).")}
+		# Without the POS Closing Entry DocType there is no reconciled closing
+		# document, so the shift must not be marked closed silently.
+		frappe.throw(_("POS Closing Entry is not installed on this site. The shift was not closed."))
 
 	if not pos_opening_entry:
 		frappe.throw(_("POS Opening Entry is required to close a shift."))
@@ -2675,7 +2381,6 @@ def create_and_submit_pos_closing_entry(pos_profile, pos_opening_entry, payments
 	closing.__dict__["pos_transactions"] = closing.sales_invoices if inv_doctype == "Sales Invoice" else closing.pos_invoices
 
 	# 6. Insert and Submit
-	closing.flags.ignore_permissions = True
 	closing.insert()
 	closing.submit()
 
@@ -2695,7 +2400,6 @@ def create_and_submit_pos_closing_entry(pos_profile, pos_opening_entry, payments
 			"pos_closing_entry": closing.name,
 		}, update_modified=False)
 
-	frappe.db.commit()
 
 	return {
 		"success": True,
@@ -2752,6 +2456,7 @@ def sync_offline_invoices(invoices):
 	Bulk-processes invoices queued in localStorage while the POS was offline.
 	Guarantees background failures do not surface intrusive popup modals in desk.
 	"""
+	require_pos_access()
 	if isinstance(invoices, str):
 		invoices = json.loads(invoices)
 
@@ -2811,6 +2516,7 @@ def get_recent_pos_orders(pos_profile=None, branch=None, limit=15):
 	Allows restaurant cashiers to review, view slip, or reload/edit in the cart.
 	Resilient to pos_profile name or active shift opening. (v2: no branch.)
 	"""
+	require_pos_access()
 	limit = cint(limit) or 15
 	user = frappe.session.user
 
@@ -2932,6 +2638,7 @@ def get_recent_pos_orders(pos_profile=None, branch=None, limit=15):
 @frappe.whitelist()
 def get_invoice_slip_data(invoice_name, doctype=None):
 	"""Return comprehensive invoice and payment data for printing customer POS slip."""
+	require_pos_access()
 	if not doctype:
 		doctype = "POS Invoice" if frappe.db.exists("POS Invoice", invoice_name) else "Sales Invoice"
 
@@ -3018,6 +2725,7 @@ def get_active_kitchen_kots(pos_profile=None, branch=None, station=None):
 	was nowhere to be found). The same function feeds both views, so one
 	fix covers both.
 	"""
+	require_pos_access()
 	filters = {
 		"status": ["in", ["Pending", "In Progress", "Ready", "Served"]],
 		"is_settled": ["in", [0, None]],
@@ -3094,6 +2802,7 @@ def get_kot_for_payment(kot_name):
 	cart. Rates come from the profile's selling price list (same source as
 	get_items); Food KOT Item itself stores no rate.
 	"""
+	require_pos_access()
 	if not kot_name or not frappe.db.exists("Food KOT", kot_name):
 		frappe.throw(_("Kitchen ticket {0} not found").format(kot_name))
 	kot = frappe.get_doc("Food KOT", kot_name)
@@ -3149,6 +2858,7 @@ def get_kot_for_payment(kot_name):
 @frappe.whitelist()
 def update_kot_item_done_status(kot_name, item_name=None, is_done=0, row_id=None):
 	"""Update completion flag for individual item in KOT with accurate row resolution."""
+	require_pos_access()
 	is_done = cint(is_done)
 	target_row = None
 	if row_id and frappe.db.exists("Food KOT Item", row_id):
@@ -3162,7 +2872,6 @@ def update_kot_item_done_status(kot_name, item_name=None, is_done=0, row_id=None
 
 	if target_row:
 		frappe.db.set_value("Food KOT Item", target_row, "is_done", is_done, update_modified=True)
-		frappe.db.commit()
 
 	# Recalculate remaining & done count
 	all_items = frappe.get_all("Food KOT Item", filters={"parent": kot_name}, fields=["is_done"])
@@ -3176,16 +2885,12 @@ def update_kot_item_done_status(kot_name, item_name=None, is_done=0, row_id=None
 		new_status = "Ready"
 		kot_doc = frappe.get_doc("Food KOT", kot_name)
 		kot_doc.status = "Ready"
-		kot_doc.flags.ignore_permissions = True
 		kot_doc.save()
-		frappe.db.commit()
 	elif not all_done and current_status == "Ready":
 		new_status = "In Progress"
 		kot_doc = frappe.get_doc("Food KOT", kot_name)
 		kot_doc.status = "In Progress"
-		kot_doc.flags.ignore_permissions = True
 		kot_doc.save()
-		frappe.db.commit()
 
 	return {
 		"success": True,
@@ -3200,6 +2905,7 @@ def update_kot_item_done_status(kot_name, item_name=None, is_done=0, row_id=None
 @frappe.whitelist()
 def update_kot_stage(kot_name, status):
 	"""Update KOT lifecycle status: Pending -> In Progress -> Ready -> Served -> Cancelled."""
+	require_pos_access()
 	allowed = ["Pending", "In Progress", "Ready", "Served", "Cancelled"]
 	if status not in allowed:
 		frappe.throw(_("Invalid KOT status: {0}").format(status))
@@ -3207,7 +2913,6 @@ def update_kot_stage(kot_name, status):
 	old_status = frappe.db.get_value("Food KOT", kot_name, "status")
 	kot_doc = frappe.get_doc("Food KOT", kot_name)
 	kot_doc.status = status
-	kot_doc.flags.ignore_permissions = True
 	if status in ["Ready", "Served"]:
 		for item in kot_doc.items:
 			item.is_done = 1
@@ -3218,7 +2923,6 @@ def update_kot_stage(kot_name, status):
 		kot_doc.cancel()
 	else:
 		kot_doc.save()
-	frappe.db.commit()
 
 	# Audit Log entry for KOT status transition (guaranteed via FoodKOT.on_update or fallback)
 	audit_id = getattr(kot_doc.flags, "audit_log_id", None)
@@ -3233,7 +2937,6 @@ def update_kot_stage(kot_name, status):
 			audit.details = f"Kitchen ticket {kot_name} status updated from {old_status} to {status} ({kot_doc.kitchen_station or 'Kitchen'})"
 			audit.flags.ignore_permissions = True
 			audit.insert()
-			frappe.db.commit()
 			audit_id = audit.name
 		except Exception as e:
 			frappe.log_error(f"Audit log failed for KOT status change: {e}", "Food POS Audit Log")
@@ -3244,18 +2947,21 @@ def update_kot_stage(kot_name, status):
 @frappe.whitelist()
 def get_kitchen_orders(pos_profile=None, branch=None, station=None):
 	"""Alias for get_active_kitchen_kots."""
+	require_pos_access()
 	return get_active_kitchen_kots(pos_profile=pos_profile, branch=branch, station=station)
 
 
 @frappe.whitelist()
 def update_kot_status(kot_name, status):
 	"""Alias for update_kot_stage."""
+	require_pos_access()
 	return update_kot_stage(kot_name=kot_name, status=status)
 
 
 @frappe.whitelist()
 def toggle_kot_item_done(kot_name, item_name=None, is_done=0, row_id=None):
 	"""Alias for update_kot_item_done_status."""
+	require_pos_access()
 	return update_kot_item_done_status(kot_name=kot_name, item_name=item_name, is_done=is_done, row_id=row_id)
 
 
@@ -3265,6 +2971,7 @@ def check_table_has_unsettled_kot(table):
 	Check if a table has any active or served KOT tickets not yet linked to a paid invoice.
 	Used by frontend to prevent clearing orders or vacating occupied tables without settlement or void.
 	"""
+	require_pos_access()
 	if not table:
 		return {"has_kot": False}
 
@@ -3375,6 +3082,7 @@ def get_served_kot_exceptions(branch=None, pos_profile=None):
 	Fetch all Served KOTs that have no linked submitted invoice and no manager void trace.
 	This is the mandatory manager exception list reviewed daily to ensure no food order vanishes.
 	"""
+	require_pos_access()
 	conds = [
 		"k.status = 'Served'",
 		"k.status != 'Cancelled'",
@@ -3478,6 +3186,7 @@ def void_served_kot(kot_name, manager_pin, reason):
 	Requires valid Manager PIN and mandatory reason.
 	Updates KOT with void trace and logs into Food POS Audit Log.
 	"""
+	require_pos_access()
 	if not kot_name or not frappe.db.exists("Food KOT", kot_name):
 		frappe.throw(_("Food KOT {0} not found").format(kot_name))
 
@@ -3507,7 +3216,6 @@ def void_served_kot(kot_name, manager_pin, reason):
 	kot.voided_by = manager_user
 	kot.void_reason = (reason or "").strip()
 	kot.void_timestamp = now_datetime()
-	kot.flags.ignore_permissions = True
 	kot.flags.allow_void_cancel = True
 	if kot.docstatus == 1:
 		kot.cancel()
@@ -3535,7 +3243,6 @@ def void_served_kot(kot_name, manager_pin, reason):
 	audit.flags.ignore_permissions = True
 	audit.insert()
 
-	frappe.db.commit()
 	return {
 		"success": True,
 		"message": _("KOT {0} voided and recorded in Manager Audit Log.").format(kot_name)
@@ -3549,6 +3256,7 @@ def close_pos_opening_entry(pos_profile, pos_opening_entry=None, payments=None, 
 	Called when the cashier clicks 'Finalize Shift & Exit to Desk' to create
 	and submit the POS Closing Entry DocType.
 	"""
+	require_pos_access()
 	if not pos_opening_entry:
 		openings = check_opening_entry(user=frappe.session.user, pos_profile=pos_profile)
 		if openings:
@@ -3575,6 +3283,7 @@ def hold_order(order_data, reason=None):
 	Persistently hold an active order in Food POS Held Order.
 	Frees any associated table so other guests aren't blocked.
 	"""
+	require_pos_access()
 	if isinstance(order_data, str):
 		order_data = json.loads(order_data)
 
@@ -3637,21 +3346,16 @@ def hold_order(order_data, reason=None):
 	order_data["cart_items"] = items
 	order_data["grand_total"] = grand_total_val
 	held.order_data = json.dumps(order_data)
-	held.flags.ignore_permissions = True
 	held.insert()
 
 	# If Dine In table was specified, maintain Occupied status referencing the held order
 	if table_no and frappe.db.exists("Restaurant Table", table_no):
-		frappe.db.set_value(
-			"Restaurant Table",
-			table_no,
-			{
+		set_table_fields(table_no, {
 				"status": "Occupied",
 				"order_id": held.name,
 				"occupied_since": now_datetime(),
-			}
-		)
-		frappe.publish_realtime("fpos_table_status_changed", {"table": table_no, "status": "Occupied", "order_id": held.name, "occupied_since": str(now_datetime())})
+			})
+		frappe.publish_realtime("fpos_table_status_changed", {"table": table_no, "status": "Occupied", "order_id": held.name, "occupied_since": str(now_datetime())}, after_commit=True)
 
 	# Comprehensive Audit Log for Order Held
 	try:
@@ -3669,7 +3373,6 @@ def hold_order(order_data, reason=None):
 	except Exception as e:
 		frappe.log_error(f"Audit log failed for order hold: {e}", "Food POS Audit Log")
 
-	frappe.db.commit()
 	held_count = frappe.db.count("Food POS Held Order", filters={"status": "Held"})  # v2: no branch filter.
 	return {"success": True, "held_order_id": held.name, "held_count": held_count}
 
@@ -3680,6 +3383,7 @@ def get_held_orders(branch=None, pos_profile=None):
 	Fetch all active held orders for the active shift.
 	v2: `branch` is accepted for backward compatibility and ignored.
 	"""
+	require_pos_access()
 	filters = {"status": "Held"}
 	if pos_profile:
 		filters["pos_profile"] = pos_profile
@@ -3699,6 +3403,7 @@ def resume_held_order(held_order_id):
 	Resume a held order, marking it as Resumed and returning the full payload.
 	If order had a table, re-occupies table if available.
 	"""
+	require_pos_access()
 	if not frappe.db.exists("Food POS Held Order", held_order_id):
 		frappe.throw(_("Held Order {0} not found.").format(held_order_id))
 
@@ -3714,8 +3419,8 @@ def resume_held_order(held_order_id):
 			# old code set Occupied without occupied_since, so the floor
 			# showed Reserved with no time running.
 			resume_since = frappe.db.get_value("Restaurant Table", doc.table, "occupied_since") or now_datetime()
-			frappe.db.set_value("Restaurant Table", doc.table, {"status": "Occupied", "occupied_since": resume_since})
-			frappe.publish_realtime("fpos_table_status_changed", {"table": doc.table, "status": "Occupied", "occupied_since": str(resume_since)})
+			set_table_fields(doc.table, {"status": "Occupied", "occupied_since": resume_since})
+			frappe.publish_realtime("fpos_table_status_changed", {"table": doc.table, "status": "Occupied", "occupied_since": str(resume_since)}, after_commit=True)
 			table_status = "Occupied"
 		else:
 			table_status = current_status
@@ -3736,7 +3441,6 @@ def resume_held_order(held_order_id):
 	except Exception as e:
 		frappe.log_error(f"Audit log failed for order resume: {e}", "Food POS Audit Log")
 
-	frappe.db.commit()
 	held_count = frappe.db.count("Food POS Held Order", filters={"status": "Held"})  # v2: no branch filter.
 
 	order_data = json.loads(doc.order_data) if isinstance(doc.order_data, str) else doc.order_data
@@ -3755,6 +3459,7 @@ def discard_held_order(held_order_id, reason=None):
 	Discard a held order.
 	Frees associated table if it was reserved by this held order.
 	"""
+	require_pos_access()
 	if not frappe.db.exists("Food POS Held Order", held_order_id):
 		frappe.throw(_("Held Order {0} not found.").format(held_order_id))
 
@@ -3765,16 +3470,12 @@ def discard_held_order(held_order_id, reason=None):
 	if doc.table and frappe.db.exists("Restaurant Table", doc.table):
 		current_order = frappe.db.get_value("Restaurant Table", doc.table, "order_id")
 		if current_order == held_order_id:
-			frappe.db.set_value(
-				"Restaurant Table",
-				doc.table,
-				{
+			set_table_fields(doc.table, {
 					"status": "Available",
 					"order_id": None,
 					"occupied_since": None,
-				}
-			)
-			frappe.publish_realtime("fpos_table_status_changed", {"table": doc.table, "status": "Available", "order_id": None, "occupied_since": None})
+				})
+			frappe.publish_realtime("fpos_table_status_changed", {"table": doc.table, "status": "Available", "order_id": None, "occupied_since": None}, after_commit=True)
 
 	# Comprehensive Audit Log for Order Discarded
 	try:
@@ -3792,7 +3493,6 @@ def discard_held_order(held_order_id, reason=None):
 	except Exception as e:
 		frappe.log_error(f"Audit log failed for order discard: {e}", "Food POS Audit Log")
 
-	frappe.db.commit()
 	held_count = frappe.db.count("Food POS Held Order", filters={"status": "Held"})  # v2: no branch filter.
 	return {"success": True, "held_count": held_count}
 
@@ -3803,6 +3503,7 @@ def release_table_if_no_order(table):
 	Safely release an abandoned or draft occupied table to Available if it has
 	no active kitchen ticket, no held order, and no draft invoice.
 	"""
+	require_pos_access()
 	if not table or not frappe.db.exists("Restaurant Table", table):
 		return {"success": False, "message": _("Table not found")}
 
@@ -3829,17 +3530,12 @@ def release_table_if_no_order(table):
 	if has_hold:
 		return {"success": False, "message": _("Table has active held order")}
 
-	frappe.db.set_value(
-		"Restaurant Table",
-		table,
-		{
+	set_table_fields(table, {
 			"status": "Available",
 			"order_id": None,
 			"occupied_since": None,
-		}
-	)
-	frappe.db.commit()
-	frappe.publish_realtime("fpos_table_status_changed", {"table": table, "status": "Available", "order_id": None, "occupied_since": None})
+		})
+	frappe.publish_realtime("fpos_table_status_changed", {"table": table, "status": "Available", "order_id": None, "occupied_since": None}, after_commit=True)
 	return {"success": True, "table": table, "status": "Available"}
 
 
@@ -3901,6 +3597,7 @@ def confirm_order(order_data):
 	for the grep proof (no show_pos_slip / print_pos_slip /
 	get_invoice_slip_data call on the confirm path, client or server).
 	"""
+	require_pos_access()
 	if isinstance(order_data, str):
 		order_data = json.loads(order_data)
 
@@ -3939,9 +3636,6 @@ def _day_times_from_opening(opening_name):
 	by patch v0.3.0). Before that patch has run (``bench migrate``), the
 	cache fallback below is used so the home screen still works.
 	"""
-	# v7.1: heal the fields first (see _ensure_day_time_fields) so a site
-	# whose migrate never ran can actually store the times.
-	_ensure_day_time_fields()
 	day_start = day_end = None
 	try:
 		meta = frappe.get_meta("POS Opening Entry")
@@ -3982,6 +3676,7 @@ def get_day_status(pos_profile=None):
 	"""v2 home screen: is the day open, when did it start, what times did
 	the user set? Day Open == an open POS Opening Entry for the profile.
 	"""
+	require_pos_access()
 	openings = []
 	try:
 		openings = check_opening_entry(user=frappe.session.user, pos_profile=pos_profile) or []
@@ -4014,6 +3709,7 @@ def set_day_times(pos_profile=None, day_start_time=None, day_end_time=None):
 	run, in cache for that opening entry. They do NOT close the day by
 	themselves — Day Close still runs the shift-closing / Z-report flow.
 	"""
+	require_pos_access()
 	for label, value in (("Day Start", day_start_time), ("Day End", day_end_time)):
 		if value and not _re.match(r"^([01]\d|2[0-3]):[0-5]\d$", str(value).strip()):
 			frappe.throw(_("{0} time must be HH:MM, e.g. 09:00.").format(label))
@@ -4021,10 +3717,6 @@ def set_day_times(pos_profile=None, day_start_time=None, day_end_time=None):
 	if not openings:
 		frappe.throw(_("Open the day first — there is no open shift to attach times to."))
 	entry_name = openings[0].get("name")
-	# v7.1: heal the fields first so the set_value below can land on sites
-	# whose migrate never ran (otherwise the times only ever lived in
-	# cache, which `bench clear-cache` wipes).
-	_ensure_day_time_fields()
 	stored_in = "cache"
 	try:
 		meta = frappe.get_meta("POS Opening Entry")
@@ -4035,7 +3727,6 @@ def set_day_times(pos_profile=None, day_start_time=None, day_end_time=None):
 			updates["custom_fpos_day_end_time"] = day_end_time
 		if updates:
 			frappe.db.set_value("POS Opening Entry", entry_name, updates)
-			frappe.db.commit()
 			stored_in = "POS Opening Entry"
 	except Exception:
 		pass
@@ -4059,6 +3750,7 @@ def set_day_times(pos_profile=None, day_start_time=None, day_end_time=None):
 @frappe.whitelist()
 def get_staff_attendance(attendance_date=None, pos_profile=None):
 	"""v2: staff attendance rows for one day (default today)."""
+	require_pos_access()
 	date = attendance_date or str(getdate())
 	if not frappe.db.exists("DocType", "Food POS Attendance"):
 		return {"date": date, "rows": [], "note": "Food POS Attendance will appear after bench migrate."}
@@ -4079,6 +3771,7 @@ def mark_staff_attendance(staff_name, action, attendance_date=None, user=None):
 	"""v2: mark attendance inline (no dialog). ``action`` is one of
 	``check_in`` / ``check_out`` / ``absent``. One row per staff per day.
 	"""
+	require_pos_access()
 	staff_name = (staff_name or "").strip()
 	if not staff_name:
 		frappe.throw(_("Staff name is required."))
@@ -4105,7 +3798,6 @@ def mark_staff_attendance(staff_name, action, attendance_date=None, user=None):
 			doc.status = "Absent"
 			doc.flags.ignore_permissions = True
 			doc.insert()
-		frappe.db.commit()
 		return {"success": True, "action": "absent", "staff_name": staff_name, "date": date}
 
 	if existing:
@@ -4128,7 +3820,6 @@ def mark_staff_attendance(staff_name, action, attendance_date=None, user=None):
 			frappe.throw(_("Check-in first — {0} has not checked in today.").format(staff_name))
 		doc.check_out = now_datetime()
 	doc.save()
-	frappe.db.commit()
 	return {
 		"success": True,
 		"action": action,
@@ -4151,6 +3842,7 @@ def get_daily_report(report_date=None, pos_profile=None):
 	after Day Close. All queries are defensive: a missing table returns
 	zeros instead of failing the page.
 	"""
+	require_pos_access()
 	date = report_date or str(getdate())
 	profile_cond = ""
 	params = {"date": date}

@@ -2,46 +2,35 @@
 # License: MIT
 
 import frappe
-from frappe import _
-from frappe.utils import add_days, cint, get_datetime, getdate, now_datetime
+from frappe.utils import add_days, cint, getdate
+
+from foodpos.foodpos.services.tables import set_table_fields
 
 
 def on_pos_invoice_submit(doc, method=None):
 	"""
-	When a POS Invoice (is_pos=1) is submitted upon payment completion,
-	automatically revert the linked table status back to Available/Free
-	and broadcast a realtime event to sync all connected POS terminals.
+	When a POS invoice is submitted (paid), free its table through the table
+	service so every POS screen is updated. The invoice is already committed to
+	the ledger, so a failure here is logged and not raised; the savepoint keeps
+	a failed table write from leaving a partial change.
 	"""
-	# Only act on POS sales
 	if not cint(getattr(doc, "is_pos", 0)):
 		return
 
 	table = getattr(doc, "custom_table", None)
-	if not table:
+	if not table or not frappe.db.exists("Restaurant Table", table):
 		return
 
+	savepoint = "pos_invoice_free_table"
+	frappe.db.savepoint(savepoint)
 	try:
-		if frappe.db.exists("Restaurant Table", table):
-			frappe.db.set_value(
-				"Restaurant Table",
-				table,
-				{
-					"status":         "Available",
-					"order_id":       None,
-					"occupied_since": None,
-				},
-			)
-
-			# Publish realtime event to all connected POS clients
-			frappe.publish_realtime(
-				"fpos_table_status_changed",
-				{
-					"table": table,
-					"status": "Available",
-					"order_id": None,
-				},
-			)
+		set_table_fields(
+			table,
+			{"status": "Available", "order_id": None, "occupied_since": None},
+			ignore_permissions=True,
+		)
 	except Exception:
+		frappe.db.rollback(save_point=savepoint)
 		frappe.log_error(frappe.get_traceback(), "FoodPOS: on_pos_invoice_submit hook error")
 
 
@@ -80,18 +69,17 @@ def auto_clear_served_kots():
 			pluck="name",
 		)
 		for kot in orphan_kots:
+			savepoint = "auto_cancel_orphan_kot"
+			frappe.db.savepoint(savepoint)
 			try:
-				# Round 23 fix: cancel through the document (validate() runs)
-				# instead of db.set_value, which bypasses all guards.
+				# Cancel through the document so validate() runs.
 				doc = frappe.get_doc("Food KOT", kot)
 				doc.status = "Cancelled"
 				doc.flags.ignore_permissions = True
 				doc.save()
 			except Exception:
+				frappe.db.rollback(save_point=savepoint)
 				frappe.log_error(frappe.get_traceback(), f"FoodPOS: failed to cancel orphan KOT {kot}")
-
-		if stale_done or orphan_kots:
-			frappe.db.commit()
 
 		if stale_done or orphan_kots:
 			frappe.logger().info(

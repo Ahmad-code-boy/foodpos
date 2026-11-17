@@ -10,15 +10,46 @@ Run with:
 
 import frappe
 from frappe.tests.utils import FrappeTestCase
-from frappe.utils import now_datetime, nowdate
+
+
+def _test_table():
+	"""A Restaurant Table for the KOT tests (created once per test; rolled back)."""
+	from foodpos.foodpos.single_branch import SINGLE_BRANCH
+
+	if not frappe.db.exists("Branch", SINGLE_BRANCH):
+		frappe.get_doc({"doctype": "Branch", "branch": SINGLE_BRANCH}).insert(ignore_permissions=True)
+	name = f"{SINGLE_BRANCH}-KOT-TEST-T1"
+	if not frappe.db.exists("Restaurant Table", name):
+		doc = frappe.get_doc({
+			"doctype": "Restaurant Table",
+			"branch": SINGLE_BRANCH,
+			"table_no": "KOT-TEST-T1",
+			"section": "Test Section",
+			"capacity": 4,
+			"status": "Available",
+			"disabled": 0,
+		})
+		doc.flags.ignore_permissions = True
+		doc.insert()
+	return name
+
+
+def _mark_items_done(kot):
+	"""Ready and Served require every item to be done (controller rule)."""
+	for row in kot.items:
+		row.is_done = 1
+	kot.save(ignore_permissions=True)
 
 
 def _make_kot(**kwargs):
 	"""Helper: build and return a Food KOT document (not saved)."""
+	from foodpos.foodpos.single_branch import SINGLE_BRANCH
+
 	defaults = {
 		"doctype": "Food KOT",
 		"order_type": "Dine In",
-		"table": "T1",
+		"branch": SINGLE_BRANCH,
+		"table": _test_table(),
 		"items": [
 			{
 				"item_code": "_Test Item",
@@ -77,14 +108,21 @@ class TestFoodKOT(FrappeTestCase):
 	# ── Status transitions ─────────────────────────────────────────────────────
 
 	def test_kot_status_transition_forward(self):
-		"""KOT status can advance Pending → In Progress → Ready → Served."""
+		"""KOT status can advance Pending → In Progress → Ready → Served once items are done."""
 		kot = _make_kot()
 		kot.insert(ignore_permissions=True)
 
-		for next_status in ("In Progress", "Ready", "Served"):
-			kot.status = next_status
-			kot.save(ignore_permissions=True)
-			self.assertEqual(kot.reload().status, next_status)
+		kot.status = "In Progress"
+		kot.save(ignore_permissions=True)
+		self.assertEqual(kot.reload().status, "In Progress")
+
+		# All items done while In Progress: the controller advances to Ready.
+		_mark_items_done(kot)
+		self.assertEqual(kot.reload().status, "Ready")
+
+		kot.status = "Served"
+		kot.save(ignore_permissions=True)
+		self.assertEqual(kot.reload().status, "Served")
 
 		frappe.db.delete("Food KOT", {"name": kot.name})
 
@@ -92,6 +130,7 @@ class TestFoodKOT(FrappeTestCase):
 		"""Advancing to Ready then trying to go back to Pending must raise ValidationError."""
 		kot = _make_kot()
 		kot.insert(ignore_permissions=True)
+		_mark_items_done(kot)
 		kot.status = "Ready"
 		kot.save(ignore_permissions=True)
 

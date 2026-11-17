@@ -1,7 +1,6 @@
 # Copyright (c) 2026, Nextash and contributors
 # For license information, please see license.txt
 
-import frappe
 from frappe import _
 from foodpos.foodpos.page.food_pos.food_pos import get_served_kot_exceptions
 

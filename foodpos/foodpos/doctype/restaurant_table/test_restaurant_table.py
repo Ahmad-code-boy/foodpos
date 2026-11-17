@@ -17,8 +17,13 @@ from frappe.utils import now_datetime
 def _make_table(**kwargs):
 	"""Helper: insert and return a Restaurant Table (cleaned up by caller)."""
 	import random
+	from foodpos.foodpos.single_branch import SINGLE_BRANCH
+
+	if not frappe.db.exists("Branch", SINGLE_BRANCH):
+		frappe.get_doc({"doctype": "Branch", "branch": SINGLE_BRANCH}).insert(ignore_permissions=True)
 	defaults = {
 		"doctype": "Restaurant Table",
+		"branch": SINGLE_BRANCH,
 		"table_no": f"TEST-{random.randint(10000, 99999)}",
 		"section": "Test Section",
 		"capacity": 4,

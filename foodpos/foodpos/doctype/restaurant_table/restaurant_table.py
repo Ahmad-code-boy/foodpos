@@ -2,16 +2,14 @@
 # License: MIT
 
 import frappe
-from frappe import _
 from frappe.model.document import Document
-from frappe.utils import now_datetime
 
 
 class RestaurantTable(Document):
 	# ── Lifecycle hooks ────────────────────────────────────────────────────────
 
 	def validate(self):
-		if self.capacity and self.capacity < 1:
+		if (self.capacity or 0) < 1:
 			self.capacity = 1
 
 	def on_update(self):
@@ -47,16 +45,22 @@ def seed_demo_tables():
 		{"table_no": "B02", "section": "Bar", "capacity": 2},
 	]
 
+	from foodpos.foodpos.single_branch import SINGLE_BRANCH
+
+	if not frappe.db.exists("Branch", SINGLE_BRANCH):
+		frappe.get_doc({"doctype": "Branch", "branch": SINGLE_BRANCH}).insert(ignore_permissions=True)
+
 	created = 0
 	skipped = 0
 
 	for t in _TABLES:
-		if frappe.db.exists("Restaurant Table", t["table_no"]):
+		if frappe.db.exists("Restaurant Table", {"branch": SINGLE_BRANCH, "table_no": t["table_no"]}):
 			skipped += 1
 			continue
 
 		doc = frappe.get_doc({
 			"doctype": "Restaurant Table",
+			"branch": SINGLE_BRANCH,
 			"table_no": t["table_no"],
 			"section": t["section"],
 			"capacity": t["capacity"],
@@ -67,5 +71,4 @@ def seed_demo_tables():
 		doc.insert()
 		created += 1
 
-	frappe.db.commit()
 	print(f"seed_demo_tables: {created} created, {skipped} already existed.")

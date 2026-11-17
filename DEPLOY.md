@@ -1,3 +1,88 @@
+# DEPLOY — Food POS v7.2 audit fixes (branch `fix/audit-round-2`)
+
+Not yet committed to `main`. Changes are in the working tree of branch
+`fix/audit-round-2`, based on `46212a7`.
+
+## What changed
+
+- **Table status works again.** The POS endpoint `update_table_status` took
+  `(table, status)` while the screens send named fields, so every table update
+  failed and was reported as success. One endpoint now serves the UI payload
+  (`services/tables.py`); the duplicate proxy is gone.
+- **Every whitelisted POS endpoint requires a POS role.** The roles are the
+  ones on the Food POS page (`services/access.py`). Voiding an invoice and
+  settling unpaid invoices also require a manager role (Food POS Manager,
+  Branch Manager, Accounts Manager, System Manager). This is a policy change.
+- **Unpaid invoices are no longer auto-settled.** The old code ran on every
+  POS load and marked invoices Paid with a fabricated Cash row and no ledger
+  entry. The background call is removed. `get_unpaid_pos_invoices` is read-only;
+  `settle_unpaid_pos_invoices` (manager only) creates ERPNext Payment Entries,
+  one savepoint per invoice.
+- **Shift handling never closes silently.** A previous-day shift is closed
+  through the POS Closing Entry flow in a savepoint, or the operation raises.
+  Opening a shift is one implementation (`services/opening.py`) for both the
+  page and the API.
+- **Transactions.** Removed the mid-request `frappe.db.commit()` calls; Frappe
+  commits once per successful request. Savepoints are used where a failed step
+  must not leave partial writes. The scheduled KOT job still commits (Frappe
+  commits after each scheduled job).
+- **KOT ledger lock.** The KOT-to-invoice link used to set `docstatus=1` with
+  raw SQL, skipping `on_submit`. It now saves and submits through the
+  controller. The KOT status rule is one function (`check_status_change`).
+- **Schema at migrate, not per request.** Custom Fields and seed tables are
+  created by patches `v7_2_0/ensure_pos_custom_fields` and
+  `v7_2_0/ensure_seed_tables`. The request path no longer runs DDL.
+- **Restaurant Table is no longer a fixture.** Table layout and live status
+  are site data. `seed_demo_tables` and the seed patch create tables.
+- **Realtime events fire after commit** (`after_commit=True`).
+- **Lint and tests.** Unused imports and variables removed. The foodpos test
+  suite passes (66/66) on `foodpos-test.local`. New tests are in
+  `services/test_pos_services.py`.
+
+## Ownership
+
+- **Git (repository):** Python and JS under `foodpos/`, `patches.txt`,
+  `hooks.py`. No DocType JSON changed.
+- **Database (site):** `migrate` adds missing Custom Fields and tops up seed
+  tables to 8. Existing Restaurant Table and KOT rows are not changed.
+- **Not changed:** POS Closing Entry, POS Opening Entry and Sales Invoice
+  records; no KOT or invoice is deleted or re-linked.
+
+## Deploy steps
+
+1. Backup: `bench --site pos.local backup --with-files`
+   (taken on 2026-11-17 for this work: `20261117_172004`).
+2. Check out branch `fix/audit-round-2` in `apps/foodpos`, then commit.
+3. `bench --site pos.local migrate` (runs the two v7.2 patches).
+4. `bench restart` and `bench --site pos.local clear-cache`.
+5. Verify: sign in as a POS user, open Food POS, set a table to Reserved and
+   back, Confirm an order, and check the Error Log for new entries.
+
+Rollback: `git checkout 46212a7` in `apps/foodpos`, then restore the backup
+(`bench --site pos.local restore <database.sql.gz> --with-public-files
+<files.tar> --with-private-files <private.tar>`). Migrations are additive,
+so a rollback without a restore also works for the code.
+
+Test site: `foodpos-test.local` (own MariaDB on `127.0.0.1:3307`, data in
+`sites/.foodpos-validation`). Test runs use `allow_tests=1`.
+
+## Residual risks (not closed here)
+
+- Read endpoints (`get_kitchen_orders`, `get_held_orders`, etc.) still return
+  an empty list on error after logging. The kitchen screen polls them.
+- Some writes still bypass permissions: audit logs, walk-in customer, kitchen
+  station master, Food Table Merge, staff attendance, and the KOT link step.
+  POS roles have no create right on those DocTypes. Adding those rights is a
+  DocType permission decision.
+- The browser UI was not click-tested. The smoke flow (tables, KOT, transfer,
+  hold, kitchen status, role refusal) passed on the test site through the same
+  endpoints. Invoice settlement and shift closing need an ERPNext company and
+  chart of accounts, which the test site does not have, so they are covered
+  only by code review.
+- Many older test stubs in `api/test_food_pos.py` still contain `pass`.
+
+---
+
 # DEPLOY — Food POS Round 23 fix (KOT mis-linking + PIN/pricing holes)
 
 Source: this working copy, based on branch `develop` HEAD `4a7c7eb`

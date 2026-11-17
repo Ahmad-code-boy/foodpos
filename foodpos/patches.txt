@@ -9,3 +9,5 @@ foodpos.patches.v0_2_0.add_modifier_group_to_item
 foodpos.patches.v0_2_0.add_order_id_index_to_food_kot
 foodpos.patches.v0_3_0.add_day_time_fields
 foodpos.patches.v0_4_0.add_seed_data
+foodpos.patches.v7_2_0.ensure_pos_custom_fields
+foodpos.patches.v7_2_0.ensure_seed_tables

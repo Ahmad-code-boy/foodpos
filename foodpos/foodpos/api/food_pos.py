@@ -12,8 +12,12 @@ import frappe
 from frappe import _
 
 # v2 single branch: see foodpos.foodpos.single_branch.
-from foodpos.foodpos.single_branch import SINGLE_BRANCH, SINGLE_NAMING_SERIES, normalise_order_type
-from frappe.utils import cint, flt, get_datetime, getdate, now_datetime, nowdate
+from foodpos.foodpos.services.access import require_pos_access, require_pos_manager
+from foodpos.foodpos.services.opening import open_shift
+from foodpos.foodpos.services.kot import update_kot
+from foodpos.foodpos.services.tables import set_table_status
+from foodpos.foodpos.single_branch import SINGLE_BRANCH, SINGLE_NAMING_SERIES
+from frappe.utils import cint, flt, getdate, now_datetime, nowdate
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -42,6 +46,7 @@ def _table_exists(table_name):
 @frappe.whitelist()
 def get_item_groups(pos_profile=None):
 	"""Return item groups that are valid for this POS profile."""
+	require_pos_access()
 	try:
 		if pos_profile:
 			profile = frappe.get_cached_doc("POS Profile", pos_profile)
@@ -78,6 +83,7 @@ def get_food_items(pos_profile, item_group="", search_term="", start=0, page_len
 	item codes) instead of the previous N+1 per-item loop, giving a significant
 	speed improvement for large menus.
 	"""
+	require_pos_access()
 	start       = cint(start)
 	page_length = cint(page_length)
 
@@ -262,6 +268,7 @@ _PAYMENT_ICONS = {
 @frappe.whitelist()
 def get_payment_methods(pos_profile=None):
 	"""Return payment methods configured in POS Profile (or all active ones)."""
+	require_pos_access()
 	try:
 		if pos_profile:
 			profile = frappe.get_cached_doc("POS Profile", pos_profile)
@@ -372,6 +379,7 @@ def create_pos_invoice(order, payments):
     """
     Create the correct invoice type based on the POS Profile setting.
     """
+    require_pos_access()
     if isinstance(order, str):
         order = json.loads(order)
     if isinstance(payments, str):
@@ -388,15 +396,6 @@ def create_pos_invoice(order, payments):
     # ── Determine invoice doctype ────────────────────────────────────────
     invoice_doctype = _get_invoice_doctype(profile)
 
-    # v7.1: heal the invoice fields first (same fix as the page module's
-    # submit_pos_invoice) — on sites whose v0.1.0 patch never ran, the
-    # has_field() guards below silently skipped storing order type/table,
-    # so a Dine-In order read back as "Takeaway".
-    try:
-        from foodpos.foodpos.page.food_pos.food_pos import _ensure_invoice_custom_fields
-        _ensure_invoice_custom_fields(invoice_doctype)
-    except Exception:
-        pass
     opening_name = None
     if invoice_doctype == "POS Invoice":
         try:
@@ -518,7 +517,6 @@ def create_pos_invoice(order, payments):
             doc.discount_amount = disc_amt
 
         # ── Set missing values & calculate totals ────────────────────────────
-        doc.flags.ignore_permissions = True
         doc.set_missing_values(for_validate=True)
         # v5.2: NO TAX — never apply the POS Profile's Sales Taxes and Charges
         # template to the invoice, even if one is configured on the profile.
@@ -626,6 +624,7 @@ def create_pos_invoice(order, payments):
 @frappe.whitelist()
 def verify_manager_pin(pin, action_type, branch=None, cashier=None, order_id=None, table=None, details=None):
 	"""Proxy to food_pos page verify_manager_pin. v2: `branch` is ignored (single branch)."""
+	require_pos_access()
 	from foodpos.foodpos.page.food_pos.food_pos import verify_manager_pin as _verify_pin
 	return _verify_pin(pin, action_type, cashier=cashier, order_id=order_id, table=table, details=details)
 
@@ -712,6 +711,7 @@ def create_kot(order):
 	for the same order_id reuses the open KOT instead of creating a
 	duplicate. The order token is returned so the caller can store it.
 	"""
+	require_pos_access()
 	if isinstance(order, str):
 		order = json.loads(order)
 
@@ -736,9 +736,7 @@ def create_kot(order):
 						})
 						_added = True
 				if _added:
-					reused.flags.ignore_permissions = True
 					reused.save()
-					frappe.db.commit()
 				return {"kot_name": reused.name, "order_id": pos_order_id, "reused": True}
 
 		kot = frappe.new_doc("Food KOT")
@@ -767,11 +765,9 @@ def create_kot(order):
 				"is_done":   0,
 			})
 
-		kot.flags.ignore_permissions = True
 		kot.flags.ignore_mandatory   = False
 		kot.save()
 
-		frappe.db.commit()
 		return {"kot_name": kot.name, "order_id": pos_order_id}
 
 	except Exception as e:
@@ -783,6 +779,7 @@ def create_kot(order):
 @frappe.whitelist()
 def get_kitchen_orders(pos_profile=None):
 	"""Return active KOT orders (Pending, In Progress, Ready)."""
+	require_pos_access()
 	try:
 		filters = {"status": ["in", ["Pending", "In Progress", "Ready"]]}
 		kots = frappe.get_all(
@@ -803,7 +800,7 @@ def get_kitchen_orders(pos_profile=None):
 			)
 
 		return kots
-	except Exception as e:
+	except Exception:
 		frappe.log_error(frappe.get_traceback(), "Food POS: get_kitchen_orders error")
 		return []
 
@@ -811,13 +808,13 @@ def get_kitchen_orders(pos_profile=None):
 @frappe.whitelist()
 def update_kot_status(kot_name, status):
 	"""Update KOT status: Pending → In Progress → Ready → Served."""
+	require_pos_access()
 	allowed = ["Pending", "In Progress", "Ready", "Served", "Cancelled"]
 	if status not in allowed:
 		frappe.throw(_("Invalid KOT status: {0}").format(status))
 
 	kot_doc = frappe.get_doc("Food KOT", kot_name)
 	kot_doc.status = status
-	kot_doc.flags.ignore_permissions = True
 	if status == "Served" and kot_doc.docstatus == 0:
 		kot_doc.submit()
 	elif status == "Cancelled" and kot_doc.docstatus == 1:
@@ -825,13 +822,13 @@ def update_kot_status(kot_name, status):
 		kot_doc.cancel()
 	else:
 		kot_doc.save()
-	frappe.db.commit()
 	return {"success": True, "status": status}
 
 
 @frappe.whitelist()
 def toggle_kot_item_done(kot_name, item_name=None, is_done=0, row_id=None):
 	"""Mark / unmark an individual KOT item as done."""
+	require_pos_access()
 	from foodpos.foodpos.page.food_pos.food_pos import update_kot_item_done_status as _update_item
 	return _update_item(kot_name=kot_name, item_name=item_name, is_done=is_done, row_id=row_id)
 
@@ -839,6 +836,7 @@ def toggle_kot_item_done(kot_name, item_name=None, is_done=0, row_id=None):
 @frappe.whitelist()
 def get_active_kitchen_kots(pos_profile=None, branch=None, station=None):
 	"""Alias for page food_pos get_active_kitchen_kots. v2: branch is ignored (single branch)."""
+	require_pos_access()
 	from foodpos.foodpos.page.food_pos.food_pos import get_active_kitchen_kots as _get_kots
 	return _get_kots(pos_profile=pos_profile, station=station)
 
@@ -846,6 +844,7 @@ def get_active_kitchen_kots(pos_profile=None, branch=None, station=None):
 @frappe.whitelist()
 def update_kot_stage(kot_name, status):
 	"""Alias for page food_pos update_kot_stage."""
+	require_pos_access()
 	from foodpos.foodpos.page.food_pos.food_pos import update_kot_stage as _update_stage
 	return _update_stage(kot_name=kot_name, status=status)
 
@@ -853,6 +852,7 @@ def update_kot_stage(kot_name, status):
 @frappe.whitelist()
 def update_kot_item_done_status(kot_name, item_name=None, is_done=0, row_id=None):
 	"""Alias for page food_pos update_kot_item_done_status."""
+	require_pos_access()
 	from foodpos.foodpos.page.food_pos.food_pos import update_kot_item_done_status as _update_item
 	return _update_item(kot_name=kot_name, item_name=item_name, is_done=is_done, row_id=row_id)
 
@@ -865,6 +865,7 @@ def update_kot_item_done_status(kot_name, item_name=None, is_done=0, row_id=None
 @frappe.whitelist()
 def get_tables(pos_profile=None, branch=None):
 	"""Return restaurant tables with live status. v2: `branch` is ignored (single branch)."""
+	require_pos_access()
 	try:
 		filters = {"disabled": 0}
 
@@ -883,31 +884,30 @@ def get_tables(pos_profile=None, branch=None):
 		return []
 
 
+_UNSET = object()
+
+
 @frappe.whitelist()
-def update_table_status(table_name, status, guests=None, waiter=None,
-						notes=None, reservation_time=None, customer_name=None,
-						order_id=None, occupied_since=None):
-	"""Update a restaurant table's status and metadata."""
-	try:
-		values = {"status": status}
-		if guests      is not None: values["guests"]           = cint(guests)
-		if waiter      is not None: values["waiter"]           = waiter
-		if notes       is not None: values["notes"]            = notes
-		if order_id    is not None: values["order_id"]         = order_id
-		if occupied_since is not None: values["occupied_since"] = occupied_since
-
-		if status == "Occupied" and not occupied_since:
-			values["occupied_since"] = now_datetime()
-		if status in ("Available", "Cleaning"):
-			values["occupied_since"] = None
-			values["order_id"]       = None
-
-		frappe.db.set_value("Restaurant Table", table_name, values)
-		frappe.db.commit()
-		return {"success": True}
-	except Exception as e:
-		frappe.log_error(frappe.get_traceback(), "Food POS: update_table_status error")
-		return {"error": str(e)}
+def update_table_status(table_name, status=_UNSET, guests=_UNSET, waiter=_UNSET, notes=_UNSET,
+						reservation_time=_UNSET, customer_name=_UNSET, mobile=_UNSET,
+						order_id=_UNSET, occupied_since=_UNSET):
+	"""Update a restaurant table. Only the arguments the caller sent are changed;
+	an explicit null clears that field.
+	"""
+	require_pos_access()
+	supplied = {
+		"guests": guests, "waiter": waiter, "notes": notes,
+		"reservation_time": reservation_time, "customer_name": customer_name,
+		"mobile": mobile, "order_id": order_id, "occupied_since": occupied_since,
+	}
+	fields = {k: v for k, v in supplied.items() if v is not _UNSET}
+	if "guests" in fields and fields["guests"] is not None:
+		fields["guests"] = cint(fields["guests"])
+	return set_table_status(
+		table_name,
+		None if status is _UNSET else status,
+		fields,
+	)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -918,6 +918,7 @@ def update_table_status(table_name, status, guests=None, waiter=None,
 @frappe.whitelist()
 def check_opening_entry(user=None):
 	"""Return open POS Opening Entry vouchers for the user, or [] if the doctype doesn't exist."""
+	require_pos_access()
 	if not _get_opening_entry_doctype():
 		return []  # POS Opening Entry not installed — skip opening dialog
 
@@ -937,91 +938,21 @@ def check_opening_entry(user=None):
 
 @frappe.whitelist()
 def create_opening_voucher(pos_profile, company, balance_details):
-	"""Create a POS Opening Entry. Returns a dummy dict if the doctype doesn't exist."""
-	if not _get_opening_entry_doctype():
-		return {"name": None, "pos_profile": pos_profile, "company": company}
-
-	if isinstance(balance_details, str):
-		balance_details = json.loads(balance_details)
-
-	# ── Always auto-populate balance_details from POS Profile ────────────────
-	# Whether the caller sent [] or a populated list, we regenerate from the
-	# profile's payment rows to guarantee ERPNext validation passes.
-	try:
-		profile_doc = frappe.get_cached_doc("POS Profile", pos_profile)
-		payment_rows = profile_doc.payments or []
-		if payment_rows:
-			# Merge: keep any amounts the caller supplied, default to 0
-			caller_amounts = {
-				row.get("mode_of_payment"): flt(row.get("opening_amount", 0))
-				for row in balance_details
-			}
-			balance_details = [
-				{
-					"mode_of_payment": row.mode_of_payment,
-					"opening_amount":  caller_amounts.get(row.mode_of_payment, 0),
-				}
-				for row in payment_rows
-			]
-	except Exception:
-		pass
-
-	# ── Final fallback: Cash with 0 ──────────────────────────────────────────
-	if not balance_details:
-		balance_details = [{"mode_of_payment": "Cash", "opening_amount": 0}]
-
-	# ── Check if an open session already exists for this user+profile ────────
-	existing = frappe.db.get_all(
-		"POS Opening Entry",
-		filters={
-			"user":              frappe.session.user,
-			"pos_profile":       pos_profile,
-			"pos_closing_entry": ["in", ["", None]],
-			"docstatus":         1,
-		},
-		fields=["name", "period_start_date"],
-		limit=1,
-	)
-	if existing:
-		entry = existing[0]
-		entry_date = getdate(entry.get("period_start_date"))
-		if entry_date == getdate():
-			# Already open for today — return it instead of creating a duplicate
-			return frappe.get_doc("POS Opening Entry", entry.name).as_dict()
-		else:
-			# Stale entry from a previous day — close it
-			try:
-				from foodpos.foodpos.page.food_pos.food_pos import _close_stale_opening_entry
-				_close_stale_opening_entry(entry.name)
-			except Exception:
-				# Fallback: force-close via status
-				try:
-					frappe.db.set_value("POS Opening Entry", entry.name, "status", "Closed", update_modified=False)
-					frappe.db.commit()
-				except Exception:
-					pass
-
-	new_opening = frappe.get_doc({
-		"doctype":           "POS Opening Entry",
-		"period_start_date": now_datetime(),
-		"posting_date":      getdate(),
-		"user":              frappe.session.user,
-		"pos_profile":       pos_profile,
-		"company":           company,
-	})
-	new_opening.set("balance_details", balance_details)
-	new_opening.submit()
-	return new_opening.as_dict()
+	"""Open (or return today's open) POS Opening Entry for the profile."""
+	require_pos_access()
+	return open_shift(pos_profile, company, balance_details)
 
 
 @frappe.whitelist()
 def get_shift_closing_details(pos_profile=None, pos_opening_entry=None):
+	require_pos_access()
 	from foodpos.foodpos.page.food_pos.food_pos import get_shift_closing_details as _get_shift_closing_details
 	return _get_shift_closing_details(pos_profile=pos_profile, pos_opening_entry=pos_opening_entry)
 
 
 @frappe.whitelist()
 def create_and_submit_pos_closing_entry(pos_profile, pos_opening_entry, payments=None, closing_notes=None):
+	require_pos_access()
 	from foodpos.foodpos.page.food_pos.food_pos import create_and_submit_pos_closing_entry as _create_and_submit_pos_closing_entry
 	return _create_and_submit_pos_closing_entry(
 		pos_profile=pos_profile,
@@ -1039,6 +970,7 @@ def create_and_submit_pos_closing_entry(pos_profile, pos_opening_entry, payments
 @frappe.whitelist()
 def get_today_summary(pos_profile=None):
 	"""Return today's sales summary for the dashboard header."""
+	require_pos_access()
 	today = getdate()
 
 	# Use whichever invoice table is available
@@ -1075,6 +1007,7 @@ def get_today_summary(pos_profile=None):
 @frappe.whitelist()
 def get_top_items(pos_profile=None, limit=5):
 	"""Return top-selling items today."""
+	require_pos_access()
 	today = getdate()
 	limit = cint(limit)
 
@@ -1124,6 +1057,7 @@ def get_pos_profile_details(pos_profile=None):
 	Return all config values the frontend needs at startup in a single call,
 	avoiding multiple frappe.call() round-trips on page load.
 	"""
+	require_pos_access()
 	if not pos_profile:
 		pos_profile = _get_default_pos_profile()
 
@@ -1167,16 +1101,14 @@ def get_pos_profile_details(pos_profile=None):
 
 @frappe.whitelist()
 def void_invoice(invoice_name, reason=""):
+	"""Cancel a submitted POS/Sales Invoice (manager only), free its table and
+	cancel the open KOTs of that table. Returns {"success", "invoice", "doctype"}.
 	"""
-	Cancel a submitted POS/Sales Invoice, reopen the linked table,
-	and mark the linked KOT (if any) as Cancelled.
-
-	Returns: {"success": True, "invoice": invoice_name}
-	"""
+	require_pos_access()
+	require_pos_manager()
 	if not invoice_name:
 		frappe.throw(_("Invoice name is required."))
 
-	# Determine doctype
 	if _pos_invoice_exists() and frappe.db.exists("POS Invoice", invoice_name):
 		inv_doctype = "POS Invoice"
 	elif frappe.db.exists("Sales Invoice", invoice_name):
@@ -1185,48 +1117,26 @@ def void_invoice(invoice_name, reason=""):
 		frappe.throw(_("Invoice {0} not found.").format(invoice_name))
 
 	inv = frappe.get_doc(inv_doctype, invoice_name)
-
 	if inv.docstatus != 1:
 		frappe.throw(_("Only submitted invoices can be voided."))
-
-	# Permission check
 	if not frappe.has_permission(inv_doctype, "cancel", inv):
 		frappe.throw(_("You do not have permission to cancel {0}.").format(invoice_name))
 
-	# Add cancellation reason to remarks if provided
 	if reason:
 		inv.add_comment("Comment", text=_("Void reason: {0}").format(reason))
-
 	inv.cancel()
 
-	# Reopen the linked table (if any)
 	table = getattr(inv, "custom_table", None)
 	if table and frappe.db.exists("Restaurant Table", table):
-		frappe.db.set_value(
-			"Restaurant Table",
-			table,
-			{
-				"status":         "Available",
-				"order_id":       None,
-				"occupied_since": None,
-			},
-		)
-
-	# Cancel linked KOTs that reference this invoice (matched by table + posting_date)
-	# KOTs don't store invoice_name directly, so we match on table + same-day creation
-	if table:
+		set_table_status(table, "Available")
 		linked_kots = frappe.get_all(
 			"Food KOT",
-			filters={
-				"table":  table,
-				"status": ["in", ["Pending", "In Progress", "Ready", "Held"]],
-			},
+			filters={"table": table, "status": ["in", ["Pending", "In Progress", "Ready", "Held"]]},
 			pluck="name",
 		)
 		for kot_name in linked_kots:
-			frappe.db.set_value("Food KOT", kot_name, "status", "Cancelled")
+			update_kot(kot_name, {"status": "Cancelled"})
 
-	frappe.db.commit()
 	return {"success": True, "invoice": invoice_name, "doctype": inv_doctype}
 
 
@@ -1237,48 +1147,35 @@ def void_invoice(invoice_name, reason=""):
 
 @frappe.whitelist()
 def hold_order(order):
-	"""
-	Save the current cart as a Food KOT with status 'Held' so the cashier
-	can serve another table and recall this order later.
+	"""Save the cart as a Food KOT with status Held, to recall it later.
 
-	Accepts the same `order` dict shape as create_kot().
-	Returns: {"kot_name": "FKOT-..."} or {"error": "..."}
+	Accepts the same `order` dict shape as create_kot(). Errors are raised to
+	the caller; nothing is reported as success when it failed.
 	"""
+	require_pos_access()
 	if isinstance(order, str):
 		order = json.loads(order)
 
-	try:
-		kot = frappe.new_doc("Food KOT")
-		kot.order_type = order.get("order_type", "Dine In") or "Dine In"
-		kot.table      = order.get("table", "") or ""
-		kot.order_note = order.get("order_note", "") or ""
-		kot.pos_profile = order.get("pos_profile", "") or ""
-
-		customer = order.get("customer", "")
-		if customer:
-			kot.customer = customer
-
-		for item in order.get("items", []):
-			kot.append("items", {
-				"item_code": item["item_code"],
-				"item_name": item.get("item_name", item["item_code"]),
-				"qty":       flt(item.get("qty", 1)),
-				"item_note": item.get("item_note", "") or "",
-				"is_done":   0,
-			})
-
-		kot.flags.ignore_permissions = True
-		# Insert first (before_insert forces Pending), then set Held and save
-		kot.insert()
-		frappe.db.set_value("Food KOT", kot.name, "status", "Held")
-		frappe.db.commit()
-
-		return {"kot_name": kot.name}
-
-	except Exception as e:
-		frappe.db.rollback()
-		frappe.log_error(frappe.get_traceback(), "Food POS: hold_order error")
-		return {"error": str(e)}
+	kot = frappe.new_doc("Food KOT")
+	kot.branch = SINGLE_BRANCH
+	kot.order_type = order.get("order_type", "Dine In") or "Dine In"
+	kot.table = order.get("table", "") or ""
+	kot.order_note = order.get("order_note", "") or ""
+	kot.pos_profile = order.get("pos_profile", "") or ""
+	if order.get("customer"):
+		kot.customer = order.get("customer")
+	for item in order.get("items", []):
+		kot.append("items", {
+			"item_code": item["item_code"],
+			"item_name": item.get("item_name", item["item_code"]),
+			"qty": flt(item.get("qty", 1)),
+			"item_note": item.get("item_note", "") or "",
+			"is_done": 0,
+		})
+	kot.insert()  # before_insert forces Pending; the held state is set on the saved draft
+	kot.status = "Held"
+	kot.save()
+	return {"kot_name": kot.name}
 
 
 @frappe.whitelist()
@@ -1287,6 +1184,7 @@ def get_held_orders(pos_profile=None):
 	Return all Food KOTs with status 'Held', optionally scoped to a POS Profile.
 	Used to populate the "Recall Order" picker.
 	"""
+	require_pos_access()
 	try:
 		filters = {"status": "Held"}
 		if pos_profile:
@@ -1311,7 +1209,7 @@ def get_held_orders(pos_profile=None):
 
 		return kots
 
-	except Exception as e:
+	except Exception:
 		frappe.log_error(frappe.get_traceback(), "Food POS: get_held_orders error")
 		return []
 
@@ -1348,6 +1246,7 @@ def get_item_modifiers(item_code):
 	  }
 	  or {} if no modifier group is attached.
 	"""
+	require_pos_access()
 	if not item_code:
 		return {}
 
@@ -1428,6 +1327,7 @@ def create_split_invoices(splits, pos_profile=None):
 	Returns:
 	    {"invoices": [{"invoice": "...", "grand_total": ..., "invoice_type": "..."}, ...]}
 	"""
+	require_pos_access()
 	if isinstance(splits, str):
 		splits = json.loads(splits)
 
@@ -1483,207 +1383,120 @@ def create_split_invoices(splits, pos_profile=None):
 
 @frappe.whitelist()
 def transfer_table_order(source_table, destination_table):
+	"""Move an active order from source_table to destination_table (source Occupied,
+	destination Available). Active KOTs follow the order.
+	Returns {"success", "source", "destination", "kots_moved"}.
 	"""
-	Move an active order from source_table → destination_table.
-
-	- source_table    must be Occupied
-	- destination_table must be Available
-
-	Returns: {"success": True, "source": source_table, "destination": destination_table}
-	"""
+	require_pos_access()
 	if not source_table or not destination_table:
 		frappe.throw(_("Both source and destination tables are required."))
-
 	if source_table == destination_table:
 		frappe.throw(_("Source and destination cannot be the same table."))
 
 	src = frappe.db.get_value(
-		"Restaurant Table",
-		source_table,
-		["status", "order_id", "guests", "waiter", "notes", "occupied_since"],
-		as_dict=True,
+		"Restaurant Table", source_table,
+		["status", "order_id", "guests", "waiter", "notes", "occupied_since"], as_dict=True,
 	)
 	if not src:
 		frappe.throw(_("Source table '{0}' not found.").format(source_table))
 	if src.status != "Occupied":
 		frappe.throw(_("Source table '{0}' is not Occupied (status: {1}).").format(source_table, src.status))
 
-	dst = frappe.db.get_value("Restaurant Table", destination_table, ["status", "table_no"], as_dict=True)
-	if not dst:
+	dst_status = frappe.db.get_value("Restaurant Table", destination_table, "status")
+	if not dst_status:
 		frappe.throw(_("Destination table '{0}' not found.").format(destination_table))
-	if dst.status != "Available":
-		frappe.throw(
-			_("Destination table '{0}' is not Available (status: {1}).").format(destination_table, dst.status)
-		)
+	if dst_status != "Available":
+		frappe.throw(_("Destination table '{0}' is not Available (status: {1}).").format(destination_table, dst_status))
 
-	# ── Move table metadata ──────────────────────────────────────────────────
-	frappe.db.set_value(
-		"Restaurant Table",
-		destination_table,
-		{
-			"status":         "Occupied",
-			"order_id":       src.order_id,
-			"guests":         src.guests,
-			"waiter":         src.waiter,
-			"notes":          src.notes,
-			"occupied_since": src.occupied_since,
-		},
-	)
+	set_table_status(destination_table, "Occupied", {
+		"order_id": src.order_id, "guests": src.guests, "waiter": src.waiter,
+		"notes": src.notes, "occupied_since": src.occupied_since,
+	})
+	set_table_status(source_table, "Cleaning", {
+		"order_id": None, "guests": 0, "waiter": None, "occupied_since": None,
+	})
 
-	# Free source table
-	frappe.db.set_value(
-		"Restaurant Table",
-		source_table,
-		{
-			"status":         "Cleaning",
-			"order_id":       None,
-			"guests":         0,
-			"waiter":         None,
-			"occupied_since": None,
-		},
-	)
-
-	# ── Redirect active KOTs to the new table ────────────────────────────────
-	# KOTs store table as a plain Data field — update all Pending/In Progress/Ready KOTs
 	active_kots = frappe.get_all(
 		"Food KOT",
-		filters={
-			"table":  source_table,
-			"status": ["in", ["Pending", "In Progress", "Ready", "Held"]],
-		},
+		filters={"table": source_table, "status": ["in", ["Pending", "In Progress", "Ready", "Held"]]},
 		pluck="name",
 	)
 	for kot_name in active_kots:
-		frappe.db.set_value("Food KOT", kot_name, "table", destination_table)
+		update_kot(kot_name, {"table": destination_table})
 
-	frappe.db.commit()
 	return {"success": True, "source": source_table, "destination": destination_table, "kots_moved": len(active_kots)}
 
 
 @frappe.whitelist()
 def merge_tables(primary_table, secondary_tables):
+	"""Merge secondary_tables into primary_table for a large party.
+
+	The primary must be Occupied or Available; each secondary must be Available
+	or Reserved. Secondaries take the primary's order. Returns
+	{"success", "merge_name"}.
 	"""
-	Physically merge secondary_tables into primary_table for a large party.
-
-	- primary_table      must be Occupied (has the active order)
-	- secondary_tables   list of table names; must be Available or Reserved
-
-	Creates a Food Table Merge record to track the merge.
-	Secondary tables are marked Occupied with the primary's order_id.
-
-	Returns: {"merge_name": "FTMRG-...", "success": True}
-	"""
+	require_pos_access()
 	if isinstance(secondary_tables, str):
 		secondary_tables = json.loads(secondary_tables)
-
 	if not secondary_tables:
 		frappe.throw(_("At least one secondary table is required for merging."))
 
-	# Validate primary
-	primary = frappe.db.get_value(
-		"Restaurant Table",
-		primary_table,
-		["status", "order_id", "table_no"],
-		as_dict=True,
-	)
+	primary = frappe.db.get_value("Restaurant Table", primary_table, ["status", "order_id"], as_dict=True)
 	if not primary:
 		frappe.throw(_("Primary table '{0}' not found.").format(primary_table))
 	if primary.status not in ("Occupied", "Available"):
-		frappe.throw(
-			_("Primary table must be Occupied or Available (current: {0}).").format(primary.status)
-		)
+		frappe.throw(_("Primary table must be Occupied or Available (current: {0}).").format(primary.status))
 
-	# Validate secondaries
 	for tbl in secondary_tables:
-		row = frappe.db.get_value("Restaurant Table", tbl, ["status", "table_no"], as_dict=True)
-		if not row:
+		status = frappe.db.get_value("Restaurant Table", tbl, "status")
+		if not status:
 			frappe.throw(_("Table '{0}' not found.").format(tbl))
-		if row.status not in ("Available", "Reserved"):
-			frappe.throw(
-				_("Secondary table '{0}' must be Available or Reserved (current: {1}).").format(
-					tbl, row.status
-				)
-			)
+		if status not in ("Available", "Reserved"):
+			frappe.throw(_("Secondary table '{0}' must be Available or Reserved (current: {1}).").format(tbl, status))
 
-	# ── Create the merge record ──────────────────────────────────────────────
 	merge_doc = frappe.new_doc("Food Table Merge")
 	merge_doc.primary_table = primary_table
 	merge_doc.status = "Active"
 	for tbl in secondary_tables:
 		merge_doc.append("secondary_tables", {"table": tbl})
-
-	merge_doc.flags.ignore_permissions = True  # system-initiated
+	# POS roles have no create right on Food Table Merge; the POS role gate above
+	# controls access. The merge record is written as the system.
+	merge_doc.flags.ignore_permissions = True
 	merge_doc.insert()
 
-	# ── Mark primary Occupied if it wasn't already ───────────────────────────
 	if primary.status == "Available":
-		frappe.db.set_value(
-			"Restaurant Table",
-			primary_table,
-			{"status": "Occupied", "occupied_since": now_datetime()},
-		)
+		set_table_status(primary_table, "Occupied", {"occupied_since": now_datetime()})
 
-	# ── Mark secondaries as Occupied under the primary's order_id ────────────
 	for tbl in secondary_tables:
-		frappe.db.set_value(
-			"Restaurant Table",
-			tbl,
-			{
-				"status":         "Occupied",
-				"order_id":       primary.order_id or merge_doc.name,
-				"occupied_since": now_datetime(),
-				"notes":          _("Merged with {0}").format(primary_table),
-			},
-		)
+		set_table_status(tbl, "Occupied", {
+			"order_id": primary.order_id or merge_doc.name,
+			"occupied_since": now_datetime(),
+			"notes": _("Merged with {0}").format(primary_table),
+		})
 
-	frappe.db.commit()
 	return {"success": True, "merge_name": merge_doc.name}
 
 
 @frappe.whitelist()
 def unmerge_tables(primary_table):
+	"""Undo the active merge for primary_table. Secondaries go to Cleaning and the
+	merge record is set to Unmerged. Returns {"success", "merge_name"}.
 	"""
-	Undo an active merge for primary_table.
-	Secondary tables are released back to Cleaning status.
-	The Food Table Merge record is set to Unmerged.
-
-	Returns: {"success": True, "merge_name": "FTMRG-..."}
-	"""
-	# Find the active merge for this primary table
+	require_pos_access()
 	merge_name = frappe.db.get_value(
-		"Food Table Merge",
-		{"primary_table": primary_table, "status": "Active"},
-		"name",
+		"Food Table Merge", {"primary_table": primary_table, "status": "Active"}, "name",
 	)
 	if not merge_name:
 		frappe.throw(_("No active merge found for table '{0}'.").format(primary_table))
 
 	merge_doc = frappe.get_doc("Food Table Merge", merge_name)
-
-	# Release each secondary table
 	for row in merge_doc.secondary_tables or []:
-		frappe.db.set_value(
-			"Restaurant Table",
-			row.table,
-			{
-				"status":         "Cleaning",
-				"order_id":       None,
-				"occupied_since": None,
-				"notes":          None,
-			},
-		)
+		set_table_status(row.table, "Cleaning", {"order_id": None, "occupied_since": None, "notes": None})
 
-	# Close the merge record
-	frappe.db.set_value(
-		"Food Table Merge",
-		merge_name,
-		{
-			"status":      "Unmerged",
-			"unmerged_at": now_datetime(),
-		},
-	)
-
-	frappe.db.commit()
+	merge_doc.flags.ignore_permissions = True
+	merge_doc.status = "Unmerged"
+	merge_doc.unmerged_at = now_datetime()
+	merge_doc.save()
 	return {"success": True, "merge_name": merge_name}
 
 
@@ -1696,6 +1509,7 @@ def get_active_merge(table_name):
 	Used by the frontend to show merged-table badges.
 	"""
 	# Check as primary
+	require_pos_access()
 	merge_name = frappe.db.get_value(
 		"Food Table Merge",
 		{"primary_table": table_name, "status": "Active"},
@@ -1734,6 +1548,7 @@ def get_active_merge(table_name):
 @frappe.whitelist()
 def save_draft_order(order_data):
 	"""Proxy to page food_pos save_draft_order."""
+	require_pos_access()
 	from foodpos.foodpos.page.food_pos.food_pos import save_draft_order as _save_draft_order
 	return _save_draft_order(order_data)
 
@@ -1741,6 +1556,7 @@ def save_draft_order(order_data):
 @frappe.whitelist()
 def get_active_draft_tabs(pos_profile=None):
 	"""Proxy to page food_pos get_active_draft_tabs."""
+	require_pos_access()
 	from foodpos.foodpos.page.food_pos.food_pos import get_active_draft_tabs as _get_active_draft_tabs
 	return _get_active_draft_tabs(pos_profile)
 
@@ -1748,12 +1564,7 @@ def get_active_draft_tabs(pos_profile=None):
 @frappe.whitelist()
 def discard_draft_order(invoice_name, table=None):
 	"""Proxy to page food_pos discard_draft_order."""
+	require_pos_access()
 	from foodpos.foodpos.page.food_pos.food_pos import discard_draft_order as _discard_draft_order
 	return _discard_draft_order(invoice_name, table)
 
-
-@frappe.whitelist()
-def update_table_status(table, status):
-	"""Proxy to page food_pos update_table_status."""
-	from foodpos.foodpos.page.food_pos.food_pos import update_table_status as _update_table_status
-	return _update_table_status(table, status)

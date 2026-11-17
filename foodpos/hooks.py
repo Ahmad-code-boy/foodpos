@@ -48,8 +48,9 @@ scheduler_events = {
 }
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
+# Restaurant Table rows are site business data (layout plus live status), so they
+# are not exported as fixtures. Seed tables come from the v0.4.0 and v7.2.0 patches.
 fixtures = [
-	{"doctype": "Restaurant Table", "filters": []},
 	{
 		"doctype": "Custom Field",
 		"filters": [
