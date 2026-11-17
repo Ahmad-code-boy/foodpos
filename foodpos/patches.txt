@@ -11,3 +11,6 @@ foodpos.patches.v0_3_0.add_day_time_fields
 foodpos.patches.v0_4_0.add_seed_data
 foodpos.patches.v7_2_0.ensure_pos_custom_fields
 foodpos.patches.v7_2_0.ensure_seed_tables
+foodpos.patches.v7_3_0.kitchen_print_setup
+foodpos.patches.v7_3_1.item_diet_fields
+foodpos.patches.v7_3_2.delivery_invoice_fields

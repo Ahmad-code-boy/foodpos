@@ -40,6 +40,7 @@ const FPOS_ICONS = {
 	clock: '<circle cx="12" cy="12" r="10"/> <path d="M12 6v6l4 2"/>',
 	users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/> <path d="M16 3.128a4 4 0 0 1 0 7.744"/> <path d="M22 21v-2a4 4 0 0 0-3-3.87"/> <circle cx="9" cy="7" r="4"/>',
 	user: '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/> <circle cx="12" cy="7" r="4"/>',
+	phone: '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/>',
 	check: '<path d="M20 6 9 17l-5-5"/>',
 	checkCircle: '<circle cx="12" cy="12" r="10"/> <path d="m16 9-5.5 5.5L8 12"/>',
 	star: '<path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"/>',
@@ -78,6 +79,74 @@ const FPOS_ICONS = {
 };
 function fpos_icon(name, cls) {
 	return `<svg class="fpos-ic ${cls || ""}" viewBox="0 0 24 24" aria-hidden="true">${FPOS_ICONS[name] || ""}</svg>`;
+}
+
+// ── POS-styled notices and confirmations ────────────────────────────────────
+// Replace the Desk's msgprint / confirm dialogs, so every message inside the
+// POS uses the POS design. Message text is escaped; pass HTML only on purpose.
+function fpos_escape(text) {
+	return String(text == null ? "" : text)
+		.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+		.replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+function fpos_notify(message, indicator) {
+	const tone = indicator === "red" ? "fpos-toast-red" : indicator === "green" ? "fpos-toast-green" : "";
+	const $t = $(`<div class="fpos-toast ${tone}" role="status">${fpos_escape(message)}</div>`);
+	$("body").append($t);
+	setTimeout(() => $t.addClass("fpos-toast-out"), 3200);
+	setTimeout(() => $t.remove(), 3600);
+}
+
+function fpos_msg(opts) {
+	if (typeof opts === "string") opts = { message: opts };
+	const title = opts.title || __("Notice");
+	const indicator = opts.indicator || "orange";
+	const label = opts.primary_action_label || __("OK");
+	const $o = $(`
+		<div class="fpos-modal-overlay fpos-msg-overlay">
+			<div class="fpos-modal fpos-msg-modal" role="alertdialog" aria-modal="true">
+				<div class="fpos-modal-head">
+					<div class="fpos-modal-title"><span class="fpos-msg-dot fpos-msg-${fpos_escape(indicator)}"></span>${fpos_escape(title)}</div>
+				</div>
+				<div class="fpos-modal-body"><div class="fpos-msg-text">${fpos_escape(opts.message || "")}</div></div>
+				<div class="fpos-modal-foot">
+					<span class="fpos-modal-spacer"></span>
+					<button type="button" class="fpos-btn fpos-msg-ok">${fpos_escape(label)}</button>
+				</div>
+			</div>
+		</div>`);
+	const close = () => { $(document).off("keydown.fposmsg"); $o.remove(); };
+	$o.find(".fpos-msg-ok").on("click", () => {
+		close();
+		if (opts.primary_action && typeof opts.primary_action.action === "function") opts.primary_action.action();
+	});
+	$(document).on("keydown.fposmsg", (e) => { if (e.key === "Escape" || e.key === "Enter") close(); });
+	$("body").append($o);
+	$o.find(".fpos-msg-ok").trigger("focus");
+}
+
+function fpos_confirm(message, on_yes, on_no) {
+	const $o = $(`
+		<div class="fpos-modal-overlay fpos-msg-overlay">
+			<div class="fpos-modal fpos-msg-modal" role="alertdialog" aria-modal="true">
+				<div class="fpos-modal-head">
+					<div class="fpos-modal-title">${fpos_icon("alert", "fpos-ic-sm")} ${__("Please confirm")}</div>
+				</div>
+				<div class="fpos-modal-body"><div class="fpos-msg-text">${fpos_escape(message || "")}</div></div>
+				<div class="fpos-modal-foot">
+					<span class="fpos-modal-spacer"></span>
+					<button type="button" class="fpos-btn-ghost fpos-msg-no">${__("No")}</button>
+					<button type="button" class="fpos-btn fpos-msg-yes">${__("Yes")}</button>
+				</div>
+			</div>
+		</div>`);
+	const close = () => { $(document).off("keydown.fposconfirm"); $o.remove(); };
+	$o.find(".fpos-msg-yes").on("click", () => { close(); if (on_yes) on_yes(); });
+	$o.find(".fpos-msg-no").on("click", () => { close(); if (on_no) on_no(); });
+	$(document).on("keydown.fposconfirm", (e) => { if (e.key === "Escape") { close(); if (on_no) on_no(); } });
+	$("body").append($o);
+	$o.find(".fpos-msg-yes").trigger("focus");
 }
 
 frappe.pages["food-pos"].on_page_load = function (wrapper) {
@@ -184,6 +253,16 @@ foodpos.FoodPOS.Controller = class {
 	}
 
 	bind_global_events() {
+		// Kitchen print outcome. Success is silent; a failure is a small notice,
+		// and the ticket stays on the order to retry from the Kitchen drawer.
+		frappe.realtime.off("fpos_kitchen_print");
+		frappe.realtime.on("fpos_kitchen_print", (d) => {
+			if (d && d.status === "Failed") {
+				fpos_notify(__("Kitchen printer: {0}. The ticket is saved; retry it from Live Kitchen Orders.", [d.error || __("not printed")]), "red");
+				if (this.wrapper && this.wrapper.is(":visible")) this.refresh_kitchen_badge();
+			}
+		});
+
 		window.addEventListener("online", () => {
 			this.is_online = true;
 			this.update_connection_indicator();
@@ -259,8 +338,7 @@ foodpos.FoodPOS.Controller = class {
 					<div class="fpos-empty-profile" style="max-width:480px;margin:80px auto;text-align:center;background:#fff;padding:40px;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.08);">
 						<div style="margin-bottom:12px;color:#f59e0b;">${fpos_icon("alert", "fpos-ic-lg")}</div>
 						<h3>${__("No POS Profile Found")}</h3>
-						<p style="color:#78716c;margin:12px 0 20px;">${__("Please create or assign a POS Profile for your user in ERPNext to begin sales operations.")}</p>
-						<button class="btn btn-primary" onclick="frappe.set_route('List', 'POS Profile')">${__("Open POS Profiles")}</button>
+						<p style="color:#78716c;margin:12px 0 0;">${__("Ask your administrator to assign a POS Profile to your user to start sales.")}</p>
 					</div>
 				`);
 				return;
@@ -367,6 +445,7 @@ foodpos.FoodPOS.Controller = class {
 			const shift_active = await this.init_pos_shift();
 			if (!shift_active) {
 				this.render_layout();
+				this._hold_screen();
 				await this.load_data();
 				await this.init_tabs();
 				this.show_home();
@@ -380,6 +459,7 @@ foodpos.FoodPOS.Controller = class {
 			const restored_early = this.restore_cart_backup();
 
 			this.render_layout();
+			this._hold_screen();
 
 			if (restored_early) {
 				this.update_order_type_ui();
@@ -389,12 +469,10 @@ foodpos.FoodPOS.Controller = class {
 			}
 
 			await this.load_data();
-			// v7: a browser refresh keeps the user on their current screen
-			// — restore the saved view when the day is open (Home is the
-			// first screen only when there is nothing saved to restore).
-			const saved_view = this._saved_view();
-			if (saved_view) this._restore_view(saved_view);
-			else this.show_home(); // v2: Home / Day screen is the first screen.
+			// Start screen: Home on a fresh open; a browser refresh returns to the
+			// screen it was on. Applied while the layout is still hidden.
+			this._restore_view(this._start_view());
+			this._reveal_screen();
 			await this.init_tabs();
 			this.setup_realtime_table_listener();
 			this.sync_offline_invoices();
@@ -417,6 +495,7 @@ foodpos.FoodPOS.Controller = class {
 		} finally {
 			clearTimeout(safety_timer);
 			this._force_unfreeze();
+			this._reveal_screen();
 		}
 	}
 
@@ -556,7 +635,7 @@ foodpos.FoodPOS.Controller = class {
 			} catch (e) {
 				frappe.dom.unfreeze();
 				$btn.prop("disabled", false).text(__("Open Day"));
-				frappe.msgprint({
+				fpos_msg({
 					title: __("Could not open the day"),
 					indicator: "red",
 					message: e.message || __("Something went wrong. Please try again."),
@@ -575,7 +654,7 @@ foodpos.FoodPOS.Controller = class {
 		if (!this.pos_opening || !frappe.realtime) return;
 		frappe.realtime.on(`poe_${this.pos_opening}`, (data) => {
 			if (data && data.operation === "Closed") {
-				frappe.msgprint({
+				fpos_msg({
 					title: __("POS Closed"),
 					indicator: "orange",
 					message: __("Shift {0} has been closed by another session. Please refresh.", [this.pos_opening]),
@@ -644,6 +723,13 @@ foodpos.FoodPOS.Controller = class {
 			icon = "plate";
 			badge_color = "#57534e";
 			badge_bg = "#f5efe4";
+		}
+
+		// The item's own group is the menu category whenever it is a real menu
+		// group; the name-based guess above only picks the icon and colours.
+		const GENERIC_GROUPS = ["", "All Item Groups", "Products", "Raw Material", "Services", "Sub Assemblies", "Consumable"];
+		if (item.item_group && !GENERIC_GROUPS.includes(item.item_group)) {
+			category = item.item_group;
 		}
 
 		const is_veg = Boolean(item.is_vegetarian || /veg|vegetarian|paneer|falafel|vegan|plant-based|tofu/.test(name));
@@ -871,6 +957,8 @@ foodpos.FoodPOS.Controller = class {
 					<div class="fpos-daily-report-view" style="display:none;"></div>
 					<!-- v7: Pending Payments is a dedicated full page now, not a drawer. -->
 					<div class="fpos-pending-view" style="display:none;"></div>
+					<div class="fpos-reservations-view fpos-sb-view" style="display:none;"></div>
+					<div class="fpos-delivery-view fpos-sb-view" style="display:none;"></div>
 
 					<!-- Main Layout: Left Menu Area (Zone 3) + Right Cart (Zone 4) -->
 					<div class="fpos-body">
@@ -904,7 +992,6 @@ foodpos.FoodPOS.Controller = class {
 									<div class="fpos-cart-overflow-wrapper">
 										<button class="fpos-cart-overflow-btn" title="${__("More cart actions")}">⋮</button>
 										<div class="fpos-cart-overflow-menu" style="display:none;">
-											<button class="fpos-cart-overflow-item fpos-discount-btn">${fpos_icon("tag", "fpos-ic-sm")} ${__("Discount & Presets")}</button>
 											<button class="fpos-cart-overflow-item fpos-danger-text fpos-clear-btn">${fpos_icon("trash", "fpos-ic-sm")} ${__("Clear Order")}</button>
 										</div>
 									</div>
@@ -934,13 +1021,21 @@ foodpos.FoodPOS.Controller = class {
 
 						<!-- Pricing Summary -->
 						<div class="fpos-cart-totals">
-							<div class="fpos-total-row" style="display:flex;justify-content:space-between;margin-bottom:5px;font-size:13px;color:#57534e;">
+							<div class="fpos-total-row fpos-subtotal-row">
 								<span>${__("Subtotal")}</span>
-								<span class="fpos-subtotal-val">Rs 0.00</span>
+								<span class="fpos-subtotal-right">
+									<label class="fpos-disc-inline">
+										${fpos_icon("tag", "fpos-ic-sm")}
+										<span>${__("Discount Rs")}</span>
+										<input type="number" min="0" step="1" inputmode="numeric" class="fpos-disc-inline-input" placeholder="0" aria-label="${__("Discount in Rs")}">
+									</label>
+									<span class="fpos-subtotal-val">Rs 0.00</span>
+								</span>
 							</div>
-							<div class="fpos-discount-row" style="display:none;justify-content:space-between;margin-bottom:5px;font-size:13px;color:#dc2626;">
-								<span>${__("Discount")}</span>
+							<div class="fpos-discount-row" style="display:none;">
+								<span class="fpos-discount-label">${__("Discount")}</span>
 								<span class="fpos-discount-val fpos-discount-badge">-Rs 0.00</span>
+								<button type="button" class="fpos-discount-remove" title="${__("Remove discount")}">&times;</button>
 							</div>
 							<div class="fpos-delivery-row" style="display:none;justify-content:space-between;margin-bottom:5px;font-size:13px;color:#0284c7;">
 								<span>${__("Delivery Fee")}</span>
@@ -953,12 +1048,6 @@ foodpos.FoodPOS.Controller = class {
 							</div>
 						</div>
 
-						<!-- v3: payment method pick (Cash / Card / QR) — sets the payment page default. -->
-						<div class="fpos-pay-methods" role="group" aria-label="${__("Payment method")}">
-							<button class="fpos-pay-method active" data-mode="Cash">${fpos_icon("cash")} <span>${__("Cash")}</span></button>
-							<button class="fpos-pay-method" data-mode="Card">${fpos_icon("card")} <span>${__("Card")}</span></button>
-							<button class="fpos-pay-method" data-mode="QR">${fpos_icon("qr")} <span>${__("QR")}</span></button>
-						</div>
 						<!-- v3: BILL RULE — the customer bill is printed ONLY at payment (Pay & Print Bill).
 						     Confirming sends the KOT to the kitchen and leaves payment Pending; no bill yet. -->
 						<div class="fpos-pending-banner" role="status"></div>
@@ -1157,29 +1246,25 @@ foodpos.FoodPOS.Controller = class {
 			const img = this.item_media_html(item);
 
 			// Diet badges (Veg / Non-Veg / Spicy) + short description (v2 cards)
-			let diet_badge = "";
-			if (item._is_veg) {
-				diet_badge = `<span class="fpos-card-diet-badge fpos-diet-veg">VEG</span>`;
-			} else {
-				diet_badge = `<span class="fpos-card-diet-badge fpos-diet-nonveg">NON-VEG</span>`;
-			}
+			let diet_badge = `<span class="fpos-diet-mark ${item._is_veg ? "is-veg" : "is-nonveg"}" title="${item._is_veg ? __("Vegetarian") : __("Non-vegetarian")}"><i></i>${item._is_veg ? __("Veg") : __("Non-veg")}</span>`;
 			if (item._is_spicy) {
-				diet_badge += ` <span class="fpos-card-diet-badge fpos-diet-spicy">SPICY</span>`;
+				diet_badge += `<span class="fpos-diet-mark is-spicy" title="${__("Spicy")}">${__("Spicy")}</span>`;
 			}
-			const item_desc = (item.description || "").trim();
+			const raw_desc = $("<div>").html(item.description || "").text().trim();
+			const item_desc = raw_desc && raw_desc.toLowerCase() !== (item.item_name || "").toLowerCase() ? raw_desc : "";
 
 			// Clean item card without category banner
 			const card = $(`
 				<div class="fpos-item-card" data-code="${item.item_code}">
 					<div class="fpos-item-media">
 						${img}
-						${diet_badge}
+						<div class="fpos-diet-marks">${diet_badge}</div>
 					</div>
 					<div class="fpos-item-details">
 						<div class="fpos-item-title" title="${item.item_name}">
 							${item.item_name}
 						</div>
-						${item_desc ? `<div class="fpos-item-desc" title="${item_desc}">${item_desc}</div>` : ""}
+						${item_desc ? `<div class="fpos-item-desc" title="${fpos_escape(item_desc)}">${fpos_escape(item_desc)}</div>` : ""}
 						<div class="fpos-item-footer">
 							<span class="fpos-item-rate">${price}</span>
 							${(() => {
@@ -1192,7 +1277,7 @@ foodpos.FoodPOS.Controller = class {
 										<button class="fpos-step-plus" title="${__("Add one")}">+</button>
 									</span>`;
 								}
-								return `<button class="fpos-add-dish-btn" title="${__("Add to Dish")}">${__("Add to Dish")}</button>`;
+								return `<button class="fpos-add-dish-btn" title="${__("Add to order")}">+ ${__("Add")}</button>`;
 							})()}
 						</div>
 					</div>
@@ -1297,7 +1382,7 @@ foodpos.FoodPOS.Controller = class {
 			primary_action_label: __("Verify & Authorize"),
 			primary_action: async (vals) => {
 				if (!vals.pin) {
-					frappe.msgprint(__("Please enter a PIN."));
+					fpos_msg(__("Please enter a PIN."));
 					return;
 				}
 				try {
@@ -1371,11 +1456,11 @@ foodpos.FoodPOS.Controller = class {
 			primary_action: (values) => {
 				const new_rate = flt(values.rate);
 				if (new_rate !== original_rate && !item.manager_approved_price) {
-					frappe.msgprint(__("Price is locked. Please click 'Unlock Price (Manager PIN)' first."));
+					fpos_msg(__("Price is locked. Please click 'Unlock Price (Manager PIN)' first."));
 					return;
 				}
 				if (new_rate <= 0 && !item.is_free_item) {
-					frappe.msgprint(__("Unit rate cannot be Rs 0.00 without Manager Free-Item authorization."));
+					fpos_msg(__("Unit rate cannot be Rs 0.00 without Manager Free-Item authorization."));
 					return;
 				}
 				item.item_note = values.item_note || "";
@@ -1430,37 +1515,25 @@ foodpos.FoodPOS.Controller = class {
 		this.wrapper.find(".fpos-confirm-order-btn").prop("disabled", false).css("opacity", "1");
 
 		this.cart_items.forEach((item, idx) => {
-			const note_html = item.item_note
-				? `<div class="fpos-cart-line-note">${item.item_note}</div>`
-				: "";
+			const meta = item.item_note ? fpos_escape(item.item_note) : "";
 
 			const row = $(`
-				<div class="fpos-cart-row">
-					<div class="fpos-cart-row-main">
-						<div class="fpos-cart-row-info">
-							<span class="fpos-cart-item-name">${item.item_name}</span>
-							${note_html}
-						</div>
-						<div class="fpos-cart-row-pricing">
-							<span class="fpos-cart-row-amount">${this.format_money(item.amount)}</span>
-							${flt(item.qty) > 1 ? `<span class="fpos-cart-row-unit">@ ${this.format_money(item.rate)}</span>` : ""}
-						</div>
+				<div class="fpos-cart-row fpos-cart-row-compact">
+					<div class="fpos-cart-row-info">
+						<span class="fpos-cart-item-name" title="${fpos_escape(item.item_name)}">${fpos_escape(item.item_name)}</span>
+						${meta ? `<span class="fpos-cart-row-meta">${meta}</span>` : ""}
 					</div>
-
-					<div class="fpos-cart-row-sub">
-						<button class="fpos-note-trigger">${fpos_icon("edit", "fpos-ic-sm")} ${__("Note / Price")}</button>
-						<div class="fpos-cart-row-stepper">
-							<button class="fpos-qty-minus" title="${item.qty === 1 ? __("Remove Item") : __("Decrease")}">${item.qty === 1 ? "✕" : "−"}</button>
-							<span class="fpos-cart-qty">${item.qty}</span>
-							<button class="fpos-qty-plus" title="${__("Increase")}">+</button>
-						</div>
+					<div class="fpos-cart-row-stepper">
+						<button class="fpos-qty-minus" title="${item.qty === 1 ? __("Remove item") : __("Decrease")}">${item.qty === 1 ? "✕" : "−"}</button>
+						<span class="fpos-cart-qty">${item.qty}</span>
+						<button class="fpos-qty-plus" title="${__("Increase")}">+</button>
 					</div>
+					<span class="fpos-cart-row-amount">${this.format_money(item.amount)}</span>
 				</div>
 			`);
 
 			row.find(".fpos-qty-minus").on("click", () => this.update_cart_item_qty(idx, item.qty - 1));
 			row.find(".fpos-qty-plus").on("click", () => this.update_cart_item_qty(idx, item.qty + 1));
-			row.find(".fpos-note-trigger").on("click", () => this.edit_item_instruction(idx));
 
 			$box.append(row);
 		});
@@ -1469,9 +1542,13 @@ foodpos.FoodPOS.Controller = class {
 	update_cart_summary() {
 		const subtotal = this.cart_items.reduce((sum, i) => sum + i.amount, 0);
 
-		// v5.2: NO TAX. Discount is a flat Rs amount only (no % anymore) and is
-		// clamped to the subtotal so Total Due can never go below 0.
-		const discount = Math.min(subtotal, Math.max(0, flt(this.discount_amount || 0)));
+		// Discount: a percentage (follows the subtotal) or a fixed amount. Either
+		// way it is clamped so Total Due never goes below 0. NO TAX on this POS.
+		const pct = Math.min(100, Math.max(0, flt(this.discount_percentage || 0)));
+		const discount = pct > 0
+			? Math.round(subtotal * pct) / 100
+			: Math.min(subtotal, Math.max(0, flt(this.discount_amount || 0)));
+		this.discount_amount = discount;
 
 		const discounted_subtotal = Math.max(0, subtotal - discount);
 		const delivery_fee = (this.order_type === "Delivery") ? flt(this.delivery_charges || 0) : 0;
@@ -1489,7 +1566,10 @@ foodpos.FoodPOS.Controller = class {
 		this.wrapper.find(".fpos-grand-total-val").text(this.format_money(grand_total));
 		this.update_order_sub();
 
+		const $disc_input = this.wrapper.find(".fpos-disc-inline-input");
+		if (!$disc_input.is(":focus")) $disc_input.val(discount > 0 ? discount : "");
 		if (discount > 0) {
+			this.wrapper.find(".fpos-discount-label").text(__("Discount"));
 			this.wrapper.find(".fpos-discount-row").css("display", "flex");
 			this.wrapper.find(".fpos-discount-val").text(`-${this.format_money(discount)}`);
 		} else {
@@ -1580,8 +1660,6 @@ foodpos.FoodPOS.Controller = class {
 		this.cart_items = [];
 		this.discount_percentage = 0;
 		this.discount_amount = 0;
-		this.discount_approved_by = null;
-		this.discount_manager_pin = null;
 		this.delivery_phone = "";
 		this.delivery_address = "";
 		this.delivery_charges = 0;
@@ -1609,7 +1687,7 @@ foodpos.FoodPOS.Controller = class {
 				this.selected_table_no = data.table_no || (data.table ? data.table.split("-").pop().trim() : "");
 				this.linked_kot_id = data.linked_kot_id || null;
 				this.pos_order_id = data.pos_order_id || null;
-				this.discount_percentage = 0; // v5.2: % discounts removed — Rs only, stale % never restored.
+				this.discount_percentage = flt(data.discount_percentage || 0);
 				this.discount_amount = flt(data.discount_amount || 0);
 				this.delivery_phone = data.delivery_phone || "";
 				this.delivery_address = data.delivery_address || "";
@@ -1902,7 +1980,7 @@ foodpos.FoodPOS.Controller = class {
 		this.pos_order_id = target.pos_order_id || null;
 		this.customer = target.customer || (this.profile_data && this.profile_data.customer) || "";
 		this.cart_items = [...(target.cart_items || [])];
-		this.discount_percentage = 0; // v5.2: % discounts removed — Rs only.
+		this.discount_percentage = flt(target.discount_percentage || 0);
 		this.discount_amount = target.discount_amount || 0;
 		this.order_note = target.order_note || "";
 
@@ -1963,7 +2041,7 @@ foodpos.FoodPOS.Controller = class {
 					freeze: false,
 				});
 				if (res.message && res.message.has_kot) {
-					frappe.msgprint({
+					fpos_msg({
 						title: __("Active Kitchen Tickets Exist"),
 						indicator: "red",
 						message: __("Tab '{0}' has a {1} kitchen order ticket ({2}) for Table {3}. Settle payment or perform an authorized Manager Void before closing.", [
@@ -1981,7 +2059,7 @@ foodpos.FoodPOS.Controller = class {
 		}
 
 		if (tab.cart_items && tab.cart_items.length > 0) {
-			frappe.confirm(
+			fpos_confirm(
 				__("Discard open tab '{0}' with {1} item(s)?", [tab.title || "Tab", tab.cart_items.length]),
 				() => perform_close()
 			);
@@ -2266,7 +2344,10 @@ foodpos.FoodPOS.Controller = class {
 	show_pending_banner(kot_name) {
 		const $b = this.wrapper.find(".fpos-pending-banner");
 		if (!$b.length) return;
-		$b.html(`<b>${__("Payment Pending")}</b> — ${__("KOT {0} is in the kitchen. No bill has been given to the customer yet — the bill is printed only when the customer pays.", [kot_name || ""])}`);
+		const full = __("KOT {0} is in the kitchen. No bill has been given to the customer yet — the bill is printed only when the customer pays.", [kot_name || ""]);
+		const kots = String(kot_name || "").split(",").map((k) => k.trim()).filter(Boolean);
+		const kot_label = kots.length > 1 ? `${kots[0]} +${kots.length - 1}` : (kots[0] || "");
+		$b.attr("title", full).html(`<span class="fpos-pending-dot"></span><b>${__("Payment pending")}</b><span class="fpos-pending-kot">${fpos_escape(kot_label)}</span>`);
 		$b.addClass("show");
 	}
 	hide_pending_banner() {
@@ -2368,6 +2449,21 @@ foodpos.FoodPOS.Controller = class {
 			frappe.dom.unfreeze();
 			const msg = res.message || {};
 			const kot_name = msg.kot_name;
+			// Kitchen ticket outcome, straight from the server (does not depend on
+			// the realtime channel). A failed ticket stays on the order to retry.
+			const kot_list = (msg.kot_names || []).filter(Boolean);
+			if (kot_list.length) {
+				frappe.call({
+					method: "foodpos.foodpos.page.food_pos.food_pos.get_kitchen_print_status",
+					args: { kot_names: kot_list },
+				}).then((st) => {
+					const failed = (st.message && st.message.failed) || [];
+					if (failed.length) {
+						const why = String(failed[0].error || __("not printed")).replace(/\.$/, "");
+						fpos_notify(__("Kitchen printer: {0}. The ticket is saved; retry it from Live Kitchen Orders.", [why]), "red");
+					}
+				});
+			}
 			if (msg.order_id) {
 				this.pos_order_id = msg.order_id;
 				if (this.active_tab_id && this.tabs && this.tabs[this.active_tab_id]) {
@@ -2404,22 +2500,8 @@ foodpos.FoodPOS.Controller = class {
 			this.render_table_chips();
 			this.refresh_kitchen_badge();
 			this.render_tables_view();
-			// v7: a TABLE (dine-in) order auto-shows its KOT slip in the
-			// centered print-preview dialog — the cashier taps Print once
-			// and the kitchen gets the paper ticket. This is safe now
-			// because the preview is an in-page dialog: it never triggers
-			// the browser print function from the opener and never opens
-			// a new tab (the v5.9 freeze came from the print DIALOG
-			// blocking the POS tab). Non-table orders keep the v5.10
-			// behavior — no auto slip; the live KDS screen IS the kitchen
-			// ticket. The customer bill is still printed ONLY at settle,
-			// never here.
-			if (this.selected_table && kot_name) {
-				this.open_kot_slip({ kot_name, order_id: msg.order_id }, order_payload);
-			}
-			// v5.10: NO auto slip/print on confirm for non-table orders.
-			// Paper slip for those: the Print button on the KOT card in
-			// the Live Kitchen Orders drawer (open_kot_slip).
+			// The kitchen ticket is printed by the server when the order is
+			// confirmed (one ticket, once). Nothing is shown on the POS screen.
 		} catch (e) {
 			frappe.dom.unfreeze();
 			frappe.show_alert({ message: __("Failed to confirm order: {0}", [e.message]), indicator: "red" });
@@ -2474,7 +2556,7 @@ foodpos.FoodPOS.Controller = class {
 			primary_action_label: __("Create & Select"),
 			primary_action: async (values) => {
 				if (!values.customer_name) {
-					frappe.msgprint(__("Customer Name is required."));
+					fpos_msg(__("Customer Name is required."));
 					return;
 				}
 				try {
@@ -2549,7 +2631,7 @@ foodpos.FoodPOS.Controller = class {
 				const phone = (values.phone || "").trim();
 				const addr = (values.delivery_address || "").trim();
 				if (!name || !phone || !addr) {
-					frappe.msgprint({
+					fpos_msg({
 						title: __("Missing Information"),
 						indicator: "orange",
 						message: __("Customer Name, Phone number, and Delivery address are required for Delivery orders.")
@@ -3060,7 +3142,7 @@ foodpos.FoodPOS.Controller = class {
 			});
 
 			if (total_tendered < total - 0.001) {
-				frappe.msgprint({
+				fpos_msg({
 					title: __("Insufficient Payment"),
 					indicator: "red",
 					message: __("Amount tendered ({0}) is less than the total order amount due ({1}).", [format_curr(total_tendered), format_curr(total)])
@@ -3092,9 +3174,6 @@ foodpos.FoodPOS.Controller = class {
 			pos_opening_entry: this.pos_opening,
 			discount_percentage: this.discount_percentage,
 			discount_amount: this.discount_amount,
-			discount_approved_by: this.discount_approved_by || null,
-			discount_manager_pin: this.discount_manager_pin || null,
-			manager_pin: this.discount_manager_pin || null,
 			order_note: this.order_note,
 			items: this.cart_items,
 			draft_invoice_name: (this.active_tab_id && this.tabs[this.active_tab_id] && this.tabs[this.active_tab_id].draft_invoice_name) || null,
@@ -3188,9 +3267,24 @@ foodpos.FoodPOS.Controller = class {
 			this.refresh_exceptions_badge();
 		} catch (err) {
 			frappe.dom.unfreeze();
-			console.warn("Server submission failed. Queuing offline.", err);
-			this.queue_offline_invoice(order_payload, payments);
+			// Only a lost connection goes to the offline queue. A server error
+			// (validation, permissions) is shown, and the order stays in the
+			// cart so the cashier can fix it and pay again.
+			if (this._is_network_failure(err)) {
+				this.queue_offline_invoice(order_payload, payments);
+			} else {
+				this.show_pos();
+				fpos_notify(__("Payment was not completed. The order is still in the cart."), "red");
+			}
 		}
+	}
+
+	_is_network_failure(err) {
+		if (!navigator.onLine) return true;
+		if (!err) return false;
+		if (err.status === 0 || err.readyState === 0) return true;
+		const text = String(err.message || err.statusText || err || "");
+		return /Failed to fetch|NetworkError|ERR_INTERNET|ERR_CONNECTION|timeout/i.test(text);
 	}
 
 	// ─── 8.1 Customer POS Slip Generator & Thermal Printer ────────────────────
@@ -3302,7 +3396,7 @@ foodpos.FoodPOS.Controller = class {
 					<div style="display: flex; flex-direction: column; gap: 3px; font-size: 11px;">
 						<div style="display: flex; justify-content: space-between;">
 							<span>Subtotal:</span>
-							<span>${format_curr(receipt_data.net_total || receipt_data.subtotal || receipt_data.grand_total)}</span>
+							<span>${format_curr(receipt_data.total || receipt_data.net_total || receipt_data.subtotal || receipt_data.grand_total)}</span>
 						</div>
 						${flt(receipt_data.discount_amount) > 0 ? `
 						<div style="display: flex; justify-content: space-between; color: #b91c1c;">
@@ -3543,7 +3637,7 @@ foodpos.FoodPOS.Controller = class {
 					<tbody>${items_html}</tbody>
 				</table>
 				<div class="divider"></div>
-				<div class="row"><span>Subtotal:</span><span>${format_curr(receipt_data.net_total || receipt_data.subtotal || receipt_data.grand_total)}</span></div>
+				<div class="row"><span>Subtotal:</span><span>${format_curr(receipt_data.total || receipt_data.net_total || receipt_data.subtotal || receipt_data.grand_total)}</span></div>
 				${flt(receipt_data.discount_amount) > 0 ? `<div class="row"><span>Discount:</span><span>-${format_curr(receipt_data.discount_amount)}</span></div>` : ""}
 				<!-- v5.2: NO TAX on the thermal receipt. -->
 				${flt(receipt_data.delivery_charges) > 0 ? `<div class="row"><span>Delivery Fee:</span><span>${format_curr(receipt_data.delivery_charges)}</span></div>` : ""}
@@ -3710,22 +3804,7 @@ foodpos.FoodPOS.Controller = class {
 			});
 
 			// View & print slip
-			card.find(".fpos-view-slip-btn").on("click", async () => {
-				try {
-					frappe.dom.freeze(__("Fetching POS slip data..."));
-					const res = await frappe.call({
-						method: "foodpos.foodpos.page.food_pos.food_pos.get_invoice_slip_data",
-						args: { invoice_name: o.name, doctype: o.doctype },
-					});
-					frappe.dom.unfreeze();
-					if (res.message) {
-						this.show_pos_slip(res.message);
-					}
-				} catch (err) {
-					frappe.dom.unfreeze();
-					frappe.msgprint(__("Could not load slip data: {0}", [err.message]));
-				}
-			});
+			card.find(".fpos-view-slip-btn").on("click", () => this.open_invoice_slip(o.name, o.doctype));
 
 			$container.append(card);
 		});
@@ -3776,7 +3855,7 @@ foodpos.FoodPOS.Controller = class {
 		};
 
 		if (this.cart_items.length > 0) {
-			frappe.confirm(
+			fpos_confirm(
 				__("Your active cart has items. Replace active cart with Customer Order {0} to edit?", [order.name]),
 				() => load()
 			);
@@ -4148,7 +4227,7 @@ foodpos.FoodPOS.Controller = class {
 						<span style="font-size:11px;color:#a8a29e;">${kot.customer || "Walk-in"}</span>
 						<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
 							${stage_btn}
-							<button class="btn btn-default btn-xs fpos-kot-print-btn" data-kot="${kot.name}" style="font-weight:700;background:#faf6f0;color:#44403c;border-color:#d8cbb8;border-radius:6px;padding:5px 12px;">${fpos_icon("printer", "fpos-ic-sm")} ${__("Print")}</button>
+							${kot.kitchen_print_error ? `<button class="btn btn-default btn-xs fpos-kot-retry-print-btn" data-kot="${kot.name}" title="${fpos_escape(kot.kitchen_print_error)}" style="font-weight:700;background:#fef3c7;color:#92400e;border-color:#f59e0b;border-radius:6px;padding:5px 12px;">${fpos_icon("printer", "fpos-ic-sm")} ${__("Retry kitchen print")}</button>` : ""}
 							<button class="btn btn-default btn-xs fpos-kot-settle-btn" data-kot="${kot.name}" style="font-weight:700;background:#ea580c;color:#fff;border-color:#ea580c;border-radius:6px;padding:5px 12px;">${__("Settle & Print Bill")}</button>
 						</div>
 					</div>
@@ -4179,7 +4258,7 @@ foodpos.FoodPOS.Controller = class {
 					await this.show_kitchen_drawer();
 					this.refresh_kitchen_badge();
 				} catch (err) {
-					frappe.msgprint(__("Error updating item: {0}", [err.message]));
+					fpos_msg(__("Error updating item: {0}", [err.message]));
 				}
 			});
 
@@ -4199,28 +4278,25 @@ foodpos.FoodPOS.Controller = class {
 					this.show_kitchen_drawer();
 				} catch (err) {
 					frappe.dom.unfreeze();
-					frappe.msgprint(__("Could not update stage: {0}", [err.message]));
+					fpos_msg(__("Could not update stage: {0}", [err.message]));
 				}
 			});
 
-			// v5.10: paper KOT slip on demand (manual Print button inside the
-			// slip tab) — never auto-printed, so the counter never blocks.
-			card.find(".fpos-kot-print-btn").on("click", (e) => {
+			card.find(".fpos-kot-retry-print-btn").on("click", async (e) => {
 				const kot_id = $(e.currentTarget).data("kot");
-				this.open_kot_slip(
-					{ kot_name: kot_id, order_id: kot.order_id || "" },
-					{
-						order_type: kot.order_type,
-						table: kot.table || "",
-						order_note: kot.order_note || "",
-						items: (kot.items || []).map((it) => ({
-							item_code: it.item_code,
-							item_name: it.item_name,
-							qty: it.qty,
-							item_note: it.item_note || "",
-						})),
-					}
-				);
+				try {
+					const r = await frappe.call({
+						method: "foodpos.foodpos.page.food_pos.food_pos.retry_kitchen_print",
+						args: { kot_name: kot_id },
+						freeze: false,
+					});
+					const res = r.message || {};
+					if (res.status === "Printed") fpos_notify(__("Kitchen ticket printed."), "green");
+					else fpos_notify(__("Kitchen printer: {0}", [res.error || __("not printed")]), "red");
+					this.show_kitchen_drawer();
+				} catch (err) {
+					fpos_notify(__("Kitchen printer: {0}", [err.message || __("not printed")]), "red");
+				}
 			});
 
 			// v5.9: settle an open KOT — loads its items back into the cart
@@ -4250,7 +4326,7 @@ foodpos.FoodPOS.Controller = class {
 				frappe.dom.unfreeze();
 				const data = res.message || {};
 				if (!data.items || !data.items.length) {
-					frappe.msgprint(__("Kitchen ticket {0} has no items to bill.", [kot_name]));
+					fpos_msg(__("Kitchen ticket {0} has no items to bill.", [kot_name]));
 					return;
 				}
 				this.hide_kitchen_drawer();
@@ -4266,13 +4342,14 @@ foodpos.FoodPOS.Controller = class {
 				this.order_type = data.order_type || "Walk In";
 				this.selected_table = data.table || null;
 				this.selected_table_no = (data.table || "").split("-").pop().trim() || "";
-				this.linked_kot_id = kot_name;
+				const order_kots = (data.kot_names && data.kot_names.length) ? data.kot_names : [kot_name];
+				this.linked_kot_id = order_kots.join(", ");
 				this.pos_order_id = data.order_id || null;
 				this.customer = data.customer || this.customer;
 				this.order_note = data.order_note || "";
 				this.order_confirmed = true;
 				this.payment_pending = true;
-				this.show_pending_banner(kot_name);
+				this.show_pending_banner(this.linked_kot_id);
 				this.update_order_type_ui();
 				this.render_cart_items();
 				this.update_cart_summary();
@@ -4284,16 +4361,19 @@ foodpos.FoodPOS.Controller = class {
 				}
 				this.render_tab_bar();
 				this.save_cart_backup();
+				// The payment page and the delivery-details form live on the menu screen.
+				if (this.current_view !== "pos") this.show_pos();
 				this.show_payment_page();
 			} catch (e) {
 				frappe.dom.unfreeze();
-				frappe.msgprint(__("Could not load kitchen ticket: {0}", [e.message]));
+				fpos_msg(__("Could not load kitchen ticket: {0}", [e.message]));
 			} finally {
 				this._force_unfreeze();
 			}
 		};
-		if (this.cart_items.length > 0 && this.linked_kot_id !== kot_name) {
-			frappe.confirm(
+		const already_loaded = String(this.linked_kot_id || "").split(",").map((k) => k.trim()).includes(kot_name);
+		if (this.cart_items.length > 0 && !already_loaded) {
+			fpos_confirm(
 				__("Your active cart has items. Replace it with kitchen ticket {0} to bill it?", [kot_name]),
 				() => load()
 			);
@@ -4566,7 +4646,7 @@ foodpos.FoodPOS.Controller = class {
 							}
 						} catch (err) {
 							frappe.dom.unfreeze();
-							frappe.msgprint(err.message || __("Void authorization failed."));
+							fpos_msg(err.message || __("Void authorization failed."));
 						}
 					}
 				});
@@ -4761,7 +4841,7 @@ foodpos.FoodPOS.Controller = class {
 					await this.refresh_held_badge();
 				} catch (err) {
 					frappe.dom.unfreeze();
-					frappe.msgprint(__("Could not hold order: {0}", [err.message]));
+					fpos_msg(__("Could not hold order: {0}", [err.message]));
 				}
 			}
 		});
@@ -4804,7 +4884,7 @@ foodpos.FoodPOS.Controller = class {
 				this.delivery_phone = data.phone || "";
 				this.delivery_address = data.delivery_address || "";
 				this.delivery_charges = flt(data.delivery_charges || 0);
-				this.discount_percentage = 0; // v5.2: % discounts removed — Rs only, stale % never restored.
+				this.discount_percentage = flt(data.discount_percentage || 0);
 				this.discount_amount = flt(data.discount_amount || 0);
 				this.order_note = data.order_note || "";
 
@@ -4834,12 +4914,12 @@ foodpos.FoodPOS.Controller = class {
 				frappe.show_alert({ message: __("Held order {0} resumed!", [held_order_id]), indicator: "green" });
 			} catch (err) {
 				frappe.dom.unfreeze();
-				frappe.msgprint(__("Could not resume order: {0}", [err.message]));
+				fpos_msg(__("Could not resume order: {0}", [err.message]));
 			}
 		};
 
 		if (this.cart_items.length > 0) {
-			frappe.confirm(
+			fpos_confirm(
 				__("Your active cart has items. Replace cart with Held Order {0}?", [held_order_id]),
 				() => load()
 			);
@@ -4849,7 +4929,7 @@ foodpos.FoodPOS.Controller = class {
 	}
 
 	async discard_held_order_from_drawer(held_order_id) {
-		frappe.confirm(__("Are you sure you want to discard Held Order {0}?", [held_order_id]), async () => {
+		fpos_confirm(__("Are you sure you want to discard Held Order {0}?", [held_order_id]), async () => {
 			try {
 				const res_disc = await frappe.call({
 					method: "foodpos.foodpos.page.food_pos.food_pos.discard_held_order",
@@ -4869,7 +4949,7 @@ foodpos.FoodPOS.Controller = class {
 				this.render_held_orders(held_list);
 				this.update_held_badge(held_list);
 			} catch (err) {
-				frappe.msgprint(__("Could not discard order: {0}", [err.message]));
+				fpos_msg(__("Could not discard order: {0}", [err.message]));
 			}
 		});
 	}
@@ -5283,7 +5363,7 @@ foodpos.FoodPOS.Controller = class {
 			};
 
 			if (this.cart_items.length > 0) {
-				frappe.confirm(
+				fpos_confirm(
 					__("Switch order type to {0}? Cart items will be retained.", [new_type]),
 					() => apply_type_switch()
 				);
@@ -5345,10 +5425,11 @@ foodpos.FoodPOS.Controller = class {
 			// v7: Pending is a real full-page view now, so its nav item
 			// stays highlighted like every other view (no more drawer).
 			else if (key === "pending") this.show_pending_page();
-			else if (key === "tables" || key === "reservation") this.show_tables();
-			else if (key === "delivery") this.show_daily_report();
-			else if (key === "accounting") this.show_closing_page();
-			else if (key === "settings") frappe.set_route("Form", "POS Profile", this.pos_profile);
+			else if (key === "tables") this.show_tables();
+			else if (key === "reservation") this.show_reservations();
+			else if (key === "delivery") this.show_delivery();
+			else if (key === "accounting") this.show_daily_report();
+			else if (key === "settings") this.show_settings();
 			else if (key === "logout") {
 				if (window.frappe && frappe.app && frappe.app.logout) frappe.app.logout();
 				else frappe.set_route("desk");
@@ -5362,14 +5443,6 @@ foodpos.FoodPOS.Controller = class {
 			// v4: a free-table chip starts a Dine-In order on that table.
 			const table_name = $chip.data("table-name");
 			if (table_name) this.start_table_order(table_name);
-		});
-
-		// v3: cart-panel payment method pick (Cash / Card / QR) — payment page default.
-		this.wrapper.on("click", ".fpos-pay-method", (e) => {
-			const mode = $(e.currentTarget).data("mode");
-			this.preferred_payment_mode = mode;
-			this.wrapper.find(".fpos-pay-method").removeClass("active");
-			$(e.currentTarget).addClass("active");
 		});
 
 		// KOT button click
@@ -5386,7 +5459,7 @@ foodpos.FoodPOS.Controller = class {
 						freeze: false,
 					});
 					if (res.message && res.message.has_kot) {
-						frappe.msgprint({
+						fpos_msg({
 							title: __("Active Kitchen Tickets Exist"),
 							indicator: "red",
 							message: __("Table {0} has a {1} kitchen order ticket ({2}). You cannot clear the cart or abandon a served table without settling the bill or performing an authorized Manager Void.", [
@@ -5401,7 +5474,7 @@ foodpos.FoodPOS.Controller = class {
 					console.warn("KOT check failed:", e);
 				}
 			}
-			frappe.confirm(__("Are you sure you want to clear the entire cart?"), () => this.clear_cart());
+			fpos_confirm(__("Are you sure you want to clear the entire cart?"), () => this.clear_cart());
 		});
 
 		// Pay button click -> Full Page Slide-in Transition from Left to Right
@@ -5466,27 +5539,13 @@ foodpos.FoodPOS.Controller = class {
 
 		// v2: Switch Branch removed — single branch, no branch switching.
 
-		// Exit to Desk action in More menu
-		this.wrapper.on("click", ".fpos-exit-desk-btn", () => {
-			this.wrapper.find(".fpos-more-menu").hide();
-			frappe.set_route("desk");
-		});
-
-		// Close register action in More menu (separated at bottom, prompts manager PIN)
+		// Close register action in More menu. No PIN: the closing page is the
+		// reconciliation step, and the POS Closing Entry is the audit record.
 		this.wrapper.on("click", ".fpos-close-btn-menu", () => {
 			this.wrapper.find(".fpos-more-menu").hide();
-			frappe.confirm(
+			fpos_confirm(
 				__("Close Register & reconcile daily sales for this shift?"),
-				() => {
-					this.prompt_manager_pin({
-						action_type: "Close Register",
-						title: __("Manager PIN — Close Register"),
-						details: __("Closing register for shift {0} requires manager PIN authorization.", [this.pos_opening || ""]),
-						on_success: () => {
-							this.show_closing_page();
-						}
-					});
-				}
+				() => this.show_closing_page()
 			);
 		});
 
@@ -5532,7 +5591,7 @@ foodpos.FoodPOS.Controller = class {
 				},
 				secondary_action_label: __("Discard Queue"),
 				secondary_action: () => {
-					frappe.confirm(__("Discard {0} pending offline invoices from browser storage?", [queue.length]), () => {
+					fpos_confirm(__("Discard {0} pending offline invoices from browser storage?", [queue.length]), () => {
 						localStorage.removeItem(this.offline_queue_key);
 						this.update_connection_indicator();
 						frappe.show_alert({ message: __("Offline queue cleared."), indicator: "blue" });
@@ -5551,174 +5610,298 @@ foodpos.FoodPOS.Controller = class {
 
 		// v2: the branch/register chip is a static label now — no profile switching.
 
-		// Discount modal
-		this.wrapper.on("click", ".fpos-discount-btn", () => {
-			this.open_discount_dialog();
+		// Cart discount: add, edit, remove. No PIN.
+		// Discount is a fixed Rs amount typed straight into the cart (no dialog).
+		const apply_inline_discount = ($input) => {
+			const subtotal = this.cart_items.reduce((sum, i) => sum + flt(i.amount), 0);
+			let amount = Math.max(0, flt($input.val()));
+			if (amount > subtotal) {
+				amount = subtotal;
+				fpos_notify(__("Discount cannot be more than the subtotal."), "red");
+			}
+			this.discount_percentage = 0;
+			this.discount_amount = amount;
+			this.update_cart_summary();
+		};
+		let disc_timer = null;
+		this.wrapper.on("input", ".fpos-disc-inline-input", (e) => {
+			clearTimeout(disc_timer);
+			const $input = $(e.currentTarget);
+			disc_timer = setTimeout(() => apply_inline_discount($input), 350);
+		});
+		this.wrapper.on("change", ".fpos-disc-inline-input", (e) => {
+			clearTimeout(disc_timer);
+			apply_inline_discount($(e.currentTarget));
+		});
+		this.wrapper.on("keydown", ".fpos-disc-inline-input", (e) => {
+			if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); }
+		});
+		this.wrapper.on("click", ".fpos-inv-open", (e) => {
+			const $b = $(e.currentTarget);
+			this.open_invoice_slip($b.data("name"), $b.data("doctype"));
+		});
+		this.wrapper.on("click", ".fpos-discount-remove", () => {
+			this.discount_percentage = 0;
+			this.discount_amount = 0;
+			this.update_cart_summary();
 		});
 	}
 
-	open_discount_dialog() {
-		const format_curr = (val) => this.format_money(val);
-		const subtotal = flt(this.totals && this.totals.subtotal) || 0;
+	open_invoice_slip(name, doctype) {
+		frappe.dom.freeze(__("Loading receipt..."));
+		frappe.call({
+			method: "foodpos.foodpos.page.food_pos.food_pos.get_invoice_slip_data",
+			args: { invoice_name: name, doctype: doctype },
+		}).then((res) => {
+			frappe.dom.unfreeze();
+			if (res.message) this.show_pos_slip(res.message);
+		}).catch((err) => {
+			frappe.dom.unfreeze();
+			fpos_msg(__("Could not load slip data: {0}", [err.message || ""]));
+		});
+	}
 
-		const d = new frappe.ui.Dialog({
-			title: __("Apply Order Discount"),
-			fields: [
-				{
-					fieldname: "info_html",
-					fieldtype: "HTML",
-					options: `
-						<div style="background:#faf6f0;border:1px solid #eadfd2;border-radius:10px;padding:12px;margin-bottom:14px;">
-							<div style="display:flex;justify-content:space-between;align-items:center;">
-								<span style="font-size:13px;color:#78716c;font-weight:600;">${__("Current Order Subtotal:")}</span>
-								<span style="font-size:16px;color:#292524;font-weight:800;">${format_curr(subtotal)}</span>
-							</div>
-							<div style="font-size:11px;color:#a8a29e;margin-top:4px;">
-								${__("Cashier cap: Max Rs 100 without Manager PIN. Discount is always in Rs, never %.")}
-							</div>
-						</div>
-
-						<div style="margin-bottom:14px;">
-							<label style="font-size:12px;font-weight:700;color:#44403c;margin-bottom:6px;display:block;">${__("Discount Presets (Rs)")}</label>
-							<div class="fpos-disc-presets" style="display:flex;gap:6px;flex-wrap:wrap;">
-								<button type="button" class="btn btn-default btn-sm fpos-preset-btn" data-type="amt" data-val="50" style="font-weight:700;">Rs 50</button>
-								<button type="button" class="btn btn-default btn-sm fpos-preset-btn" data-type="amt" data-val="100" style="font-weight:700;">Rs 100</button>
-								<button type="button" class="btn btn-default btn-sm fpos-preset-btn" data-type="amt" data-val="200" style="font-weight:700;border-color:#f59e0b;color:#b45309;">Rs 200 (PIN)</button>
-								<button type="button" class="btn btn-default btn-sm fpos-preset-btn" data-type="amt" data-val="500" style="font-weight:700;border-color:#f59e0b;color:#b45309;">Rs 500 (PIN)</button>
-								<button type="button" class="btn btn-default btn-sm fpos-preset-clear text-danger" style="font-weight:700;">${__("Clear")}</button>
-							</div>
-						</div>
-					`
-				},
-				{
-					// v5.2: discount is a flat Rs amount only — no % field anymore.
-					fieldname: "discount_amount",
-					fieldtype: "Currency",
-					label: __("Discount Amount (Rs)"),
-					default: this.discount_amount,
-				},
-				{
-					fieldname: "pin_section",
-					fieldtype: "Section Break",
-					label: __("Manager Authorization Required"),
-					hidden: 1,
-				},
-				{
-					fieldname: "manager_pin",
-					fieldtype: "Password",
-					label: __("Manager PIN"),
-					hidden: 1,
-					description: __("Exceeds cashier cap (Max Rs 100). Manager PIN is required."),
-				},
-				{
-					fieldname: "discount_reason",
-					fieldtype: "Data",
-					label: __("Reason for Override"),
-					hidden: 1,
-					default: __("Manager approved customer discount"),
+	// Settings panel inside the POS: the kitchen printer for this register.
+	async show_settings() {
+		const $o = $(`
+			<div class="fpos-modal-overlay fpos-settings-overlay">
+				<div class="fpos-modal fpos-settings-modal" role="dialog" aria-modal="true">
+					<div class="fpos-modal-head">
+						<div class="fpos-modal-title">${fpos_icon("settings", "fpos-ic-sm")} ${__("Register settings")}</div>
+						<button type="button" class="fpos-modal-x" aria-label="${__("Close")}">&times;</button>
+					</div>
+					<div class="fpos-modal-body">
+						<div class="fpos-set-row"><span>${__("Register")}</span><strong>${fpos_escape(this.pos_profile || "")}</strong></div>
+						<label class="fpos-disc-label">${__("Kitchen printer")}</label>
+						<select class="fpos-set-printer" disabled><option>${__("Loading...")}</option></select>
+						<div class="fpos-set-hint"></div>
+					</div>
+					<div class="fpos-modal-foot">
+						<span class="fpos-modal-spacer"></span>
+						<button type="button" class="fpos-btn fpos-set-save" disabled>${__("Save")}</button>
+					</div>
+				</div>
+			</div>`);
+		$("body").append($o);
+		const close = () => { $o.remove(); };
+		$o.on("click", (e) => { if (e.target === e.currentTarget) close(); });
+		$o.find(".fpos-modal-x").on("click", close);
+		try {
+			const r = await frappe.call({
+				method: "foodpos.foodpos.page.food_pos.food_pos.get_kitchen_printer",
+				args: { pos_profile: this.pos_profile },
+			});
+			const info = r.message || { current: "", printers: [] };
+			const $sel = $o.find(".fpos-set-printer").empty();
+			$sel.append(`<option value="">${__("No kitchen printer")}</option>`);
+			(info.printers || []).forEach((pr) => {
+				$sel.append(`<option value="${fpos_escape(pr.name)}">${fpos_escape(pr.name)} — ${fpos_escape(pr.server_ip || "")}:${fpos_escape(pr.port || "")} (${fpos_escape(pr.printer_name || "")})</option>`);
+			});
+			$sel.val(info.current || "");
+			$o.find(".fpos-set-hint").text(
+				(info.printers || []).length
+					? __("Kitchen tickets print here automatically when an order is confirmed.")
+					: __("No printers are set up yet. An administrator adds them under Network Printer Settings.")
+			);
+			$sel.prop("disabled", false);
+			$o.find(".fpos-set-save").prop("disabled", false).on("click", async () => {
+				try {
+					await frappe.call({
+						method: "foodpos.foodpos.page.food_pos.food_pos.set_kitchen_printer",
+						args: { pos_profile: this.pos_profile, printer: $sel.val() || null },
+					});
+					fpos_notify(__("Kitchen printer saved."), "green");
+					close();
+				} catch (err) {
+					fpos_msg(__("Could not save the printer: {0}", [err.message || ""]));
 				}
-			],
-			primary_action_label: __("Apply Discount"),
-			// v5.2: discount is a flat Rs amount only — no % anywhere.
-			primary_action: async (values) => {
-				const amt = flt(values.discount_amount);
+			});
+		} catch (err) {
+			$o.find(".fpos-set-hint").text(err.message || __("Could not load printers."));
+		}
+	}
 
-				if (amt <= 0) {
-					this.discount_percentage = 0;
-					this.discount_amount = 0;
-					this.discount_approved_by = null;
-					this.discount_manager_pin = null;
-					d.hide();
-					this.update_cart_summary();
-					return;
+	// ── Sidebar: Reservations ─────────────────────────────────────────────────
+	// Reserved tables with their booking, an inline form to book a free table,
+	// and the two things a host does with a booking: seat the guests or cancel.
+	async show_reservations() {
+		this.set_view("reservations");
+		const $view = this.wrapper.find(".fpos-reservations-view");
+		$view.html(`
+			<div class="fpos-pending-head">
+				<button class="fpos-pending-back fpos-sb-back">${fpos_icon("arrowLeft", "fpos-ic-sm")} ${__("Back")}</button>
+				<span class="fpos-pending-title">${__("Reservations")}</span>
+				<span class="fpos-sb-pill fpos-res-count">…</span>
+				<button class="fpos-sb-primary fpos-res-new">+ ${__("New reservation")}</button>
+			</div>
+			<div class="fpos-sb-body">
+				<form class="fpos-res-form" style="display:none;" autocomplete="off"></form>
+				<div class="fpos-res-list"><div class="fpos-sb-loading">${__("Loading reservations...")}</div></div>
+			</div>
+		`);
+		$view.find(".fpos-sb-back").on("click", () => this.go_back("pos"));
+		let data = { reserved: [], available: [] };
+		try {
+			const r = await frappe.call({ method: "foodpos.foodpos.page.food_pos.food_pos.get_reservations", freeze: false });
+			data = r.message || data;
+		} catch (e) {
+			$view.find(".fpos-res-list").html(`<div class="fpos-sb-empty">${__("Could not load reservations.")}</div>`);
+			return;
+		}
+		$view.find(".fpos-res-count").text(__("{0} reserved", [data.reserved.length]));
+
+		const fmt_time = (v) => v ? frappe.datetime.str_to_user(v).replace(/:\d\d$/, "") : __("Time not set");
+		const cards = data.reserved.map((t) => `
+			<div class="fpos-sb-card" data-table="${fpos_escape(t.name)}">
+				<div class="fpos-sb-card-top">
+					<span class="fpos-sb-table">${fpos_escape(t.table_no || t.name)}</span>
+					<span class="fpos-sb-muted">${fpos_escape(t.section || "")} · ${cint(t.capacity)} ${__("seats")}</span>
+					<span class="fpos-sb-chip fpos-sb-chip-amber">${__("Reserved")}</span>
+				</div>
+				<div class="fpos-sb-guest">${fpos_escape(t.reservation_name || __("Guest"))}</div>
+				<div class="fpos-sb-meta">
+					<span>${fpos_icon("calendar", "fpos-ic-sm")} ${fpos_escape(fmt_time(t.reservation_time))}</span>
+					${t.guests ? `<span>${fpos_icon("user", "fpos-ic-sm")} ${cint(t.guests)} ${__("guests")}</span>` : ""}
+					${t.mobile ? `<span>${fpos_icon("phone", "fpos-ic-sm")} ${fpos_escape(t.mobile)}</span>` : ""}
+				</div>
+				${t.notes ? `<div class="fpos-sb-note">${fpos_escape(t.notes)}</div>` : ""}
+				<div class="fpos-sb-actions">
+					<button class="fpos-sb-ghost fpos-res-cancel">${__("Cancel")}</button>
+					<button class="fpos-sb-primary fpos-res-seat">${__("Seat guests")}</button>
+				</div>
+			</div>`).join("");
+		$view.find(".fpos-res-list").html(cards
+			? `<div class="fpos-sb-grid">${cards}</div>`
+			: `<div class="fpos-sb-empty">${fpos_icon("calendar", "fpos-ic-lg")}<b>${__("No reservations")}</b><span>${__("Use New reservation to book a table.")}</span></div>`);
+
+		$view.find(".fpos-res-seat").on("click", (e) => {
+			const table = $(e.currentTarget).closest(".fpos-sb-card").data("table");
+			this.start_table_order(table);
+			if (this.current_view !== "pos") this.show_pos();
+		});
+		$view.find(".fpos-res-cancel").on("click", (e) => {
+			const table = $(e.currentTarget).closest(".fpos-sb-card").data("table");
+			fpos_confirm(__("Cancel this reservation and free the table?"), async () => {
+				try {
+					await frappe.call({
+						method: "foodpos.foodpos.api.food_pos.update_table_status",
+						args: { table_name: table, status: "Available", customer_name: null, mobile: null,
+							reservation_time: null, notes: null, guests: 0 },
+					});
+					fpos_notify(__("Reservation cancelled."), "green");
+					this.show_reservations();
+				} catch (err) {
+					fpos_notify(err.message || __("Could not cancel the reservation."), "red");
 				}
+			});
+		});
 
-				const exceeds_cap = amt > 100.0;
-				if (exceeds_cap) {
-					const pin = (values.manager_pin || "").trim();
-					if (!pin) {
-						frappe.msgprint({
-							title: __("Manager PIN Required"),
-							indicator: "orange",
-							message: __("Discount of {0} exceeds the cashier cap (Rs 100). Please provide a valid Manager PIN.", [format_curr(amt)])
-						});
-						d.set_df_property("pin_section", "hidden", 0);
-						d.set_df_property("manager_pin", "hidden", 0);
-						d.set_df_property("discount_reason", "hidden", 0);
-						return;
-					}
-
-					try {
-						frappe.dom.freeze(__("Verifying Manager PIN..."));
-						const vres = await frappe.call({
-							method: "foodpos.foodpos.page.food_pos.food_pos.verify_manager_pin",
-							args: {
-								pin: pin,
-								action_type: "discount",
-								cashier: frappe.session.user,
-								details: `Discount override: Rs ${amt}. Reason: ${values.discount_reason || "Manager approval"}`
-							}
-						});
-						frappe.dom.unfreeze();
-
-						if (vres.message && vres.message.success) {
-							this.discount_percentage = 0;
-							this.discount_amount = amt;
-							this.discount_approved_by = vres.message.approved_by;
-							this.discount_manager_pin = pin;
-							frappe.show_alert({
-								message: __("Discount approved by {0}", [vres.message.manager_name]),
-								indicator: "green"
-							});
-							d.hide();
-							this.update_cart_summary();
-						}
-					} catch (e) {
-						frappe.dom.unfreeze();
-						frappe.msgprint({
-							title: __("Authorization Failed"),
-							indicator: "red",
-							message: e.message || __("Invalid Manager PIN. Access denied.")
-						});
-					}
-				} else {
-					// Within cashier cap
-					this.discount_percentage = 0;
-					this.discount_amount = amt;
-					this.discount_approved_by = null;
-					this.discount_manager_pin = null;
-					d.hide();
-					this.update_cart_summary();
-				}
+		const $form = $view.find(".fpos-res-form");
+		const in_an_hour = new Date(Date.now() + 60 * 60 * 1000);
+		const pad = (n) => String(n).padStart(2, "0");
+		const default_time = `${in_an_hour.getFullYear()}-${pad(in_an_hour.getMonth() + 1)}-${pad(in_an_hour.getDate())}T${pad(in_an_hour.getHours())}:${pad(in_an_hour.getMinutes())}`;
+		$form.html(`
+			<div class="fpos-res-form-grid">
+				<label>${__("Table")}<select name="table" required>${data.available.map((t) =>
+					`<option value="${fpos_escape(t.name)}">${fpos_escape(t.table_no || t.name)} · ${fpos_escape(t.section || "")} · ${cint(t.capacity)} ${__("seats")}</option>`).join("")}</select></label>
+				<label>${__("Guest name")}<input name="customer_name" required placeholder="${__("Name")}"></label>
+				<label>${__("Phone")}<input name="mobile" inputmode="tel" placeholder="03xx xxxxxxx"></label>
+				<label>${__("Date & time")}<input name="reservation_time" type="datetime-local" required value="${default_time}"></label>
+				<label>${__("Guests")}<input name="guests" type="number" min="1" value="2"></label>
+				<label class="fpos-res-wide">${__("Notes")}<input name="notes" placeholder="${__("Birthday, window seat...")}"></label>
+			</div>
+			<div class="fpos-sb-actions">
+				<button type="button" class="fpos-sb-ghost fpos-res-form-cancel">${__("Close")}</button>
+				<button type="submit" class="fpos-sb-primary">${__("Reserve table")}</button>
+			</div>`);
+		$view.find(".fpos-res-new").on("click", () => {
+			if (!data.available.length) { fpos_notify(__("No free tables right now."), "red"); return; }
+			$form.slideToggle(150);
+			$form.find('[name="customer_name"]').trigger("focus");
+		});
+		$form.find(".fpos-res-form-cancel").on("click", () => $form.slideUp(150));
+		$form.on("submit", async (e) => {
+			e.preventDefault();
+			const v = Object.fromEntries(new FormData($form[0]).entries());
+			if (!v.customer_name.trim()) return;
+			try {
+				await frappe.call({
+					method: "foodpos.foodpos.api.food_pos.update_table_status",
+					args: { table_name: v.table, status: "Reserved", customer_name: v.customer_name.trim(),
+						mobile: v.mobile || null, reservation_time: (v.reservation_time || "").replace("T", " ") + ":00",
+						guests: cint(v.guests) || 1, notes: v.notes || null },
+				});
+				fpos_notify(__("Table reserved."), "green");
+				this.show_reservations();
+			} catch (err) {
+				fpos_notify(err.message || __("Could not reserve the table."), "red");
 			}
 		});
+	}
 
-		const check_cap_visibility = () => {
-			const a = flt(d.get_value("discount_amount"));
-			const show_pin = a > 100.0;
-			d.set_df_property("pin_section", "hidden", show_pin ? 0 : 1);
-			d.set_df_property("manager_pin", "hidden", show_pin ? 0 : 1);
-			d.set_df_property("discount_reason", "hidden", show_pin ? 0 : 1);
+	// ── Sidebar: Delivery ─────────────────────────────────────────────────────
+	// Delivery orders still in the kitchen (collect payment when delivered) and
+	// today's paid delivery bills (open the receipt).
+	async show_delivery() {
+		this.set_view("delivery");
+		const $view = this.wrapper.find(".fpos-delivery-view");
+		$view.html(`
+			<div class="fpos-pending-head">
+				<button class="fpos-pending-back fpos-sb-back">${fpos_icon("arrowLeft", "fpos-ic-sm")} ${__("Back")}</button>
+				<span class="fpos-pending-title">${__("Delivery")}</span>
+				<span class="fpos-sb-pill fpos-del-count">…</span>
+				<button class="fpos-sb-primary fpos-del-new">+ ${__("New delivery order")}</button>
+			</div>
+			<div class="fpos-sb-body"><div class="fpos-sb-loading">${__("Loading delivery orders...")}</div></div>
+		`);
+		$view.find(".fpos-sb-back").on("click", () => this.go_back("pos"));
+		$view.find(".fpos-del-new").on("click", () => {
+			this.show_pos();
+			this.wrapper.find('.fpos-ot-tab[data-type="Delivery"]').trigger("click");
+		});
+		let data = { active: [], completed: [] };
+		try {
+			const r = await frappe.call({
+				method: "foodpos.foodpos.page.food_pos.food_pos.get_delivery_orders",
+				args: { pos_profile: this.pos_profile }, freeze: false,
+			});
+			data = r.message || data;
+		} catch (e) {
+			$view.find(".fpos-sb-body").html(`<div class="fpos-sb-empty">${__("Could not load delivery orders.")}</div>`);
+			return;
+		}
+		$view.find(".fpos-del-count").text(__("{0} active", [data.active.length]));
+		const chip = (s) => {
+			const cls = s === "Ready" ? "fpos-sb-chip-green" : s === "In Progress" ? "fpos-sb-chip-blue" : "fpos-sb-chip-amber";
+			return `<span class="fpos-sb-chip ${cls}">${__(s)}</span>`;
 		};
-
-		d.$wrapper.on("input", "input[data-fieldname='discount_amount']", () => {
-			check_cap_visibility();
-		});
-
-		d.$wrapper.on("click", ".fpos-preset-btn", (e) => {
-			const val = flt($(e.currentTarget).data("val"));
-			d.set_value("discount_amount", val);
-			check_cap_visibility();
-		});
-
-		d.$wrapper.on("click", ".fpos-preset-clear", () => {
-			d.set_value("discount_amount", 0);
-			check_cap_visibility();
-		});
-
-		this.style_dialog(d);
-		d.show();
-		check_cap_visibility();
+		const active = data.active.map((o) => `
+			<div class="fpos-sb-card" data-kot="${fpos_escape(o.kots[0])}">
+				<div class="fpos-sb-card-top">
+					<span class="fpos-sb-table">${fpos_escape(o.customer || __("Customer"))}</span>
+					<span class="fpos-sb-muted">${fpos_escape(frappe.datetime.prettyDate(o.created))}</span>
+					${chip(o.status)}
+				</div>
+				<div class="fpos-sb-items">${o.items.map((i) => `<span>${cint(i.qty)} × ${fpos_escape(i.item_name)}</span>`).join("")}</div>
+				<div class="fpos-sb-actions">
+					<span class="fpos-sb-total">${this.format_money(o.estimated_total)}</span>
+					<button class="fpos-sb-primary fpos-del-pay">${__("Collect payment")}</button>
+				</div>
+			</div>`).join("");
+		const done = data.completed.map((c) => `
+			<button class="fpos-sb-row fpos-del-receipt" data-name="${fpos_escape(c.name)}">
+				<span class="fpos-sb-row-main"><b>${fpos_escape(c.customer_name || "")}</b><span class="fpos-sb-muted">${[c.custom_contact_phone, c.custom_delivery_address, c.name, c.posting_time].filter(Boolean).map(fpos_escape).join(" · ")}</span></span>
+				<span class="fpos-sb-total">${this.format_money(c.grand_total)}</span>
+				${flt(c.outstanding_amount) > 0 ? `<span class="fpos-sb-chip fpos-sb-chip-amber">${__("Unpaid")}</span>` : `<span class="fpos-sb-chip fpos-sb-chip-green">${__("Paid")}</span>`}
+			</button>`).join("");
+		$view.find(".fpos-sb-body").html(`
+			<div class="fpos-sb-section">${__("In progress")}</div>
+			${active ? `<div class="fpos-sb-grid">${active}</div>` : `<div class="fpos-sb-empty fpos-sb-empty-sm">${__("No delivery orders in the kitchen.")}</div>`}
+			<div class="fpos-sb-section">${__("Delivered today")}</div>
+			${done ? `<div class="fpos-sb-list">${done}</div>` : `<div class="fpos-sb-empty fpos-sb-empty-sm">${__("No delivery bills yet today.")}</div>`}
+		`);
+		$view.find(".fpos-del-pay").on("click", (e) => this.resume_kot_for_payment($(e.currentTarget).closest(".fpos-sb-card").data("kot")));
+		$view.find(".fpos-del-receipt").on("click", (e) => this.open_invoice_slip($(e.currentTarget).data("name"), "Sales Invoice"));
 	}
 
 	async show_closing_page() {
@@ -5753,7 +5936,7 @@ foodpos.FoodPOS.Controller = class {
 			this.render_closing_page(data);
 		} catch (err) {
 			console.error("Error loading closing details:", err);
-			frappe.msgprint({
+			fpos_msg({
 				title: __("Closing Error"),
 				indicator: "red",
 				message: __("Could not fetch closing summary. Please check connection.")
@@ -5861,7 +6044,6 @@ foodpos.FoodPOS.Controller = class {
 				// "Where Orders Came From" breakdown above.
 				const ot = inv.custom_order_type || ((inv.custom_table || inv.custom_restaurant_table) ? "Dine In" : "Takeaway");
 				const ot_icon = fpos_icon(ot === "Dine In" ? "table" : ot === "Takeaway" ? "box" : "truck", "fpos-ic-sm");
-				const doc_route = inv.doctype === "POS Invoice" ? `/app/pos-invoice/${inv.name}` : `/app/sales-invoice/${inv.name}`;
 				const is_paid = flt(inv.outstanding_amount) <= 0.001;
 				const status_badge = is_paid
 					? `<span style="background: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 700;">Paid</span>`
@@ -5870,7 +6052,7 @@ foodpos.FoodPOS.Controller = class {
 				return `
 					<tr style="border-bottom: 1px solid #f5efe4;">
 						<td style="padding: 10px 14px;">
-							<a href="${doc_route}" target="_blank" style="font-weight: 700; color: #2563eb; text-decoration: none;">${inv.name} ↗</a>
+							<button type="button" class="fpos-inv-open" data-name="${fpos_escape(inv.name)}" data-doctype="${fpos_escape(inv.doctype || "Sales Invoice")}" style="border:0;background:none;padding:0;font-weight:700;color:#ea580c;cursor:pointer;">${fpos_escape(inv.name)}</button>
 						</td>
 						<td style="padding: 10px 14px; color: #78716c; font-size: 12px;">${(inv.posting_time || "").substring(0, 5)}</td>
 						<td style="padding: 10px 14px; font-weight: 500; color: #292524;">${inv.customer_name || inv.customer || "Walk-in"}</td>
@@ -6101,7 +6283,7 @@ foodpos.FoodPOS.Controller = class {
 						<button class="btn btn-default fpos-print-closing-btn" style="font-weight: 700; border-radius: 8px; padding: 8px 18px; border: 1px solid #d8cbb8;">
 							<span>${fpos_icon("printer", "fpos-ic-sm")} ${__("Print Z-Report")}</span>
 						</button>
-						<button class="btn btn-danger fpos-exit-desk-btn" style="font-weight: 800; border-radius: 8px; padding: 8px 22px;">
+						<button class="btn btn-danger fpos-finalize-shift-btn" style="font-weight: 800; border-radius: 8px; padding: 8px 22px;">
 							<span>${fpos_icon("checkCircle", "fpos-ic-sm")} ${__("Close Day")}</span>
 						</button>
 					</div>
@@ -6176,9 +6358,9 @@ foodpos.FoodPOS.Controller = class {
 		});
 
 		// Finalize the day & submit the closing entry
-		$page.on("click", ".fpos-exit-desk-btn", () => {
-			frappe.confirm(
-				__("Are you sure you want to finalize this shift and submit the POS Closing Entry?<br><br>This will consolidate all shift invoices, record counted payments, deduct stock, and post General Ledger entries."),
+		$page.on("click", ".fpos-finalize-shift-btn", () => {
+			fpos_confirm(
+				__("Are you sure you want to finalize this shift and submit the POS Closing Entry?\n\nThis will consolidate all shift invoices, record counted payments, deduct stock, and post General Ledger entries."),
 				() => {
 					// Collect payment reconciliation rows
 					const recon_data = [];
@@ -6212,28 +6394,18 @@ foodpos.FoodPOS.Controller = class {
 						freeze_message: __("Consolidating shift and submitting POS Closing Entry..."),
 						callback: (r) => {
 							sessionStorage.removeItem("fpos_active_profile");
+							sessionStorage.removeItem("fpos_current_view");
 							this.pos_opening = null;
 							this.pos_opening_time = null;
 							this.pos_opening_entry = null;
 
 							const closing_name = (r.message && (r.message.closing_entry || r.message.name)) || "";
-							frappe.msgprint({
-								title: __("Shift Closed Successfully"),
-								indicator: "green",
-								message: __(
-									"POS Closing Entry <b><a href='/app/pos-closing-entry/{0}'>{0}</a></b> has been submitted.<br>All shift invoices have been consolidated and inventory/ledger entries posted.",
-									[closing_name]
-								),
-								primary_action_label: __("Go to Desk"),
-								primary_action: {
-									action() {
-										frappe.set_route("");
-									},
-								},
-							});
+							fpos_notify(__("Shift closed. POS Closing Entry {0} submitted.", [closing_name]), "green");
+							this.day_open = false;
+							this.show_home();
 						},
 						error: (err) => {
-							frappe.msgprint({
+							fpos_msg({
 								title: __("Shift Closing Error"),
 								indicator: "red",
 								message: (err && err.message) || __("Failed to submit POS Closing Entry. Please check error log."),
@@ -6353,6 +6525,41 @@ foodpos.FoodPOS.Controller = class {
 
 	// Show exactly one view: "home" | "pos" | "tables" | "attendance" |
 	// "report" | "pending" (v7: Pending Payments is a full page now).
+	// Hide the screens while the start view is being chosen, so no other
+	// screen paints first (the menu and Home both show by default).
+	_hold_screen() {
+		this.wrapper.find(".fpos-hold-loader").remove();
+		this.wrapper.find(".fpos-wrapper").hide();
+		this.wrapper.append(`
+			<div class="fpos-hold-loader" style="display:flex;align-items:center;justify-content:center;height:70vh;">
+				<div class="fpos-spinner" style="width:36px;height:36px;border:3px solid #eadfd2;border-top-color:#ea580c;border-radius:50%;animation:fpos-spin .8s linear infinite;"></div>
+			</div>
+		`);
+	}
+
+	_reveal_screen() {
+		this.wrapper.find(".fpos-hold-loader").remove();
+		this.wrapper.find(".fpos-wrapper").show();
+	}
+
+	// Start screen for this open of the POS. A browser refresh (first load in
+	// this document only) returns to the screen the cashier was on; any other
+	// open, including coming back from the Desk, starts on Home.
+	_start_view() {
+		if (window.__fposStarted) return "home";
+		window.__fposStarted = true;
+		let is_reload = false;
+		try {
+			const nav = performance.getEntriesByType("navigation")[0];
+			is_reload = !!nav && nav.type === "reload";
+		} catch (e) {}
+		if (is_reload) {
+			const saved = this._saved_view();
+			if (saved) return saved;
+		}
+		return "home";
+	}
+
 	set_view(name) {
 		this.current_view = name;
 		// v4: each view has exactly one header — on Home/Tables/Attendance/Report
@@ -6369,6 +6576,8 @@ foodpos.FoodPOS.Controller = class {
 		show(".fpos-attendance-view", name === "attendance");
 		show(".fpos-daily-report-view", name === "report");
 		show(".fpos-pending-view", name === "pending");
+		show(".fpos-reservations-view", name === "reservations");
+		show(".fpos-delivery-view", name === "delivery");
 		show(".fpos-body", name === "pos");
 		// v7.1: the closing page is a view too — any other view must unmount
 		// it, or the two screens stack (live bug: after "Back to POS" the
@@ -6394,7 +6603,7 @@ foodpos.FoodPOS.Controller = class {
 	// show_*). Before, only the click handler set it, so it lagged one
 	// step behind — e.g. "Tables" stayed orange while viewing the Menu.
 	_sync_nav(name) {
-		const map = { pos: "menu", tables: "tables", pending: "pending", closing: "accounting", report: "delivery" };
+		const map = { pos: "menu", tables: "tables", pending: "pending", reservations: "reservation", delivery: "delivery", report: "accounting" };
 		const key = map[name] || null;
 		const $items = this.wrapper.find(".fpos-pos-nav-item");
 		$items.removeClass("active");
@@ -6420,7 +6629,7 @@ foodpos.FoodPOS.Controller = class {
 		// Only real screens are restorable; Home is the default anyway.
 		let v = null;
 		try { v = sessionStorage.getItem("fpos_current_view"); } catch (e) {}
-		return ["pos", "tables", "pending", "attendance", "report", "closing"].includes(v) ? v : null;
+		return ["pos", "tables", "pending", "reservations", "delivery", "attendance", "report", "closing"].includes(v) ? v : null;
 	}
 
 	_restore_view(name) {
@@ -6435,6 +6644,8 @@ foodpos.FoodPOS.Controller = class {
 			else if (name === "attendance") this.show_attendance();
 			else if (name === "report") this.show_daily_report();
 			else if (name === "closing") this.show_closing_page();
+			else if (name === "reservations") this.show_reservations();
+			else if (name === "delivery") this.show_delivery();
 			else this.show_home();
 		} finally {
 			this._restoring_view = false;
@@ -6731,14 +6942,14 @@ foodpos.FoodPOS.Controller = class {
 		$home.find(".fpos-home-nav-item").on("click", (e) => {
 			const key = $(e.currentTarget).data("nav");
 			if (key === "orders") this.show_recent_orders_drawer();
-			else if (key === "dispatch") this.show_daily_report();
+			else if (key === "dispatch") this.show_delivery();
 			else if (key === "cashier") this.show_pos();
 			else if (key === "kds") this.show_kitchen_drawer();
-			else if (key === "shifts") frappe.set_route("List", "POS Opening Entry");
+			else if (key === "shifts") this.show_daily_report();
 			else if (key === "staff" || key === "attendance") this.show_attendance();
 			else if (key === "reports") this.show_daily_report();
 			else if (key === "printer") this.show_recent_orders_drawer();
-			else if (key === "settings") frappe.set_route("Form", "POS Profile", this.pos_profile);
+			else if (key === "settings") this.show_settings();
 		});
 		// v5.4: Chef's Pick + Popular today open the POS menu.
 		$home.find(".fpos-hero-pick, .fpos-home-popular-all, .fpos-home-popular-card").on("click", () => this.show_pos());
@@ -6839,7 +7050,7 @@ foodpos.FoodPOS.Controller = class {
 					</div>
 					<div class="fpos-floor-actions">
 						<button class="fpos-btn fpos-floor-home">${fpos_icon("arrowLeft", "fpos-ic-sm")} ${__("Back")}</button>
-						<button class="fpos-btn fpos-floor-edit">${fpos_icon("settings", "fpos-ic-sm")} ${__("Edit Layout")}</button>
+
 					</div>
 				</div>
 				<div class="fpos-floor-counts">
@@ -6882,7 +7093,6 @@ foodpos.FoodPOS.Controller = class {
 			</div>
 		`);
 		$view.find(".fpos-floor-home").on("click", () => this.go_back("home"));
-		$view.find(".fpos-floor-edit").on("click", () => frappe.set_route("List", "Restaurant Table"));
 		$view.find(".fpos-table-card").on("click", (e) => {
 			const name = $(e.currentTarget).data("table");
 			const table = (this.tables || []).find((t) => t.name === name);
@@ -7077,66 +7287,15 @@ foodpos.FoodPOS.Controller = class {
 		this.start_home_timers();
 	}
 
-	// Day Close — reuses the existing PIN-gated close-register flow, which
-	// opens the closing page / Z-report. Closing never deletes data.
+	// Day close opens the closing page (reconciliation and Z-report). No PIN.
+	// Closing never deletes data.
 	start_day_close() {
-		frappe.confirm(
+		fpos_confirm(
 			__("Close the day? Today's sales will be counted and the day will end."),
-			() => {
-				this.prompt_manager_pin({
-					action_type: "Close Register",
-					title: __("Manager PIN — Close Day"),
-					details: __("Only a manager can close the day. Please enter the manager PIN."),
-					on_success: () => { this.show_closing_page(); },
-				});
-			}
+			() => this.show_closing_page()
 		);
 	}
 
-	// v2 thermal: kitchen slip (KOT parchi) — 80mm/58mm monospace, printed
-	// automatically when an order is confirmed, so the kitchen gets paper
-	// as well as the live KDS ticket.
-	// v5.10: open the paper KOT slip in a new tab — NEVER auto-print.
-	// Any print dialog opened automatically on Confirm blocked the whole
-	// POS tab (v5.9 proved even in-tab print() does it), so the slip only
-	// opens from the drawer's Print button, with a manual Print button
-	// inside it. Same pattern as the customer bill (print_pos_slip).
-	open_kot_slip(msg, order_payload) {
-		const kot = (msg && (msg.kot_name || msg.kot)) || this.linked_kot_id || "";
-		const items = (order_payload && order_payload.items) || this.cart_items || [];
-		if (!items.length) return;
-		const lines = items.map((i) => {
-			const qty = i.qty || 1;
-			const name = (i.item_name || i.item_code || "").toUpperCase();
-			const note = i.item_note ? `  (${i.item_note})` : "";
-			return `<div class="row"><span>${qty} x ${name}${note}</span></div>`;
-		}).join("");
-		// v5.11: fragment for the centered print-preview dialog (styles
-		// live in .fpos-print-area). No new tab — the dialog's own Print
-		// button does the printing.
-		const body_html = `
-				<div class="center bold big">*** KITCHEN TICKET ***</div>
-				<div class="center bold">${kot || ""}</div>
-				<div class="divider"></div>
-				<div class="row"><span>Order:</span><span class="bold">${(msg && msg.order_id) || this.pos_order_id || ""}</span></div>
-				<div class="row"><span>Type:</span><span class="bold">${order_payload.order_type || this.order_type}</span></div>
-				${order_payload.table ? `<div class="row"><span>Table:</span><span class="bold">${order_payload.table}</span></div>` : ""}
-				<div class="row"><span>Time:</span><span>${new Date().toLocaleString()}</span></div>
-				<div class="divider"></div>
-				${lines}
-				<div class="divider"></div>
-				${order_payload.order_note ? `<div>Note: ${order_payload.order_note}</div>` : ""}
-				<div class="center" style="margin-top:8px;">— ${__("Please prepare") } —</div>
-		`;
-		this.show_print_preview({
-			title: __("Kitchen Ticket"),
-			subtitle: kot || "",
-			body_html,
-		});
-	}
-
-	// Backwards-compatible alias (old callers, if any, get the manual slip).
-	print_kot_slip(msg, order_payload) { return this.open_kot_slip(msg, order_payload); }
 
 	refresh() {
 		if (this.pos_profile) {

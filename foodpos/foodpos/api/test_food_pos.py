@@ -103,22 +103,16 @@ class TestFoodPosAPI(FrappeTestCase):
 			"items": [{"item_code": item_code, "qty": 2, "rate": 10.0}],
 		}
 
-		# 1. Save draft
+		# Cart state lives in the browser until checkout: saving a draft writes
+		# nothing to the database and reports no draft document.
+		before = frappe.db.count("POS Invoice")
 		saved = save_draft_order(order_data)
 		self.assertTrue(saved.get("success"))
-		draft_name = saved.get("draft_invoice_name")
-		self.assertTrue(draft_name)
-		self.assertEqual(frappe.db.get_value("POS Invoice", draft_name, "docstatus"), 0)
+		self.assertIsNone(saved.get("draft_invoice_name"))
+		self.assertEqual(frappe.db.count("POS Invoice"), before)
 
-		# 2. Get active draft tabs
 		tabs = get_active_draft_tabs(pos_profile)
-		tab_names = [t["draft_invoice_name"] for t in tabs]
-		self.assertIn(draft_name, tab_names)
-
-		# 3. Discard draft
-		discarded = discard_draft_order(draft_name, table=order_data.get("table"))
-		self.assertTrue(discarded.get("success"))
-		self.assertFalse(frappe.db.exists("POS Invoice", draft_name))
+		self.assertIsInstance(tabs, list)
 
 	# ── Opening entry & Shift Closing ──────────────────────────────────────────
 

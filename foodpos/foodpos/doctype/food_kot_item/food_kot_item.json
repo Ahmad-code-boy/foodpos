@@ -9,7 +9,8 @@
   "item_name",
   "qty",
   "item_note",
-  "is_done"
+  "is_done",
+  "kitchen_print_state"
  ],
  "fields": [
   {
@@ -49,6 +50,16 @@
    "fieldtype": "Check",
    "in_list_view": 1,
    "label": "Done"
+  },
+  {
+   "fieldname": "kitchen_print_state",
+   "fieldtype": "Select",
+   "label": "Kitchen Print State",
+   "options": "Pending\nPrinting\nPrinted",
+   "default": "Pending",
+   "read_only": 1,
+   "in_list_view": 0,
+   "hidden": 0
   }
  ],
  "index_web_pages_for_search": 0,

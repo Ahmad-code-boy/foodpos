@@ -23,7 +23,8 @@
   "is_voided",
   "voided_by",
   "void_timestamp",
-  "void_reason"
+  "void_reason",
+  "kitchen_print_error"
  ],
  "fields": [
   {
@@ -164,6 +165,12 @@
    "fieldtype": "Small Text",
    "label": "Void Reason",
    "allow_on_submit": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "kitchen_print_error",
+   "fieldtype": "Small Text",
+   "label": "Kitchen Print Error",
    "read_only": 1
   }
  ],

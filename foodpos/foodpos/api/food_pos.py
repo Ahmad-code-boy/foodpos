@@ -15,6 +15,7 @@ from frappe import _
 from foodpos.foodpos.services.access import require_pos_access, require_pos_manager
 from foodpos.foodpos.services.opening import open_shift
 from foodpos.foodpos.services.kot import update_kot
+from foodpos.foodpos.services.kitchen_print import claim_pending_items, schedule_print
 from foodpos.foodpos.services.tables import set_table_status
 from foodpos.foodpos.single_branch import SINGLE_BRANCH, SINGLE_NAMING_SERIES
 from frappe.utils import cint, flt, getdate, now_datetime, nowdate
@@ -494,26 +495,17 @@ def create_pos_invoice(order, payments):
             }
             doc.append("items", row)
 
-        # ── Discount with Cashier Cap & Manager PIN Guard ────────────────────
-        # v5.2: discount is a flat Rs amount only (no % anymore). Cashier cap
-        # is Rs 100 — anything above needs a fresh Manager PIN on every settle.
+        # ── Discount: fixed amount, no PIN; checked against the line totals.
         disc_amt = flt(order.get("discount_amount", 0))
-        if disc_amt > 100.0:
-            # Round 23 fix: fresh PIN on every over-cap settle; the old
-            # discount_approved_by replay is removed (see page helper).
-            mgr_pin = order.get("manager_pin") or order.get("discount_manager_pin")
-            if not mgr_pin:
-                frappe.throw(_("Discounts exceeding Rs 100 require a fresh Manager PIN on every settle. A previous approval cannot be reused."))
-            from foodpos.foodpos.page.food_pos.food_pos import verify_manager_pin
-            verify_manager_pin(
-                pin=mgr_pin,
-                action_type="discount",
-                cashier=frappe.session.user,
-                order_id=order.get("order_id") or "",
-                details=f"Discount override: Rs {disc_amt}"
-            )
+        disc_pct = flt(order.get("discount_percentage", 0))
+        from foodpos.foodpos.page.food_pos.food_pos import _validate_discount, _audit_discount
+        _validate_discount(disc_pct, disc_amt, sum(flt(r.qty) * flt(r.rate) for r in doc.items))
+        if disc_pct or disc_amt:
+            _audit_discount(doc, disc_pct, disc_amt)
 
-        if disc_amt:
+        if disc_pct:
+            doc.additional_discount_percentage = disc_pct
+        elif disc_amt:
             doc.discount_amount = disc_amt
 
         # ── Set missing values & calculate totals ────────────────────────────
@@ -737,6 +729,7 @@ def create_kot(order):
 						_added = True
 				if _added:
 					reused.save()
+				schedule_print(claim_pending_items([reused.name]))
 				return {"kot_name": reused.name, "order_id": pos_order_id, "reused": True}
 
 		kot = frappe.new_doc("Food KOT")
@@ -767,13 +760,14 @@ def create_kot(order):
 
 		kot.flags.ignore_mandatory   = False
 		kot.save()
+		schedule_print(claim_pending_items([kot.name]))
 
 		return {"kot_name": kot.name, "order_id": pos_order_id}
 
-	except Exception as e:
-		frappe.db.rollback()
+	except Exception:
+		# Errors are raised, never returned as a success-shaped dict.
 		frappe.log_error(frappe.get_traceback(), "Food POS: create_kot error")
-		return {"error": str(e)}
+		raise
 
 
 @frappe.whitelist()

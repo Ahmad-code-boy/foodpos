@@ -21,6 +21,7 @@ from frappe.utils.password import get_decrypted_password
 # PIN-scopes by branch any more.
 from foodpos.foodpos.services.access import require_pos_access, require_pos_manager
 from foodpos.foodpos.services.opening import open_shift
+from foodpos.foodpos.services.kitchen_print import claim_pending_items, retry_print, schedule_print
 from foodpos.foodpos.services.tables import broadcast, set_table_fields, set_table_status
 from foodpos.foodpos.single_branch import SINGLE_BRANCH, SINGLE_NAMING_SERIES, normalise_order_type
 
@@ -652,6 +653,15 @@ def get_customers(search_term=""):
 	)
 
 
+def _existing_leaf(doctype, preferred, fallback):
+	"""The configured default if it still exists, else a fallback that does (never fails the sale)."""
+	for name in (preferred, fallback):
+		if name and frappe.db.exists(doctype, name):
+			return name
+	leaf = frappe.db.get_value(doctype, {"is_group": 0}, "name")
+	return leaf or frappe.db.get_value(doctype, {}, "name")
+
+
 @frappe.whitelist()
 def create_customer(customer_name, mobile_no=None, email_id=None):
 	"""Quick creation of a new customer from the POS cart."""
@@ -665,8 +675,8 @@ def create_customer(customer_name, mobile_no=None, email_id=None):
 	cust = frappe.new_doc("Customer")
 	cust.customer_name = customer_name
 	cust.customer_type = "Individual"
-	cust.customer_group = frappe.db.get_single_value("Selling Settings", "customer_group") or "Individual"
-	cust.territory = frappe.db.get_single_value("Selling Settings", "territory") or "All Territories"
+	cust.customer_group = _existing_leaf("Customer Group", frappe.db.get_single_value("Selling Settings", "customer_group"), "Individual")
+	cust.territory = _existing_leaf("Territory", frappe.db.get_single_value("Selling Settings", "territory"), "All Territories")
 	if mobile_no:
 		cust.mobile_no = mobile_no
 	if email_id:
@@ -878,26 +888,28 @@ def _reprice_and_validate_items(items_list, price_list):
 			row["rate"] = live
 
 
-def _require_fresh_discount_pin(order_data, branch_val, disc_pct, disc_amt):
-	"""Round 23 fix: over-cap discounts need a FRESH PIN on every settle.
+def _validate_discount(disc_pct, disc_amt, base_total):
+	"""A discount is a percentage between 0 and 100, or an amount between 0 and the order total."""
+	if disc_pct < 0 or disc_pct > 100:
+		frappe.throw(_("Discount percentage must be between 0 and 100."))
+	if disc_amt < 0:
+		frappe.throw(_("Discount amount cannot be negative."))
+	if disc_amt > flt(base_total) + 0.001:
+		frappe.throw(_("Discount amount cannot be more than the order total ({0}).").format(flt(base_total, 2)))
 
-	The old code accepted `discount_approved_by` if ANY old Discount Override
-	audit row existed for that manager+cashier — a cashier approved once
-	could replay the username forever. That replay path is now removed:
-	without a PIN in this request, the settle is refused. The POS already
-	sends the PIN it just collected (discount_manager_pin), so the normal
-	manager-approved flow is unchanged.
-	"""
-	mgr_pin = order_data.get("manager_pin") or order_data.get("discount_manager_pin")
-	if not mgr_pin:
-		frappe.throw(_("Discounts exceeding 10% or Rs 100 require a fresh Manager PIN on every settle. A previous approval cannot be reused."))
-	verify_manager_pin(
-		pin=mgr_pin,
-		action_type="discount",
-		cashier=frappe.session.user,
-		order_id=order_data.get("order_id") or "",
-		details=f"Discount override: {disc_pct}% or Rs {disc_amt}",
-	)
+
+def _audit_discount(doc, disc_pct, disc_amt):
+	audit = frappe.new_doc("Food POS Audit Log")
+	audit.timestamp = now_datetime()
+	audit.action_type = "Discount Override"
+	audit.branch = SINGLE_BRANCH
+	audit.cashier = frappe.session.user
+	audit.pos_profile = doc.get("pos_profile") or ""
+	audit.details = (
+		f"Discount {disc_pct}%" if disc_pct else f"Discount Rs {disc_amt}"
+	) + f" on {doc.doctype} order {doc.get('pos_order_id') or ''}"
+	audit.flags.ignore_permissions = True  # system audit trail
+	audit.insert()
 
 
 def _link_kots_to_invoice(inv, order_data, branch_val, pos_profile_name, order_type):
@@ -994,6 +1006,10 @@ def _link_kots_to_invoice(inv, order_data, branch_val, pos_profile_name, order_t
 		# Link and submit through the KOT controller. Submitting runs on_submit,
 		# which only accepts a Served KOT, so the ledger lock is enforced.
 		kot = frappe.get_doc("Food KOT", k_name)
+		# The bill is paid, so the food has been served: tick every item
+		# before moving to Served (the controller refuses Served otherwise).
+		for row in kot.items:
+			row.is_done = 1
 		kot.status = "Served"
 		kot.sales_invoice = inv.name
 		kot.is_settled = 1
@@ -1178,6 +1194,10 @@ def create_kot(order_data):
 		kot.save()
 		created_kots.append(kot)
 
+	# Kitchen ticket: claim every item row not yet on paper (new KOTs and
+	# items appended to a reused KOT). Printing happens after commit, once.
+	schedule_print(claim_pending_items([k.name for k in created_kots]))
+
 	# If Dine In, update the table state to Occupied
 	if order_type == "Dine In" and table_no and frappe.db.exists("Restaurant Table", table_no):
 		primary_kot = created_kots[0].name if created_kots else ""
@@ -1260,6 +1280,21 @@ def get_pos_invoice_doctype():
 	return "Sales Invoice"
 
 
+def _delivery_income_account(company):
+	"""Income account for delivery fees; created once under the company's income tree."""
+	abbr = frappe.get_cached_value("Company", company, "abbr")
+	name = f"Delivery Charges - {abbr}"
+	if frappe.db.exists("Account", name):
+		return name
+	parent = (frappe.db.get_value("Account", {"company": company, "account_name": "Indirect Income", "is_group": 1}, "name")
+		or frappe.db.get_value("Account", {"company": company, "root_type": "Income", "is_group": 1}, "name"))
+	acc = frappe.get_doc({"doctype": "Account", "account_name": "Delivery Charges", "parent_account": parent,
+		"company": company, "account_type": "Income Account", "is_group": 0})
+	acc.flags.ignore_permissions = True  # chart-of-accounts setup done by the system
+	acc.insert()
+	return acc.name
+
+
 @frappe.whitelist()
 def submit_pos_invoice(order_data, payments):
 	"""
@@ -1281,6 +1316,11 @@ def submit_pos_invoice(order_data, payments):
 
 	company = profile_data["company"]
 	raw_cust = order_data.get("customer") or order_data.get("customer_name")
+	# A delivery goes to a named customer: create them on first order instead of
+	# billing the walk-in customer and losing who the order was for.
+	if (order_data.get("order_type") == "Delivery" and raw_cust and raw_cust != "Walk-in Customer"
+			and not frappe.db.exists("Customer", raw_cust)):
+		raw_cust = create_customer(raw_cust, order_data.get("phone") or order_data.get("contact_phone"))["name"]
 	if raw_cust and frappe.db.exists("Customer", raw_cust):
 		customer = raw_cust
 	elif profile_data.get("customer") and frappe.db.exists("Customer", profile_data["customer"]):
@@ -1407,22 +1447,31 @@ def submit_pos_invoice(order_data, payments):
 				"warehouse": profile_data.get("warehouse"),
 			})
 
-		# Discount with Cashier Cap & Manager PIN Guard
+		# Discount: percentage or fixed amount, applied directly from the cart.
+		# No PIN. The discount is range-checked against the real line totals and
+		# written to the audit log.
 		disc_pct = flt(order_data.get("discount_percentage", 0))
 		disc_amt = flt(order_data.get("discount_amount", 0))
-		if disc_pct > 10.0 or disc_amt > 100.0:
-			# Round 23 fix: fresh PIN on EVERY over-cap settle. The old
-			# discount_approved_by replay (any old audit row) is removed.
-			_require_fresh_discount_pin(
-				order_data,
-				SINGLE_BRANCH,  # v2: PIN is no longer branch-scoped.
-				disc_pct, disc_amt,
-			)
+		_validate_discount(disc_pct, disc_amt, sum(flt(r.qty) * flt(r.rate) for r in doc.items))
+		if disc_pct or disc_amt:
+			_audit_discount(doc, disc_pct, disc_amt)
 
 		if disc_pct:
 			doc.additional_discount_percentage = disc_pct
 		elif disc_amt:
 			doc.discount_amount = disc_amt
+
+		# Delivery fee: a real charge on the invoice (its own income account), so
+		# the invoice total matches what the cart showed and what was collected.
+		delivery_fee = flt(order_data.get("delivery_charges", 0))
+		if delivery_fee > 0 and normalise_order_type(order_data.get("order_type") or "") == "Delivery":
+			doc.append("taxes", {
+				"charge_type": "Actual",
+				"account_head": _delivery_income_account(company),
+				"description": _("Delivery Charges"),
+				"tax_amount": delivery_fee,
+				"cost_center": profile_data.get("cost_center") or frappe.get_cached_value("Company", company, "cost_center"),
+			})
 
 		# First set missing values & calculate totals before populating payments
 		doc.set_missing_values(for_validate=True)
@@ -1618,6 +1667,7 @@ def submit_pos_invoice(order_data, payments):
 		"branch": SINGLE_BRANCH,
 		"items": slip_items,
 		"payments": slip_payments,
+		"total": flt(getattr(inv, "total", 0)) or flt(getattr(inv, "net_total", inv.grand_total)),
 		"net_total": flt(getattr(inv, "net_total", inv.grand_total)),
 		"total_taxes_and_charges": flt(getattr(inv, "total_taxes_and_charges", 0.0)),
 		"discount_amount": flt(getattr(inv, "discount_amount", 0.0)),
@@ -1925,7 +1975,7 @@ def get_shift_closing_details(pos_profile=None, pos_opening_entry=None):
 		query = f"""
 			SELECT
 				name, 'Sales Invoice' as doctype, posting_date, posting_time, customer, customer_name,
-				grand_total, net_total, total_qty, total_taxes_and_charges, discount_amount,
+				grand_total, total, net_total, total_qty, total_taxes_and_charges, discount_amount,
 				paid_amount, outstanding_amount, change_amount, account_for_change_amount, {order_type_col}, {table_col}, {rest_table_col}
 			FROM `tabSales Invoice`
 			WHERE {' AND '.join(si_conds)}
@@ -1962,7 +2012,7 @@ def get_shift_closing_details(pos_profile=None, pos_opening_entry=None):
 		query = f"""
 			SELECT
 				name, 'POS Invoice' as doctype, posting_date, posting_time, customer, customer_name,
-				grand_total, net_total, total_qty, total_taxes_and_charges, discount_amount,
+				grand_total, total, net_total, total_qty, total_taxes_and_charges, discount_amount,
 				paid_amount, outstanding_amount, {order_type_col}, {table_col}, {rest_table_col}
 			FROM `tabPOS Invoice`
 			WHERE {' AND '.join(psi_conds)}
@@ -2037,7 +2087,7 @@ def get_shift_closing_details(pos_profile=None, pos_opening_entry=None):
 	# Summary metrics
 	total_orders = len(invoice_records)
 	net_sales = sum(flt(r.get("grand_total", 0)) for r in invoice_records)
-	gross_sales = sum(flt(r.get("net_total", 0)) for r in invoice_records)
+	gross_sales = sum(flt(r.get("total") or r.get("net_total", 0)) for r in invoice_records)  # before discounts
 	total_taxes = sum(flt(r.get("total_taxes_and_charges", 0)) for r in invoice_records)
 	total_discounts = sum(flt(r.get("discount_amount", 0)) for r in invoice_records)
 	total_paid = sum(flt(r.get("paid_amount", 0)) for r in invoice_records)
@@ -2210,7 +2260,7 @@ def create_and_submit_pos_closing_entry(pos_profile, pos_opening_entry, payments
 
 		invoices = frappe.db.sql(
 			f"""
-			SELECT name, posting_date, grand_total, net_total, total_qty, total_taxes_and_charges,
+			SELECT name, posting_date, grand_total, total, net_total, total_qty, total_taxes_and_charges,
 			       change_amount, account_for_change_amount, customer, is_return, return_against
 			FROM `tabSales Invoice`
 			WHERE {' AND '.join(inv_conds)}
@@ -2236,7 +2286,7 @@ def create_and_submit_pos_closing_entry(pos_profile, pos_opening_entry, payments
 
 		invoices = frappe.db.sql(
 			f"""
-			SELECT name, posting_date, grand_total, net_total, total_qty, total_taxes_and_charges,
+			SELECT name, posting_date, grand_total, total, net_total, total_qty, total_taxes_and_charges,
 			       change_amount, account_for_change_amount, customer, is_return, return_against
 			FROM `tabPOS Invoice`
 			WHERE {' AND '.join(inv_conds)}
@@ -2463,9 +2513,17 @@ def sync_offline_invoices(invoices):
 	results = []
 	for item in invoices:
 		offline_id = item.get("offline_id")
+		# A queued bill whose order has since been settled must not create a
+		# second invoice when the queue syncs.
+		_order_id = (item.get("order_data") or {}).get("order_id") if isinstance(item.get("order_data"), dict) else None
+		if _order_id and frappe.db.exists("Food KOT", {"order_id": _order_id, "sales_invoice": ["is", "set"]}):
+			results.append({"offline_id": offline_id, "success": True, "skipped": True, "status": "already_settled"})
+			continue
 		order_data = item.get("order_data")
 		payments = item.get("payments")
 
+		savepoint = "offline_sync_item"
+		frappe.db.savepoint(savepoint)
 		try:
 			res = submit_pos_invoice(order_data, payments)
 			results.append({
@@ -2474,6 +2532,7 @@ def sync_offline_invoices(invoices):
 				"invoice": res.get("invoice"),
 			})
 		except Exception as e:
+			frappe.db.rollback(save_point=savepoint)
 			frappe.log_error(frappe.get_traceback(), f"POS Offline Sync Failed for {offline_id}")
 			if hasattr(frappe, "clear_messages"):
 				frappe.clear_messages()
@@ -2680,6 +2739,7 @@ def get_invoice_slip_data(invoice_name, doctype=None):
 		"customer": doc.customer,
 		"customer_name": getattr(doc, "customer_name", doc.customer),
 		"currency": currency,
+		"total": flt(getattr(doc, "total", 0)) or flt(getattr(doc, "net_total", doc.grand_total)),
 		"net_total": flt(getattr(doc, "net_total", doc.grand_total)),
 		"total_taxes_and_charges": flt(getattr(doc, "total_taxes_and_charges", 0.0)),
 		"discount_amount": flt(getattr(doc, "discount_amount", 0.0)),
@@ -2742,7 +2802,7 @@ def get_active_kitchen_kots(pos_profile=None, branch=None, station=None):
 	kots = frappe.get_all(
 		"Food KOT",
 		filters=filters,
-		fields=["name", "status", "order_type", "table", "customer", "order_note", "creation", "modified", "pos_profile", "branch", "kitchen_station", "order_id"],
+		fields=["name", "status", "order_type", "table", "customer", "order_note", "creation", "modified", "pos_profile", "branch", "kitchen_station", "order_id", "kitchen_print_error"],
 		order_by="creation asc"
 	)
 
@@ -2819,8 +2879,27 @@ def get_kot_for_payment(kot_name):
 	except Exception:
 		pass
 
+	# One order can be split across kitchen stations (one KOT each). Bill the
+	# whole order: every open, unvoided KOT with the same order id.
+	order_kots = [kot]
+	if kot.order_id:
+		for name in frappe.get_all("Food KOT", filters={
+				"order_id": kot.order_id, "name": ["!=", kot.name], "docstatus": 0,
+				"is_voided": 0, "status": ["!=", "Cancelled"], "sales_invoice": ["in", ["", None]]},
+				pluck="name", order_by="creation asc"):
+			order_kots.append(frappe.get_doc("Food KOT", name))
+
+	merged = {}
+	for k in order_kots:
+		for it in k.items or []:
+			key = (it.item_code, it.item_note or "")
+			if key in merged:
+				merged[key].qty = flt(merged[key].qty) + flt(it.qty)
+			else:
+				merged[key] = frappe._dict(item_code=it.item_code, item_name=it.item_name, qty=flt(it.qty), item_note=it.item_note)
+
 	items = []
-	for it in kot.items or []:
+	for it in merged.values():
 		rate = frappe.db.get_value(
 			"Item Price",
 			{"item_code": it.item_code, "price_list": price_list, "selling": 1},
@@ -2844,6 +2923,7 @@ def get_kot_for_payment(kot_name):
 
 	return {
 		"kot_name": kot.name,
+		"kot_names": [k.name for k in order_kots],
 		"order_id": kot.order_id or "",
 		"order_type": kot.order_type or "Dine In",
 		"table": kot.table or "",
@@ -3983,3 +4063,133 @@ def get_daily_report(report_date=None, pos_profile=None):
 		"tables_served": pos_totals["orders"] + sales_totals["orders"],
 		"attendance": attendance,
 	}
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Kitchen printer (automatic kitchen tickets; see services/kitchen_print.py)
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+@frappe.whitelist()
+def retry_kitchen_print(kot_name):
+	"""Print the item rows of this KOT that have not reached the kitchen printer yet."""
+	require_pos_access()
+	if not kot_name or not frappe.db.exists("Food KOT", kot_name):
+		frappe.throw(_("Kitchen ticket {0} not found.").format(kot_name or ""))
+	return retry_print(kot_name)
+
+
+@frappe.whitelist()
+def get_kitchen_printer(pos_profile):
+	"""The kitchen printer for this POS profile and the printers that can be chosen."""
+	require_pos_access()
+	printers = frappe.get_all(
+		"Network Printer Settings",
+		fields=["name", "printer_name", "server_ip", "port"],
+		order_by="name asc",
+	)
+	current = frappe.db.get_value("POS Profile", pos_profile, "custom_fpos_kitchen_printer") if pos_profile else None
+	return {"current": current or "", "printers": printers}
+
+
+@frappe.whitelist()
+def set_kitchen_printer(pos_profile, printer=None):
+	"""Choose the kitchen printer for this POS profile (manager only)."""
+	require_pos_access()
+	require_pos_manager()
+	if not frappe.db.exists("POS Profile", pos_profile):
+		frappe.throw(_("POS Profile {0} not found.").format(pos_profile))
+	if printer and not frappe.db.exists("Network Printer Settings", printer):
+		frappe.throw(_("Printer {0} not found.").format(printer))
+	frappe.get_doc("POS Profile", pos_profile).db_set("custom_fpos_kitchen_printer", printer or None)
+	return {"success": True, "printer": printer or ""}
+
+
+@frappe.whitelist()
+def get_kitchen_print_status(kot_names):
+	"""KOTs among these whose kitchen ticket has not reached the printer (with the reason)."""
+	require_pos_access()
+	if isinstance(kot_names, str):
+		kot_names = frappe.parse_json(kot_names) if kot_names.startswith("[") else [n.strip() for n in kot_names.split(",") if n.strip()]
+	if not kot_names:
+		return {"failed": []}
+	rows = frappe.get_all(
+		"Food KOT",
+		filters={"name": ["in", kot_names], "kitchen_print_error": ["is", "set"]},
+		fields=["name", "kitchen_print_error"],
+	)
+	return {"failed": [{"kot": r.name, "error": r.kitchen_print_error} for r in rows]}
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Sidebar screens: Reservations and Delivery
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+@frappe.whitelist()
+def get_reservations():
+	"""Reserved tables with their booking details, and the free tables that can be booked."""
+	require_pos_access()
+	reserved = frappe.get_all(
+		"Restaurant Table",
+		filters={"status": "Reserved", "disabled": 0},
+		fields=["name", "table_no", "section", "capacity", "reservation_name", "mobile",
+			"reservation_time", "guests", "notes"],
+		order_by="reservation_time asc, table_no asc",
+	)
+	available = frappe.get_all(
+		"Restaurant Table",
+		filters={"status": "Available", "disabled": 0},
+		fields=["name", "table_no", "section", "capacity"],
+		order_by="table_no asc",
+	)
+	return {"reserved": reserved, "available": available}
+
+
+@frappe.whitelist()
+def get_delivery_orders(pos_profile=None):
+	"""Delivery orders still open in the kitchen (one entry per order) and today's paid delivery bills."""
+	require_pos_access()
+	price_list = (frappe.db.get_value("POS Profile", pos_profile, "selling_price_list") if pos_profile else None) or "Standard Selling"
+
+	kots = frappe.get_all(
+		"Food KOT",
+		filters={"order_type": "Delivery", "docstatus": 0, "status": ["not in", ["Cancelled"]],
+			"sales_invoice": ["in", ["", None]]},
+		fields=["name", "order_id", "status", "customer", "creation", "table"],
+		order_by="creation asc",
+	)
+	orders = {}
+	for k in kots:
+		key = k.order_id or k.name
+		o = orders.setdefault(key, {"order_id": key, "kots": [], "customer": k.customer, "created": k.creation,
+			"statuses": [], "items": [], "estimated_total": 0.0})
+		o["kots"].append(k.name)
+		o["statuses"].append(k.status)
+		for row in frappe.get_all("Food KOT Item", filters={"parent": k.name}, fields=["item_code", "item_name", "qty"]):
+			rate = flt(frappe.db.get_value("Item Price", {"item_code": row.item_code, "price_list": price_list}, "price_list_rate"))
+			o["items"].append({"item_name": row.item_name, "qty": row.qty})
+			o["estimated_total"] += rate * flt(row.qty)
+	active = []
+	for o in orders.values():
+		# The order is only as far along as its slowest kitchen ticket.
+		order = ["Pending", "In Progress", "Ready", "Served", "Held"]
+		o["status"] = min(o.pop("statuses"), key=lambda s: order.index(s) if s in order else 0)
+		active.append(o)
+
+	completed = []
+	if frappe.get_meta("Sales Invoice").has_field("custom_order_type"):
+		fields = ["name", "customer_name", "grand_total", "posting_time", "outstanding_amount"]
+		meta = frappe.get_meta("Sales Invoice")
+		for f in ("custom_contact_phone", "custom_delivery_address"):
+			if meta.has_field(f):
+				fields.append(f)
+		completed = frappe.get_all(
+			"Sales Invoice",
+			filters={"docstatus": 1, "is_pos": 1, "posting_date": nowdate(), "custom_order_type": "Delivery"},
+			fields=fields,
+			order_by="creation desc",
+		)
+		for c in completed:
+			c["posting_time"] = _format_time_hh_mm(c.posting_time)
+	return {"active": active, "completed": completed}

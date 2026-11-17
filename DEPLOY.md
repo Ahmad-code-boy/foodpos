@@ -35,6 +35,14 @@ Not yet committed to `main`. Changes are in the working tree of branch
 - **Restaurant Table is no longer a fixture.** Table layout and live status
   are site data. `seed_demo_tables` and the seed patch create tables.
 - **Realtime events fire after commit** (`after_commit=True`).
+- **Opening the POS (UI, `page/food_pos/food_pos.js`).** A fresh open starts on
+  Home. A browser refresh returns to the screen the cashier was on. The screens
+  stay hidden until the start screen is applied, so the wrong screen no longer
+  flashes on refresh.
+- **Closing the POS.** Finalizing the shift submits the POS Closing Entry, then
+  returns to Desk. A leftover handler that sent the finalize button straight to
+  Desk (without closing) is removed, and the button is now
+  `fpos-finalize-shift-btn`.
 - **Lint and tests.** Unused imports and variables removed. The foodpos test
   suite passes (66/66) on `foodpos-test.local`. New tests are in
   `services/test_pos_services.py`.
@@ -50,6 +58,8 @@ Not yet committed to `main`. Changes are in the working tree of branch
 
 ## Deploy steps
 
+0. If the site serves built assets (not developer mode), run
+   `bench build --app foodpos` so the POS page JS is refreshed.
 1. Backup: `bench --site pos.local backup --with-files`
    (taken on 2026-11-17 for this work: `20261117_172004`).
 2. Check out branch `fix/audit-round-2` in `apps/foodpos`, then commit.
